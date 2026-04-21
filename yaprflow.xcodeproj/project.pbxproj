@@ -11,13 +11,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		AFA2BC972F97E6F00048D99B /* yaprflow.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "yaprflow.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		AFA2BC972F97E6F00048D99B /* yaprflow.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = yaprflow.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		AFA2BC992F97E6F00048D99B /* yaprflow */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "yaprflow";
+			path = yaprflow;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -60,6 +60,7 @@
 				AFA2BC932F97E6F00048D99B /* Sources */,
 				AFA2BC942F97E6F00048D99B /* Frameworks */,
 				AFA2BC952F97E6F00048D99B /* Resources */,
+				AFA2BCC02F97E6F00048D99B /* Copy Models */,
 			);
 			buildRules = (
 			);
@@ -68,11 +69,11 @@
 			fileSystemSynchronizedGroups = (
 				AFA2BC992F97E6F00048D99B /* yaprflow */,
 			);
-			name = "yaprflow";
+			name = yaprflow;
 			packageProductDependencies = (
 				AFA2BCB12F97E6F00048D99B /* FluidAudio */,
 			);
-			productName = "yaprflow";
+			productName = yaprflow;
 			productReference = AFA2BC972F97E6F00048D99B /* yaprflow.app */;
 			productType = "com.apple.product-type.application";
 		};
@@ -123,6 +124,29 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		AFA2BCC02F97E6F00048D99B /* Copy Models */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/Models",
+			);
+			name = "Copy Models";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Models",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\nSRC=\"$SRCROOT/Models\"\nDEST=\"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/Models\"\nif [ -d \"$SRC\" ]; then\n  mkdir -p \"$DEST\"\n  rsync -a --delete --exclude '.cache' --exclude '.DS_Store' \"$SRC/\" \"$DEST/\"\nelse\n  echo \"warning: Models/ missing — run scripts/fetch-models.sh\"\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		AFA2BC932F97E6F00048D99B /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -172,7 +196,7 @@
 				DEVELOPMENT_TEAM = GVXC5FQ2RP;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -236,7 +260,7 @@
 				DEVELOPMENT_TEAM = GVXC5FQ2RP;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -259,7 +283,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = "yaprflow/yaprflow.entitlements";
+				CODE_SIGN_ENTITLEMENTS = yaprflow/yaprflow.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -277,7 +301,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.tmoreton.yaprflow";
+				PRODUCT_BUNDLE_IDENTIFIER = com.tmoreton.yaprflow;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -294,7 +318,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = "yaprflow/yaprflow.entitlements";
+				CODE_SIGN_ENTITLEMENTS = yaprflow/yaprflow.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -312,7 +336,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.tmoreton.yaprflow";
+				PRODUCT_BUNDLE_IDENTIFIER = com.tmoreton.yaprflow;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;

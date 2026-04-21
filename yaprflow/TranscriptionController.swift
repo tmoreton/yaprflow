@@ -136,16 +136,38 @@ final class TranscriptionController {
             }
         }
 
-        try await m.loadModelsFromHuggingFace(
-            progressHandler: { progress in
-                let pct = Int((progress.fractionCompleted * 100).rounded())
-                Task { @MainActor in
-                    AppState.shared.status = .preparing("Downloading model… \(pct)%")
+        if let bundled = Self.bundledModelURL() {
+            log.info("Loading bundled model from \(bundled.path, privacy: .public)")
+            try await m.loadModels(modelDir: bundled)
+        } else {
+            log.info("Bundled model missing, downloading from HuggingFace")
+            state.status = .preparing("Downloading model…")
+            try await m.loadModelsFromHuggingFace(
+                progressHandler: { progress in
+                    let pct = Int((progress.fractionCompleted * 100).rounded())
+                    Task { @MainActor in
+                        AppState.shared.status = .preparing("Downloading model… \(pct)%")
+                    }
                 }
-            }
-        )
+            )
+        }
 
         self.manager = m
+    }
+
+    private static func bundledModelURL() -> URL? {
+        guard let resources = Bundle.main.resourceURL else { return nil }
+        let candidate = resources
+            .appendingPathComponent("Models", isDirectory: true)
+            .appendingPathComponent("parakeet-realtime-eou-120m-coreml", isDirectory: true)
+            .appendingPathComponent("160ms", isDirectory: true)
+        let requiredFiles = ["streaming_encoder.mlmodelc", "decoder.mlmodelc", "joint_decision.mlmodelc", "vocab.json"]
+        for file in requiredFiles {
+            if !FileManager.default.fileExists(atPath: candidate.appendingPathComponent(file).path) {
+                return nil
+            }
+        }
+        return candidate
     }
 
     private func scheduleAutoHide(after seconds: Double) {

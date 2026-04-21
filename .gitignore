@@ -1,0 +1,13 @@
+# Build output
+build/
+DerivedData/
+
+# Xcode user state
+*.xcuserstate
+xcuserdata/
+
+# macOS
+.DS_Store
+
+# Model weights — hosted in GitHub Releases, fetched via scripts/fetch-models.sh
+Models/
