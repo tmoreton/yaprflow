@@ -155,26 +155,32 @@ final class TranscriptionController {
         self.manager = m
     }
 
+    private static let modelSubpath = "Models/parakeet-realtime-eou-120m-coreml/160ms"
+    private static let requiredModelFiles = [
+        "streaming_encoder.mlmodelc",
+        "decoder.mlmodelc",
+        "joint_decision.mlmodelc",
+        "vocab.json",
+    ]
+
     private static func bundledModelURL() -> URL? {
         guard let resources = Bundle.main.resourceURL else { return nil }
-        let candidate = resources
-            .appendingPathComponent("Models", isDirectory: true)
-            .appendingPathComponent("parakeet-realtime-eou-120m-coreml", isDirectory: true)
-            .appendingPathComponent("160ms", isDirectory: true)
-        let requiredFiles = ["streaming_encoder.mlmodelc", "decoder.mlmodelc", "joint_decision.mlmodelc", "vocab.json"]
-        for file in requiredFiles {
-            if !FileManager.default.fileExists(atPath: candidate.appendingPathComponent(file).path) {
-                return nil
-            }
+        let dir = resources.appendingPathComponent(modelSubpath, isDirectory: true)
+        let fm = FileManager.default
+        for file in requiredModelFiles where !fm.fileExists(atPath: dir.appendingPathComponent(file).path) {
+            return nil
         }
-        return candidate
+        return dir
     }
 
     private func scheduleAutoHide(after seconds: Double) {
         autoHideTask?.cancel()
         autoHideTask = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(seconds))
-            if Task.isCancelled { return }
+            do {
+                try await Task.sleep(for: .seconds(seconds))
+            } catch {
+                return
+            }
             state.status = .idle
             state.liveTranscript = ""
             NotchOverlayWindowController.shared.hide()

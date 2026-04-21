@@ -36,7 +36,6 @@ final class HotkeyMenuItemView: NSView {
         iconView.translatesAutoresizingMaskIntoConstraints = false
         iconView.image = NSImage(systemSymbolName: "keyboard", accessibilityDescription: nil)
         iconView.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 12, weight: .regular)
-        iconView.contentTintColor = .labelColor
         addSubview(iconView)
 
         titleField.translatesAutoresizingMaskIntoConstraints = false

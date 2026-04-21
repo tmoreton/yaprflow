@@ -40,13 +40,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         shortcutItem.view = HotkeyMenuItemView()
         menu.addItem(shortcutItem)
 
-        let quit = NSMenuItem(
+        menu.addItem(NSMenuItem(
             title: "Quit",
             action: #selector(NSApplication.terminate(_:)),
             keyEquivalent: "q"
-        )
-        quit.image = nil
-        menu.addItem(quit)
+        ))
 
         item.menu = menu
         self.statusItem = item
@@ -61,5 +59,4 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let config = AppState.shared.hotkey
         GlobalHotkey.shared.register(keyCode: config.keyCode, modifiers: config.modifiers)
     }
-
 }

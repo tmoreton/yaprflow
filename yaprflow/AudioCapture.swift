@@ -50,10 +50,6 @@ nonisolated final class AudioCapture: @unchecked Sendable {
             for ch in 0..<channels {
                 dst[ch].update(from: src[ch], count: frames)
             }
-        } else if let src = buffer.int32ChannelData, let dst = copy.int32ChannelData {
-            for ch in 0..<channels {
-                dst[ch].update(from: src[ch], count: frames)
-            }
         }
         return copy
     }

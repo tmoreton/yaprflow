@@ -1,6 +1,7 @@
 # Build output
 build/
 DerivedData/
+*.dmg
 
 # Xcode user state
 *.xcuserstate

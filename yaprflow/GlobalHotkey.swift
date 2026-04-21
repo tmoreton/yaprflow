@@ -1,5 +1,8 @@
 import AppKit
 import Carbon.HIToolbox
+import OSLog
+
+private let log = Logger(subsystem: "com.tmoreton.yaprflow", category: "GlobalHotkey")
 
 @MainActor
 final class GlobalHotkey {
@@ -29,7 +32,7 @@ final class GlobalHotkey {
         if status == noErr {
             hotKeyRef = ref
         } else {
-            NSLog("RegisterEventHotKey failed: \(status)")
+            log.error("RegisterEventHotKey failed: \(status, privacy: .public)")
         }
     }
 
