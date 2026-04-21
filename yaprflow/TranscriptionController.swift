@@ -5,7 +5,7 @@ import FluidAudio
 import Foundation
 import OSLog
 
-private let log = Logger(subsystem: "com.tmoreton.yaprflow-claude", category: "Transcription")
+private let log = Logger(subsystem: "com.tmoreton.yaprflow", category: "Transcription")
 
 enum TranscriptionError: LocalizedError {
     case microphoneDenied

@@ -44,7 +44,12 @@ struct NotchOverlayView: View {
     private var liveTranscript: String? {
         switch state.status {
         case .listening, .finishing:
-            return state.liveTranscript.isEmpty ? nil : state.liveTranscript
+            guard !state.liveTranscript.isEmpty else { return nil }
+            let tailLimit = 400
+            if state.liveTranscript.count <= tailLimit {
+                return state.liveTranscript
+            }
+            return "…" + state.liveTranscript.suffix(tailLimit)
         default:
             return nil
         }

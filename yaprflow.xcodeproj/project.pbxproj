@@ -11,13 +11,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		AFA2BC972F97E6F00048D99B /* yaprflow-claude.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "yaprflow-claude.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		AFA2BC972F97E6F00048D99B /* yaprflow.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "yaprflow.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		AFA2BC992F97E6F00048D99B /* yaprflow-claude */ = {
+		AFA2BC992F97E6F00048D99B /* yaprflow */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "yaprflow-claude";
+			path = "yaprflow";
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -37,7 +37,7 @@
 		AFA2BC8E2F97E6F00048D99B = {
 			isa = PBXGroup;
 			children = (
-				AFA2BC992F97E6F00048D99B /* yaprflow-claude */,
+				AFA2BC992F97E6F00048D99B /* yaprflow */,
 				AFA2BC982F97E6F00048D99B /* Products */,
 			);
 			sourceTree = "<group>";
@@ -45,7 +45,7 @@
 		AFA2BC982F97E6F00048D99B /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				AFA2BC972F97E6F00048D99B /* yaprflow-claude.app */,
+				AFA2BC972F97E6F00048D99B /* yaprflow.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -53,9 +53,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		AFA2BC962F97E6F00048D99B /* yaprflow-claude */ = {
+		AFA2BC962F97E6F00048D99B /* yaprflow */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = AFA2BCA22F97E6F10048D99B /* Build configuration list for PBXNativeTarget "yaprflow-claude" */;
+			buildConfigurationList = AFA2BCA22F97E6F10048D99B /* Build configuration list for PBXNativeTarget "yaprflow" */;
 			buildPhases = (
 				AFA2BC932F97E6F00048D99B /* Sources */,
 				AFA2BC942F97E6F00048D99B /* Frameworks */,
@@ -66,14 +66,14 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				AFA2BC992F97E6F00048D99B /* yaprflow-claude */,
+				AFA2BC992F97E6F00048D99B /* yaprflow */,
 			);
-			name = "yaprflow-claude";
+			name = "yaprflow";
 			packageProductDependencies = (
 				AFA2BCB12F97E6F00048D99B /* FluidAudio */,
 			);
-			productName = "yaprflow-claude";
-			productReference = AFA2BC972F97E6F00048D99B /* yaprflow-claude.app */;
+			productName = "yaprflow";
+			productReference = AFA2BC972F97E6F00048D99B /* yaprflow.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -91,7 +91,7 @@
 					};
 				};
 			};
-			buildConfigurationList = AFA2BC922F97E6F00048D99B /* Build configuration list for PBXProject "yaprflow-claude" */;
+			buildConfigurationList = AFA2BC922F97E6F00048D99B /* Build configuration list for PBXProject "yaprflow" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -108,7 +108,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				AFA2BC962F97E6F00048D99B /* yaprflow-claude */,
+				AFA2BC962F97E6F00048D99B /* yaprflow */,
 			);
 		};
 /* End PBXProject section */
@@ -259,7 +259,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = "yaprflow-claude/yaprflow-claude.entitlements";
+				CODE_SIGN_ENTITLEMENTS = "yaprflow/yaprflow.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -277,7 +277,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.tmoreton.yaprflow-claude";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.tmoreton.yaprflow";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -294,7 +294,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = "yaprflow-claude/yaprflow-claude.entitlements";
+				CODE_SIGN_ENTITLEMENTS = "yaprflow/yaprflow.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -312,7 +312,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.tmoreton.yaprflow-claude";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.tmoreton.yaprflow";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -327,7 +327,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		AFA2BC922F97E6F00048D99B /* Build configuration list for PBXProject "yaprflow-claude" */ = {
+		AFA2BC922F97E6F00048D99B /* Build configuration list for PBXProject "yaprflow" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				AFA2BCA02F97E6F10048D99B /* Debug */,
@@ -336,7 +336,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		AFA2BCA22F97E6F10048D99B /* Build configuration list for PBXNativeTarget "yaprflow-claude" */ = {
+		AFA2BCA22F97E6F10048D99B /* Build configuration list for PBXNativeTarget "yaprflow" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				AFA2BCA32F97E6F10048D99B /* Debug */,
