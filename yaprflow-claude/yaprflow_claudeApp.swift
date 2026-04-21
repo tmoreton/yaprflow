@@ -1,17 +1,16 @@
-//
-//  yaprflow_claudeApp.swift
-//  yaprflow-claude
-//
-//  Created by Tim Moreton on 4/21/26.
-//
-
 import SwiftUI
 
 @main
 struct yaprflow_claudeApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
     var body: some Scene {
-        WindowGroup {
-            ContentView()
-        }
+        _EmptyScene()
+    }
+}
+
+private struct _EmptyScene: Scene {
+    var body: some Scene {
+        Settings { EmptyView() }
     }
 }
