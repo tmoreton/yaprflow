@@ -3,6 +3,7 @@ import Carbon.HIToolbox
 
 @MainActor
 final class HotkeyMenuItemView: NSView {
+    private let iconView = NSImageView()
     private let titleField = NSTextField(labelWithString: "")
     private let shortcutField = NSTextField(labelWithString: "")
     private var isRecording = false
@@ -32,6 +33,12 @@ final class HotkeyMenuItemView: NSView {
     }
 
     private func setupLayout() {
+        iconView.translatesAutoresizingMaskIntoConstraints = false
+        iconView.image = NSImage(systemSymbolName: "keyboard", accessibilityDescription: nil)
+        iconView.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 12, weight: .regular)
+        iconView.contentTintColor = .labelColor
+        addSubview(iconView)
+
         titleField.translatesAutoresizingMaskIntoConstraints = false
         titleField.font = NSFont.menuFont(ofSize: 0)
         titleField.textColor = .labelColor
@@ -45,7 +52,12 @@ final class HotkeyMenuItemView: NSView {
         addSubview(shortcutField)
 
         NSLayoutConstraint.activate([
-            titleField.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14),
+            iconView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14),
+            iconView.centerYAnchor.constraint(equalTo: centerYAnchor),
+            iconView.widthAnchor.constraint(equalToConstant: 16),
+            iconView.heightAnchor.constraint(equalToConstant: 16),
+
+            titleField.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 6),
             titleField.centerYAnchor.constraint(equalTo: centerYAnchor),
 
             shortcutField.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -14),

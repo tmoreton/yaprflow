@@ -2,30 +2,28 @@ import AppKit
 import SwiftUI
 
 @MainActor
-final class NotchOverlayWindowController: NSWindowController {
+final class NotchOverlayWindowController: NSWindowController, NSWindowDelegate {
     static let shared = NotchOverlayWindowController()
 
-    private static let pillWidth: CGFloat = 640
-    private static let pillHeight: CGFloat = 60
-    private static let topMargin: CGFloat = 4
+    private static let initialWidth: CGFloat = 160
+    private static let initialHeight: CGFloat = 44
+    private static let topMargin: CGFloat = 0
 
     convenience init() {
         let content = NotchOverlayView(state: AppState.shared)
-        let hosting = NSHostingController(rootView: content)
+        let host = NSHostingController(rootView: content)
+        host.sizingOptions = [.intrinsicContentSize]
 
         let window = NotchOverlayWindow(
-            contentRect: NSRect(
-                x: 0, y: 0,
-                width: Self.pillWidth, height: Self.pillHeight
-            ),
+            contentRect: NSRect(x: 0, y: 0, width: Self.initialWidth, height: Self.initialHeight),
             styleMask: [.borderless],
             backing: .buffered,
             defer: false
         )
-        window.contentViewController = hosting
+        window.contentViewController = host
         window.isOpaque = false
         window.backgroundColor = .clear
-        window.hasShadow = true
+        window.hasShadow = false
         window.level = .statusBar
         window.ignoresMouseEvents = true
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
@@ -35,10 +33,17 @@ final class NotchOverlayWindowController: NSWindowController {
         window.alphaValue = 0
 
         self.init(window: window)
+        window.delegate = self
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override init(window: NSWindow?) {
+        super.init(window: window)
     }
 
     func show() {
-        positionUnderNotch()
+        recenter()
         window?.orderFrontRegardless()
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.18
@@ -56,16 +61,27 @@ final class NotchOverlayWindowController: NSWindowController {
         })
     }
 
-    private func positionUnderNotch() {
-        guard let window, let screen = NSScreen.main else { return }
-        let frame = screen.frame
-        let visible = screen.visibleFrame
-        let x = frame.midX - Self.pillWidth / 2
-        let y = visible.maxY - Self.pillHeight - Self.topMargin
-        window.setFrame(
-            NSRect(x: x, y: y, width: Self.pillWidth, height: Self.pillHeight),
-            display: true
-        )
+    func windowDidResize(_ notification: Notification) {
+        recenter()
+    }
+
+    private func recenter() {
+        guard let window, let screen = Self.preferredScreen() else { return }
+        let w = window.frame.width
+        let h = window.frame.height
+        let x = screen.frame.midX - w / 2
+        let y = screen.visibleFrame.maxY - h - Self.topMargin
+        let target = NSRect(x: x, y: y, width: w, height: h)
+        if target != window.frame {
+            window.setFrame(target, display: true)
+        }
+    }
+
+    private static func preferredScreen() -> NSScreen? {
+        if let notched = NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 }) {
+            return notched
+        }
+        return NSScreen.screens.first ?? NSScreen.main
     }
 }
 

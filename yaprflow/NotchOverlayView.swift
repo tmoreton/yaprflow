@@ -4,7 +4,8 @@ struct NotchOverlayView: View {
     @ObservedObject var state: AppState
 
     private static let transcriptFont = Font.system(size: 15, weight: .medium)
-    private static let twoLineHeight: CGFloat = 38
+    private static let maxCharsPerLine = 56
+    private static let cornerRadius: CGFloat = 22
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -12,68 +13,28 @@ struct NotchOverlayView: View {
                 .frame(width: 14, height: 14)
                 .padding(.top, 3)
 
-            transcriptArea
-        }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(Color.black.opacity(0.92))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
-        )
-        .padding(2)
-    }
-
-    @ViewBuilder
-    private var transcriptArea: some View {
-        if let live = liveTranscript {
-            scrollingTranscript(live)
-        } else {
             Text(displayText)
                 .font(Self.transcriptFont)
                 .foregroundStyle(.white)
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .topLeading)
+                .multilineTextAlignment(.leading)
+                .lineLimit(2)
+                .fixedSize(horizontal: true, vertical: true)
         }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 10)
+        .background(pillShape.fill(Color.black.opacity(0.92)))
+        .overlay(pillShape.strokeBorder(Color.white.opacity(0.08), lineWidth: 1))
+        .fixedSize(horizontal: true, vertical: true)
     }
 
-    private var liveTranscript: String? {
-        switch state.status {
-        case .listening, .finishing:
-            guard !state.liveTranscript.isEmpty else { return nil }
-            let tailLimit = 400
-            if state.liveTranscript.count <= tailLimit {
-                return state.liveTranscript
-            }
-            return "…" + state.liveTranscript.suffix(tailLimit)
-        default:
-            return nil
-        }
-    }
-
-    private func scrollingTranscript(_ text: String) -> some View {
-        ScrollViewReader { proxy in
-            ScrollView(.vertical, showsIndicators: false) {
-                Text(text)
-                    .id("live")
-                    .font(Self.transcriptFont)
-                    .foregroundStyle(.white)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
-            }
-            .scrollDisabled(true)
-            .onAppear { proxy.scrollTo("live", anchor: .bottom) }
-            .onChange(of: text) { _, _ in
-                withAnimation(.easeOut(duration: 0.12)) {
-                    proxy.scrollTo("live", anchor: .bottom)
-                }
-            }
-        }
-        .frame(height: Self.twoLineHeight)
+    private var pillShape: UnevenRoundedRectangle {
+        UnevenRoundedRectangle(
+            topLeadingRadius: 0,
+            bottomLeadingRadius: Self.cornerRadius,
+            bottomTrailingRadius: Self.cornerRadius,
+            topTrailingRadius: 0,
+            style: .continuous
+        )
     }
 
     private var displayText: String {
@@ -83,14 +44,37 @@ struct NotchOverlayView: View {
         case .preparing(let message):
             return message
         case .listening:
-            return state.liveTranscript.isEmpty ? "Listening…" : state.liveTranscript
+            return state.liveTranscript.isEmpty ? "Listening…" : Self.wrappedTail(of: state.liveTranscript)
         case .finishing:
-            return state.liveTranscript.isEmpty ? "Processing…" : state.liveTranscript
+            return state.liveTranscript.isEmpty ? "Processing…" : Self.wrappedTail(of: state.liveTranscript)
         case .copied:
             return "Copied to clipboard"
         case .error(let message):
             return message
         }
+    }
+
+    private static func wrappedTail(of text: String) -> String {
+        wrapLines(text, maxCharsPerLine: maxCharsPerLine)
+            .suffix(2)
+            .joined(separator: "\n")
+    }
+
+    private static func wrapLines(_ text: String, maxCharsPerLine: Int) -> [String] {
+        let words = text.split(separator: " ", omittingEmptySubsequences: true)
+        var lines: [String] = []
+        var current = ""
+        for word in words {
+            let candidate: String = current.isEmpty ? String(word) : current + " " + word
+            if candidate.count <= maxCharsPerLine {
+                current = candidate
+            } else {
+                if !current.isEmpty { lines.append(current) }
+                current = word.count > maxCharsPerLine ? String(word.prefix(maxCharsPerLine)) : String(word)
+            }
+        }
+        if !current.isEmpty { lines.append(current) }
+        return lines
     }
 
     @ViewBuilder
