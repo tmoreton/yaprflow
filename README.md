@@ -27,8 +27,6 @@ scripts/fetch-models.sh
 open yaprflow.xcodeproj
 ```
 
-Then ⌘R in Xcode. To package a signed+notarized DMG, see [`scripts/notarize-dmg.sh`](scripts/notarize-dmg.sh).
-
 ## License
 
 Apache 2.0. The bundled [Parakeet EOU](https://huggingface.co/FluidInference/parakeet-realtime-eou-120m-coreml) model ships under CC-BY-4.0 via FluidInference.
