@@ -3,24 +3,37 @@ import AppKit
 import CoreML
 import FluidAudio
 import Foundation
+import OSLog
+
+private let log = Logger(subsystem: "com.tmoreton.yaprflow-claude", category: "Transcription")
+
+enum TranscriptionError: LocalizedError {
+    case microphoneDenied
+
+    var errorDescription: String? {
+        switch self {
+        case .microphoneDenied: return "Microphone access denied"
+        }
+    }
+}
 
 @MainActor
 final class TranscriptionController {
     static let shared = TranscriptionController()
 
     private let state = AppState.shared
-    private var capture: AudioCapture?
+    private let capture: AudioCapture
     private var manager: StreamingEouAsrManager?
-    private var isModelLoaded = false
     private var isActive = false
     private var autoHideTask: Task<Void, Never>?
 
     private init() {
-        capture = AudioCapture { [weak self] buffer in
+        let bufferHandler: @Sendable (AVAudioPCMBuffer) -> Void = { buffer in
             Task { @MainActor in
-                await self?.feed(buffer)
+                await TranscriptionController.shared.feed(buffer)
             }
         }
+        self.capture = AudioCapture(bufferHandler: bufferHandler)
     }
 
     func toggle() {
@@ -42,26 +55,13 @@ final class TranscriptionController {
 
         do {
             try await ensureMicPermission()
-        } catch {
-            state.status = .error("Microphone access denied")
-            scheduleAutoHide(after: 2.5)
-            return
-        }
-
-        do {
             try await ensureModelLoaded()
-        } catch {
-            state.status = .error("Model load failed: \(error.localizedDescription)")
-            scheduleAutoHide(after: 3.0)
-            return
-        }
-
-        do {
             state.status = .listening
-            try capture?.start()
+            try capture.start()
             isActive = true
         } catch {
-            state.status = .error("Mic error: \(error.localizedDescription)")
+            log.error("Start failed: \(error.localizedDescription)")
+            state.status = .error(error.localizedDescription)
             scheduleAutoHide(after: 2.5)
         }
     }
@@ -69,7 +69,7 @@ final class TranscriptionController {
     private func stop() async {
         guard isActive else { return }
         isActive = false
-        capture?.stop()
+        capture.stop()
         state.status = .finishing
 
         do {
@@ -87,6 +87,7 @@ final class TranscriptionController {
             }
             scheduleAutoHide(after: 1.2)
         } catch {
+            log.error("Finish failed: \(error.localizedDescription)")
             state.status = .error(error.localizedDescription)
             scheduleAutoHide(after: 2.5)
         }
@@ -97,29 +98,26 @@ final class TranscriptionController {
         do {
             _ = try await manager.process(audioBuffer: buffer)
         } catch {
-            NSLog("ASR process error: \(error)")
+            log.error("ASR process error: \(error.localizedDescription)")
         }
     }
 
     private func ensureMicPermission() async throws {
-        let status = AVCaptureDevice.authorizationStatus(for: .audio)
-        switch status {
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .authorized:
             return
         case .notDetermined:
-            let granted = await AVCaptureDevice.requestAccess(for: .audio)
-            if !granted {
-                throw NSError(domain: "Yaprflow", code: 1, userInfo: [NSLocalizedDescriptionKey: "Microphone access denied"])
-            }
+            if await AVCaptureDevice.requestAccess(for: .audio) { return }
+            throw TranscriptionError.microphoneDenied
         case .denied, .restricted:
-            throw NSError(domain: "Yaprflow", code: 1, userInfo: [NSLocalizedDescriptionKey: "Microphone access denied"])
+            throw TranscriptionError.microphoneDenied
         @unknown default:
-            throw NSError(domain: "Yaprflow", code: 1, userInfo: [NSLocalizedDescriptionKey: "Microphone access unknown"])
+            throw TranscriptionError.microphoneDenied
         }
     }
 
     private func ensureModelLoaded() async throws {
-        if isModelLoaded, manager != nil { return }
+        if manager != nil { return }
 
         state.status = .preparing("Loading transcription model…")
 
@@ -148,7 +146,6 @@ final class TranscriptionController {
         )
 
         self.manager = m
-        self.isModelLoaded = true
     }
 
     private func scheduleAutoHide(after seconds: Double) {

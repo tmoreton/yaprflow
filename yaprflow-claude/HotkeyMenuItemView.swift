@@ -4,11 +4,11 @@ import Carbon.HIToolbox
 @MainActor
 final class HotkeyMenuItemView: NSView {
     private let titleField = NSTextField(labelWithString: "")
-    private let hintField = NSTextField(labelWithString: "click to change")
+    private let shortcutField = NSTextField(labelWithString: "")
     private var isRecording = false
 
     init() {
-        super.init(frame: NSRect(x: 0, y: 0, width: 280, height: 22))
+        super.init(frame: NSRect(x: 0, y: 0, width: 180, height: 22))
         autoresizingMask = [.width]
         setupLayout()
         refresh()
@@ -36,23 +36,21 @@ final class HotkeyMenuItemView: NSView {
         titleField.font = NSFont.menuFont(ofSize: 0)
         titleField.textColor = .labelColor
         titleField.lineBreakMode = .byTruncatingTail
-        titleField.setContentHuggingPriority(.defaultHigh, for: .horizontal)
-        titleField.setContentCompressionResistancePriority(.required, for: .horizontal)
         addSubview(titleField)
 
-        hintField.translatesAutoresizingMaskIntoConstraints = false
-        hintField.font = NSFont.menuFont(ofSize: 11)
-        hintField.textColor = .secondaryLabelColor
-        hintField.lineBreakMode = .byTruncatingTail
-        addSubview(hintField)
+        shortcutField.translatesAutoresizingMaskIntoConstraints = false
+        shortcutField.font = NSFont.menuFont(ofSize: 0)
+        shortcutField.textColor = .secondaryLabelColor
+        shortcutField.alignment = .right
+        addSubview(shortcutField)
 
         NSLayoutConstraint.activate([
             titleField.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14),
             titleField.centerYAnchor.constraint(equalTo: centerYAnchor),
 
-            hintField.leadingAnchor.constraint(equalTo: titleField.trailingAnchor, constant: 8),
-            hintField.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -14),
-            hintField.firstBaselineAnchor.constraint(equalTo: titleField.firstBaselineAnchor),
+            shortcutField.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -14),
+            shortcutField.firstBaselineAnchor.constraint(equalTo: titleField.firstBaselineAnchor),
+            shortcutField.leadingAnchor.constraint(greaterThanOrEqualTo: titleField.trailingAnchor, constant: 16),
         ])
     }
 
@@ -62,13 +60,13 @@ final class HotkeyMenuItemView: NSView {
 
     private func refresh() {
         if isRecording {
-            titleField.stringValue = "Press a new shortcut…"
+            titleField.stringValue = "Press a shortcut…"
             titleField.textColor = .systemBlue
-            hintField.stringValue = "Esc to cancel"
+            shortcutField.stringValue = "esc"
         } else {
-            titleField.stringValue = "Shortcut: \(AppState.shared.hotkey.displayString)"
+            titleField.stringValue = "Shortcut"
             titleField.textColor = .labelColor
-            hintField.stringValue = "click to change"
+            shortcutField.stringValue = AppState.shared.hotkey.displayString
         }
     }
 

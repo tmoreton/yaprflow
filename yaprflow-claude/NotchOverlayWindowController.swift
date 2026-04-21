@@ -6,7 +6,7 @@ final class NotchOverlayWindowController: NSWindowController {
     static let shared = NotchOverlayWindowController()
 
     private static let pillWidth: CGFloat = 640
-    private static let pillHeight: CGFloat = 72
+    private static let pillHeight: CGFloat = 60
     private static let topMargin: CGFloat = 4
 
     convenience init() {

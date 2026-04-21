@@ -5,17 +5,12 @@ import Carbon.HIToolbox
 final class GlobalHotkey {
     static let shared = GlobalHotkey()
 
-    nonisolated(unsafe) fileprivate static var fireHandler: (@Sendable () -> Void)?
+    nonisolated(unsafe) static var onFire: (@Sendable () -> Void)?
 
     private var hotKeyRef: EventHotKeyRef?
     private var eventHandlerRef: EventHandlerRef?
 
     private init() {}
-
-    var onFire: (@Sendable () -> Void)? {
-        get { Self.fireHandler }
-        set { Self.fireHandler = newValue }
-    }
 
     func register(keyCode: UInt32, modifiers: UInt32) {
         unregisterHotKey()
@@ -62,7 +57,7 @@ final class GlobalHotkey {
         InstallEventHandler(
             GetApplicationEventTarget(),
             { _, _, _ in
-                let handler = GlobalHotkey.fireHandler
+                let handler = GlobalHotkey.onFire
                 DispatchQueue.main.async { handler?() }
                 return noErr
             },

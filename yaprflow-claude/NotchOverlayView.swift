@@ -3,35 +3,72 @@ import SwiftUI
 struct NotchOverlayView: View {
     @ObservedObject var state: AppState
 
+    private static let transcriptFont = Font.system(size: 15, weight: .medium)
+    private static let twoLineHeight: CGFloat = 38
+
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             statusIndicator
                 .frame(width: 14, height: 14)
-                .padding(.top, 4)
+                .padding(.top, 3)
 
-            ScrollView(.vertical, showsIndicators: false) {
-                Text(displayText)
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(.white)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
-                    .animation(.easeOut(duration: 0.12), value: displayText)
-            }
-            .defaultScrollAnchor(.bottom)
-            .scrollDisabled(true)
+            transcriptArea
         }
         .padding(.horizontal, 18)
-        .padding(.vertical, 12)
+        .padding(.vertical, 10)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .fill(Color.black.opacity(0.92))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
         )
         .padding(2)
+    }
+
+    @ViewBuilder
+    private var transcriptArea: some View {
+        if let live = liveTranscript {
+            scrollingTranscript(live)
+        } else {
+            Text(displayText)
+                .font(Self.transcriptFont)
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+    }
+
+    private var liveTranscript: String? {
+        switch state.status {
+        case .listening, .finishing:
+            return state.liveTranscript.isEmpty ? nil : state.liveTranscript
+        default:
+            return nil
+        }
+    }
+
+    private func scrollingTranscript(_ text: String) -> some View {
+        ScrollViewReader { proxy in
+            ScrollView(.vertical, showsIndicators: false) {
+                Text(text)
+                    .id("live")
+                    .font(Self.transcriptFont)
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+            }
+            .scrollDisabled(true)
+            .onAppear { proxy.scrollTo("live", anchor: .bottom) }
+            .onChange(of: text) { _, _ in
+                withAnimation(.easeOut(duration: 0.12)) {
+                    proxy.scrollTo("live", anchor: .bottom)
+                }
+            }
+        }
+        .frame(height: Self.twoLineHeight)
     }
 
     private var displayText: String {

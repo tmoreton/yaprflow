@@ -40,18 +40,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         shortcutItem.view = HotkeyMenuItemView()
         menu.addItem(shortcutItem)
 
-        menu.addItem(NSMenuItem(
+        let quit = NSMenuItem(
             title: "Quit",
             action: #selector(NSApplication.terminate(_:)),
             keyEquivalent: "q"
-        ))
+        )
+        quit.image = nil
+        menu.addItem(quit)
 
         item.menu = menu
         self.statusItem = item
     }
 
     private func registerHotkey() {
-        GlobalHotkey.shared.onFire = {
+        GlobalHotkey.onFire = {
             Task { @MainActor in
                 TranscriptionController.shared.toggle()
             }
