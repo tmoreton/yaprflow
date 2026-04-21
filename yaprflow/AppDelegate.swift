@@ -11,6 +11,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _ = NotchOverlayWindowController.shared
         registerHotkey()
 
+        // Warm the ASR + VAD models in the background so the first hotkey press
+        // doesn't block on the ~30s Encoder compile.
+        TranscriptionController.shared.preload()
+
         NotificationCenter.default.addObserver(
             forName: .yaprflowHotkeyChanged,
             object: nil,

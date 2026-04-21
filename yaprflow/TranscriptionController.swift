@@ -36,6 +36,8 @@ final class TranscriptionController {
     private var vadState: VadStreamState?
     private var currentSpeechStart: Int?
     private var confirmedText = ""
+    private var volatileText = ""
+    private var lastSpeculativeSampleCount = 0
     private var transcribeChain: Task<Void, Never>?
 
     private var isActive = false
@@ -45,10 +47,15 @@ final class TranscriptionController {
     // Tighter than SDK default (0.75s) so dictation feels snappy.
     private let segmentationConfig = VadSegmentationConfig(
         minSpeechDuration: 0.15,
-        minSilenceDuration: 0.4,
+        minSilenceDuration: 0.3,
         maxSpeechDuration: 12.0,
         speechPadding: 0.1
     )
+
+    // Speculative partials: while the user is still speaking, re-transcribe the
+    // in-progress segment every N seconds and show as volatile text.
+    private let speculativeIntervalSamples = Int(1.2 * 16000)
+    private let speculativeMinSpeechSamples = Int(0.6 * 16000)
 
     private init() {
         let bufferHandler: @Sendable (AVAudioPCMBuffer) -> Void = { buffer in
@@ -69,6 +76,24 @@ final class TranscriptionController {
         }
     }
 
+    /// Eagerly load ASR + VAD models so the first hotkey press doesn't block
+    /// on the ~30s Encoder compile. Safe to call multiple times — subsequent
+    /// calls are no-ops once the models are loaded.
+    func preload() {
+        Task { @MainActor in
+            do {
+                _ = try await ensureLoaded()
+                // Don't leave the overlay/menu showing a stale "preparing…"
+                // status once preload finishes if the user hasn't started yet.
+                if !isActive, !isStarting {
+                    state.status = .idle
+                }
+            } catch {
+                log.error("Preload failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
     private func start() async {
         guard !isActive, !isStarting else { return }
         isStarting = true
@@ -76,6 +101,8 @@ final class TranscriptionController {
 
         autoHideTask?.cancel()
         confirmedText = ""
+        volatileText = ""
+        lastSpeculativeSampleCount = 0
         state.liveTranscript = ""
         NotchOverlayWindowController.shared.show()
 
@@ -166,6 +193,7 @@ final class TranscriptionController {
             switch event.kind {
             case .speechStart:
                 currentSpeechStart = event.sampleIndex
+                lastSpeculativeSampleCount = event.sampleIndex
             case .speechEnd:
                 guard let start = currentSpeechStart else { continue }
                 let clampedStart = max(0, min(start, sessionSamples.count))
@@ -176,6 +204,23 @@ final class TranscriptionController {
                 enqueueTranscribe(samples: segment)
             }
         }
+
+        maybeRunSpeculative()
+    }
+
+    /// While the user is still speaking, re-transcribe the in-progress speech
+    /// segment every ~1.2s and show it as volatile text. The confirmed segment
+    /// replaces this on speechEnd.
+    private func maybeRunSpeculative() {
+        guard let start = currentSpeechStart else { return }
+        let total = sessionSamples.count
+        guard total - lastSpeculativeSampleCount >= speculativeIntervalSamples else { return }
+        guard total - start >= speculativeMinSpeechSamples else { return }
+
+        lastSpeculativeSampleCount = total
+        let segment = Array(sessionSamples[start..<total])
+        let segmentStart = start
+        enqueueSpeculative(samples: segment, segmentStart: segmentStart)
     }
 
     /// Transcribe segments in the order they arrive by chaining Tasks.
@@ -192,17 +237,58 @@ final class TranscriptionController {
         do {
             let result = try await asr.transcribe(samples, source: .microphone)
             let trimmed = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else { return }
             await MainActor.run {
-                if self.confirmedText.isEmpty {
-                    self.confirmedText = trimmed
-                } else {
-                    self.confirmedText += " " + trimmed
+                if !trimmed.isEmpty {
+                    if self.confirmedText.isEmpty {
+                        self.confirmedText = trimmed
+                    } else {
+                        self.confirmedText += " " + trimmed
+                    }
                 }
-                self.state.liveTranscript = self.confirmedText
+                // This segment is confirmed — drop any volatile text that was
+                // showing a preview of it.
+                self.volatileText = ""
+                self.state.liveTranscript = self.displayText()
             }
         } catch {
             log.error("Transcribe failed: \(error.localizedDescription)")
+        }
+    }
+
+    private func enqueueSpeculative(samples: [Float], segmentStart: Int) {
+        let previous = transcribeChain
+        transcribeChain = Task { [weak self] in
+            await previous?.value
+            await self?.performSpeculative(samples: samples, segmentStart: segmentStart)
+        }
+    }
+
+    private func performSpeculative(samples: [Float], segmentStart: Int) async {
+        // Skip if the user already paused (speechEnd fired) — the confirmed
+        // transcribe is about to run and supersede this anyway.
+        guard currentSpeechStart == segmentStart, isActive else { return }
+        guard let asr = asrManager else { return }
+        do {
+            let result = try await asr.transcribe(samples, source: .microphone)
+            let trimmed = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            await MainActor.run {
+                // Re-check relevance: the segment may have ended or a new one
+                // started by the time the transcribe returned.
+                guard self.isActive, self.currentSpeechStart == segmentStart else { return }
+                self.volatileText = trimmed
+                self.state.liveTranscript = self.displayText()
+            }
+        } catch {
+            log.error("Speculative transcribe failed: \(error.localizedDescription)")
+        }
+    }
+
+    private func displayText() -> String {
+        switch (confirmedText.isEmpty, volatileText.isEmpty) {
+        case (true, true):   return ""
+        case (false, true):  return confirmedText
+        case (true, false):  return volatileText
+        case (false, false): return confirmedText + " " + volatileText
         }
     }
 
@@ -260,7 +346,14 @@ final class TranscriptionController {
 
             state.status = .preparing("Loading voice detector…")
             let vadConfig = VadConfig(computeUnits: .cpuAndNeuralEngine)
-            let vad = try await VadManager(config: vadConfig)
+            let vad: VadManager
+            if let vadBase = Self.bundledVADBaseURL() {
+                log.info("Loading bundled VAD from \(vadBase.path, privacy: .public)")
+                vad = try await VadManager(config: vadConfig, modelDirectory: vadBase)
+            } else {
+                log.info("Bundled VAD missing, downloading Silero VAD from HuggingFace")
+                vad = try await VadManager(config: vadConfig)
+            }
 
             return (asr, vad)
         }
@@ -277,7 +370,7 @@ final class TranscriptionController {
         }
     }
 
-    private static let modelSubpath = "Models/parakeet-tdt-0.6b-v2-coreml"
+    private static let modelSubpath = "Models/parakeet-tdt-0.6b-v2"
     private static let requiredModelFiles = [
         "Preprocessor.mlmodelc",
         "Encoder.mlmodelc",
@@ -294,6 +387,20 @@ final class TranscriptionController {
             return nil
         }
         return dir
+    }
+
+    private static let vadModelFile = "silero-vad-unified-256ms-v6.0.0.mlmodelc"
+
+    /// Returns the base directory that `VadManager(modelDirectory:)` expects —
+    /// it internally appends `Models/silero-vad/<file>`. We bundle the model at
+    /// `<Resources>/Models/silero-vad/...`, so `Resources` is the right base.
+    private static func bundledVADBaseURL() -> URL? {
+        guard let resources = Bundle.main.resourceURL else { return nil }
+        let modelPath = resources
+            .appendingPathComponent("Models/silero-vad", isDirectory: true)
+            .appendingPathComponent(vadModelFile, isDirectory: true)
+        guard FileManager.default.fileExists(atPath: modelPath.path) else { return nil }
+        return resources
     }
 
     private func scheduleAutoHide(after seconds: Double) {

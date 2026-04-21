@@ -7,10 +7,10 @@ set -euo pipefail
 
 REPO_SLUG="tmoreton/yaprflow"
 MODELS_TAG="models-v2"
-TARBALL="parakeet-tdt-0.6b-v2-coreml.tar.gz"
+TARBALL="parakeet-tdt-0.6b-v2.tar.gz"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-DEST="$ROOT/Models/parakeet-tdt-0.6b-v2-coreml"
+DEST="$ROOT/Models/parakeet-tdt-0.6b-v2"
 
 if [ -f "$DEST/parakeet_vocab.json" ] && [ -d "$DEST/Encoder.mlmodelc" ]; then
     echo "Models already present at $DEST"

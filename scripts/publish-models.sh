@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Packages Models/parakeet-tdt-0.6b-v2-coreml into a tarball and uploads it
+# Packages Models/parakeet-tdt-0.6b-v2 into a tarball and uploads it
 # to the 'models-v2' GitHub Release. Run once; updates in place if the
 # release already exists.
 
@@ -7,10 +7,10 @@ set -euo pipefail
 
 REPO_SLUG="tmoreton/yaprflow"
 MODELS_TAG="models-v2"
-TARBALL="parakeet-tdt-0.6b-v2-coreml.tar.gz"
+TARBALL="parakeet-tdt-0.6b-v2.tar.gz"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SRC="$ROOT/Models/parakeet-tdt-0.6b-v2-coreml"
+SRC="$ROOT/Models/parakeet-tdt-0.6b-v2"
 STAGE="$(mktemp -d -t yaprflow-models.XXXXXX)"
 trap 'rm -rf "$STAGE"' EXIT
 
