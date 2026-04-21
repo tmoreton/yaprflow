@@ -4,7 +4,7 @@ Menu-bar dictation app for macOS. Press ⌘T anywhere, speak, press ⌘T again �
 
 - Model: [Parakeet EOU 120m (160 ms)](https://huggingface.co/FluidInference/parakeet-realtime-eou-120m-coreml) — **English-only** streaming ASR with on-the-fly end-of-utterance detection, ~5× real-time on the Apple Neural Engine. Multilingual isn't supported here: the multilingual Parakeet (`tdt-0.6b-v3`) is batch-only, so adding other languages would mean giving up word-by-word partials.
 - ASR runtime: [FluidAudio](https://github.com/FluidInference/FluidAudio) 0.13.6
-- Swift 6 / SwiftUI / AppKit · 847 LOC across 10 files · macOS 14+
+- Swift 6 / SwiftUI / AppKit · 847 LOC across 10 files · **macOS 14 (Sonoma) or later**
 
 ## Install (prebuilt DMG)
 
