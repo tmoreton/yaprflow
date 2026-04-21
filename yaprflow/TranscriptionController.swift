@@ -23,9 +23,32 @@ final class TranscriptionController {
 
     private let state = AppState.shared
     private let capture: AudioCapture
-    private var manager: StreamingEouAsrManager?
+    private let audioConverter = AudioConverter()
+
+    // Models are loaded once and kept for the process lifetime
+    private var asrManager: AsrManager?
+    private var vadManager: VadManager?
+    private var loadingTask: Task<(AsrManager, VadManager), Error>?
+
+    // Per-session state
+    private var sessionSamples: [Float] = []
+    private var vadPending: [Float] = []
+    private var vadState: VadStreamState?
+    private var currentSpeechStart: Int?
+    private var confirmedText = ""
+    private var transcribeChain: Task<Void, Never>?
+
     private var isActive = false
+    private var isStarting = false
     private var autoHideTask: Task<Void, Never>?
+
+    // Tighter than SDK default (0.75s) so dictation feels snappy.
+    private let segmentationConfig = VadSegmentationConfig(
+        minSpeechDuration: 0.15,
+        minSilenceDuration: 0.4,
+        maxSpeechDuration: 12.0,
+        speechPadding: 0.1
+    )
 
     private init() {
         let bufferHandler: @Sendable (AVAudioPCMBuffer) -> Void = { buffer in
@@ -47,15 +70,24 @@ final class TranscriptionController {
     }
 
     private func start() async {
-        guard !isActive else { return }
-        autoHideTask?.cancel()
-        state.liveTranscript = ""
+        guard !isActive, !isStarting else { return }
+        isStarting = true
+        defer { isStarting = false }
 
+        autoHideTask?.cancel()
+        confirmedText = ""
+        state.liveTranscript = ""
         NotchOverlayWindowController.shared.show()
 
         do {
             try await ensureMicPermission()
-            try await ensureModelLoaded()
+            let (_, vad) = try await ensureLoaded()
+
+            sessionSamples.removeAll(keepingCapacity: true)
+            vadPending.removeAll(keepingCapacity: true)
+            vadState = await vad.makeStreamState()
+            currentSpeechStart = nil
+
             state.status = .listening
             try capture.start()
             isActive = true
@@ -72,33 +104,105 @@ final class TranscriptionController {
         capture.stop()
         state.status = .finishing
 
-        do {
-            let finalText = try await manager?.finish() ?? ""
-            state.liveTranscript = finalText
-            await manager?.reset()
-
-            if !finalText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                let pb = NSPasteboard.general
-                pb.clearContents()
-                pb.setString(finalText, forType: .string)
-                state.status = .copied
-            } else {
-                state.status = .idle
-            }
-            scheduleAutoHide(after: 1.2)
-        } catch {
-            log.error("Finish failed: \(error.localizedDescription)")
-            state.status = .error(error.localizedDescription)
-            scheduleAutoHide(after: 2.5)
+        // If user was still speaking when they released the hotkey, flush the
+        // remaining audio through the transcriber so nothing is lost.
+        if let start = currentSpeechStart, start < sessionSamples.count {
+            let tail = Array(sessionSamples[start..<sessionSamples.count])
+            currentSpeechStart = nil
+            enqueueTranscribe(samples: tail)
         }
+
+        // Wait for all queued segments to finish transcribing before reading
+        // confirmedText for the clipboard.
+        await transcribeChain?.value
+
+        let finalText = confirmedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        state.liveTranscript = finalText
+
+        if !finalText.isEmpty {
+            let pb = NSPasteboard.general
+            pb.clearContents()
+            pb.setString(finalText, forType: .string)
+            state.status = .copied
+        } else {
+            state.status = .idle
+        }
+        scheduleAutoHide(after: 1.2)
     }
 
     private func feed(_ buffer: AVAudioPCMBuffer) async {
-        guard isActive, let manager else { return }
+        guard isActive, let vad = vadManager, var currentVadState = vadState else { return }
+
+        let samples: [Float]
         do {
-            _ = try await manager.process(audioBuffer: buffer)
+            samples = try audioConverter.resampleBuffer(buffer)
         } catch {
-            log.error("ASR process error: \(error.localizedDescription)")
+            log.error("Resample failed: \(error.localizedDescription)")
+            return
+        }
+
+        sessionSamples.append(contentsOf: samples)
+        vadPending.append(contentsOf: samples)
+
+        while vadPending.count >= VadManager.chunkSize {
+            let chunk = Array(vadPending.prefix(VadManager.chunkSize))
+            vadPending.removeFirst(VadManager.chunkSize)
+
+            let result: VadStreamResult
+            do {
+                result = try await vad.processStreamingChunk(
+                    chunk,
+                    state: currentVadState,
+                    config: segmentationConfig
+                )
+            } catch {
+                log.error("VAD failed: \(error.localizedDescription)")
+                return
+            }
+            currentVadState = result.state
+            vadState = currentVadState
+
+            guard let event = result.event else { continue }
+            switch event.kind {
+            case .speechStart:
+                currentSpeechStart = event.sampleIndex
+            case .speechEnd:
+                guard let start = currentSpeechStart else { continue }
+                let clampedStart = max(0, min(start, sessionSamples.count))
+                let clampedEnd = max(clampedStart, min(event.sampleIndex, sessionSamples.count))
+                currentSpeechStart = nil
+                guard clampedEnd > clampedStart else { continue }
+                let segment = Array(sessionSamples[clampedStart..<clampedEnd])
+                enqueueTranscribe(samples: segment)
+            }
+        }
+    }
+
+    /// Transcribe segments in the order they arrive by chaining Tasks.
+    private func enqueueTranscribe(samples: [Float]) {
+        let previous = transcribeChain
+        transcribeChain = Task { [weak self] in
+            await previous?.value
+            await self?.performTranscribe(samples: samples)
+        }
+    }
+
+    private func performTranscribe(samples: [Float]) async {
+        guard let asr = asrManager else { return }
+        do {
+            let result = try await asr.transcribe(samples, source: .microphone)
+            let trimmed = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return }
+            await MainActor.run {
+                if self.confirmedText.isEmpty {
+                    self.confirmedText = trimmed
+                } else {
+                    self.confirmedText += " " + trimmed
+                }
+                self.state.liveTranscript = self.confirmedText
+            }
+        } catch {
+            log.error("Transcribe failed: \(error.localizedDescription)")
         }
     }
 
@@ -116,51 +220,70 @@ final class TranscriptionController {
         }
     }
 
-    private func ensureModelLoaded() async throws {
-        if manager != nil { return }
+    private func ensureLoaded() async throws -> (AsrManager, VadManager) {
+        if let asr = asrManager, let vad = vadManager { return (asr, vad) }
+        if let existing = loadingTask {
+            return try await existing.value
+        }
 
         state.status = .preparing("Loading transcription model…")
 
-        let config = MLModelConfiguration()
-        config.computeUnits = .cpuAndNeuralEngine
+        let task = Task<(AsrManager, VadManager), Error> { @MainActor in
+            let mlConfig = MLModelConfiguration()
+            mlConfig.computeUnits = .cpuAndNeuralEngine
 
-        let m = StreamingEouAsrManager(
-            configuration: config,
-            chunkSize: .ms160,
-            eouDebounceMs: 1280
-        )
-
-        await m.setPartialCallback { partial in
-            Task { @MainActor in
-                AppState.shared.liveTranscript = partial
-            }
-        }
-
-        if let bundled = Self.bundledModelURL() {
-            log.info("Loading bundled model from \(bundled.path, privacy: .public)")
-            try await m.loadModels(modelDir: bundled)
-        } else {
-            log.info("Bundled model missing, downloading from HuggingFace")
-            state.status = .preparing("Downloading model…")
-            try await m.loadModelsFromHuggingFace(
-                progressHandler: { progress in
-                    let pct = Int((progress.fractionCompleted * 100).rounded())
-                    Task { @MainActor in
-                        AppState.shared.status = .preparing("Downloading model… \(pct)%")
+            let asrModels: AsrModels
+            if let bundled = Self.bundledModelURL() {
+                log.info("Loading bundled ASR model from \(bundled.path, privacy: .public)")
+                asrModels = try await AsrModels.load(
+                    from: bundled,
+                    configuration: mlConfig,
+                    version: .v2
+                )
+            } else {
+                log.info("Downloading Parakeet TDT 0.6B v2 from HuggingFace")
+                state.status = .preparing("Downloading model…")
+                asrModels = try await AsrModels.downloadAndLoad(
+                    configuration: mlConfig,
+                    version: .v2,
+                    progressHandler: { progress in
+                        let pct = Int((progress.fractionCompleted * 100).rounded())
+                        Task { @MainActor in
+                            AppState.shared.status = .preparing("Downloading model… \(pct)%")
+                        }
                     }
-                }
-            )
-        }
+                )
+            }
 
-        self.manager = m
+            let asr = AsrManager(config: .default)
+            try await asr.loadModels(asrModels)
+
+            state.status = .preparing("Loading voice detector…")
+            let vadConfig = VadConfig(computeUnits: .cpuAndNeuralEngine)
+            let vad = try await VadManager(config: vadConfig)
+
+            return (asr, vad)
+        }
+        loadingTask = task
+
+        do {
+            let (asr, vad) = try await task.value
+            self.asrManager = asr
+            self.vadManager = vad
+            return (asr, vad)
+        } catch {
+            loadingTask = nil
+            throw error
+        }
     }
 
-    private static let modelSubpath = "Models/parakeet-realtime-eou-120m-coreml/160ms"
+    private static let modelSubpath = "Models/parakeet-tdt-0.6b-v2-coreml"
     private static let requiredModelFiles = [
-        "streaming_encoder.mlmodelc",
-        "decoder.mlmodelc",
-        "joint_decision.mlmodelc",
-        "vocab.json",
+        "Preprocessor.mlmodelc",
+        "Encoder.mlmodelc",
+        "Decoder.mlmodelc",
+        "JointDecision.mlmodelc",
+        "parakeet_vocab.json",
     ]
 
     private static func bundledModelURL() -> URL? {

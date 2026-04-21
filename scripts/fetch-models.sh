@@ -1,24 +1,23 @@
 #!/usr/bin/env bash
-# Fetches the Parakeet EOU 160ms Core ML model into ./Models/.
-# Tries this repo's GitHub Release (models-v1) first, falls back to HuggingFace.
+# Fetches the Parakeet TDT 0.6B v2 Core ML model into ./Models/.
+# Tries this repo's GitHub Release (models-v2) first, falls back to HuggingFace.
 # Run once after cloning the repo.
 
 set -euo pipefail
 
 REPO_SLUG="tmoreton/yaprflow"
-MODELS_TAG="models-v1"
-TARBALL="parakeet-eou-160ms.tar.gz"
+MODELS_TAG="models-v2"
+TARBALL="parakeet-tdt-0.6b-v2-coreml.tar.gz"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-DEST="$ROOT/Models/parakeet-realtime-eou-120m-coreml"
-FINAL="$DEST/160ms"
+DEST="$ROOT/Models/parakeet-tdt-0.6b-v2-coreml"
 
-if [ -f "$FINAL/vocab.json" ] && [ -d "$FINAL/streaming_encoder.mlmodelc" ]; then
-    echo "Models already present at $FINAL"
+if [ -f "$DEST/parakeet_vocab.json" ] && [ -d "$DEST/Encoder.mlmodelc" ]; then
+    echo "Models already present at $DEST"
     exit 0
 fi
 
-mkdir -p "$DEST"
+mkdir -p "$(dirname "$DEST")"
 
 release_url="https://github.com/$REPO_SLUG/releases/download/$MODELS_TAG/$TARBALL"
 tmp_tar="$(mktemp -t yaprflow-models.XXXXXX.tar.gz)"
@@ -27,9 +26,9 @@ trap 'rm -f "$tmp_tar"' EXIT
 echo "Trying GitHub Release: $release_url"
 if curl -fsSL --retry 3 -o "$tmp_tar" "$release_url"; then
     echo "Extracting…"
-    tar xzf "$tmp_tar" -C "$DEST"
-    echo "Done: $FINAL"
-    du -sh "$FINAL"
+    tar xzf "$tmp_tar" -C "$(dirname "$DEST")"
+    echo "Done: $DEST"
+    du -sh "$DEST"
     exit 0
 fi
 
@@ -40,19 +39,21 @@ if ! command -v hf >/dev/null 2>&1; then
     exit 1
 fi
 
-HF_REPO="FluidInference/parakeet-realtime-eou-120m-coreml"
+HF_REPO="FluidInference/parakeet-tdt-0.6b-v2-coreml"
+
+# Bypass HF's 'xet' CDN (cas-bridge.xethub.hf.co), which is unreachable on
+# some networks (Errno 65 'No route to host'). Forces the standard LFS path.
+export HF_HUB_DISABLE_XET=1
 
 hf download "$HF_REPO" \
-    --include "160ms/streaming_encoder.mlmodelc/*" \
-    --local-dir "$DEST"
-
-hf download "$HF_REPO" \
-    --include "160ms/decoder.mlmodelc/*" \
-    "160ms/joint_decision.mlmodelc/*" \
-    "160ms/vocab.json" \
+    --include "Preprocessor.mlmodelc/*" \
+              "Encoder.mlmodelc/*" \
+              "Decoder.mlmodelc/*" \
+              "JointDecision.mlmodelc/*" \
+              "parakeet_vocab.json" \
     --local-dir "$DEST"
 
 rm -rf "$DEST/.cache"
 
-echo "Done: $FINAL"
-du -sh "$FINAL"
+echo "Done: $DEST"
+du -sh "$DEST"

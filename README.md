@@ -8,7 +8,7 @@
 ---
 
 - 🔒 **100% local** — audio never leaves your Mac
-- ⚡ **Real-time** — word-by-word partials on the Neural Engine
+- ⚡ **Accurate** — NVIDIA Parakeet TDT 0.6B on the Neural Engine, with live partials
 - 🎛️ **Menu bar** — out of your way, one hotkey away
 - 🆓 **Open source** — Apache 2.0, no accounts, no telemetry
 
@@ -29,4 +29,4 @@ open yaprflow.xcodeproj
 
 ## License
 
-Apache 2.0. The bundled [Parakeet EOU](https://huggingface.co/FluidInference/parakeet-realtime-eou-120m-coreml) model ships under CC-BY-4.0 via FluidInference.
+Apache 2.0. The bundled [Parakeet TDT 0.6B v2](https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v2-coreml) model ships under CC-BY-4.0 via FluidInference.
