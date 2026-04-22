@@ -42,6 +42,7 @@ final class TranscriptionController {
 
     private var isActive = false
     private var isStarting = false
+    private var sessionIsStreaming = true
     private var autoHideTask: Task<Void, Never>?
 
     // Tighter than SDK default (0.75s) so dictation feels snappy.
@@ -104,6 +105,9 @@ final class TranscriptionController {
         volatileText = ""
         lastSpeculativeSampleCount = 0
         state.liveTranscript = ""
+        // Snapshot the mode for this session so toggling the menu mid-recording
+        // doesn't corrupt the pipeline.
+        sessionIsStreaming = state.streamingMode
         NotchOverlayWindowController.shared.show()
 
         do {
@@ -131,17 +135,23 @@ final class TranscriptionController {
         capture.stop()
         state.status = .finishing
 
-        // If user was still speaking when they released the hotkey, flush the
-        // remaining audio through the transcriber so nothing is lost.
-        if let start = currentSpeechStart, start < sessionSamples.count {
-            let tail = Array(sessionSamples[start..<sessionSamples.count])
-            currentSpeechStart = nil
-            enqueueTranscribe(samples: tail)
+        if sessionIsStreaming {
+            // Streaming: flush any pending speech segment so we don't lose the
+            // tail of what the user was saying.
+            if let start = currentSpeechStart, start < sessionSamples.count {
+                let tail = Array(sessionSamples[start..<sessionSamples.count])
+                currentSpeechStart = nil
+                enqueueTranscribe(samples: tail)
+            }
+            await transcribeChain?.value
+        } else {
+            // Single-shot: transcribe the whole clip in one pass. The overlay
+            // has been showing "Listening…" / "Processing…" the whole time; the
+            // final text will land below.
+            if !sessionSamples.isEmpty {
+                await performTranscribe(samples: sessionSamples)
+            }
         }
-
-        // Wait for all queued segments to finish transcribing before reading
-        // confirmedText for the clipboard.
-        await transcribeChain?.value
 
         let finalText = confirmedText.trimmingCharacters(in: .whitespacesAndNewlines)
         state.liveTranscript = finalText
@@ -158,7 +168,7 @@ final class TranscriptionController {
     }
 
     private func feed(_ buffer: AVAudioPCMBuffer) async {
-        guard isActive, let vad = vadManager, var currentVadState = vadState else { return }
+        guard isActive else { return }
 
         let samples: [Float]
         do {
@@ -169,6 +179,11 @@ final class TranscriptionController {
         }
 
         sessionSamples.append(contentsOf: samples)
+
+        // Single-shot mode: just accumulate, transcribe everything in stop().
+        guard sessionIsStreaming else { return }
+
+        guard let vad = vadManager, var currentVadState = vadState else { return }
         vadPending.append(contentsOf: samples)
 
         while vadPending.count >= VadManager.chunkSize {

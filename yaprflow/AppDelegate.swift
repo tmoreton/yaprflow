@@ -52,6 +52,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(NSMenuItem.separator())
 
+        let streamingItem = NSMenuItem()
+        streamingItem.view = StreamingModeMenuItemView()
+        streamingItem.toolTip = "Show live partials while you speak. Turn off for single-shot mode — more accurate on longer dictations, but no text appears until you stop."
+        menu.addItem(streamingItem)
+
+        menu.addItem(NSMenuItem.separator())
+
         menu.addItem(NSMenuItem(
             title: "Quit",
             action: #selector(NSApplication.terminate(_:)),

@@ -4,6 +4,7 @@ import SwiftUI
 
 private enum OnboardingStep {
     case welcome
+    case modeSelection
     case permissions
 }
 
@@ -11,6 +12,7 @@ struct OnboardingView: View {
     let onComplete: () -> Void
 
     @State private var step: OnboardingStep = .welcome
+    @State private var streamingSelected: Bool = AppState.shared.streamingMode
     @State private var micStatus: AVAuthorizationStatus = AVCaptureDevice.authorizationStatus(for: .audio)
 
     var body: some View {
@@ -18,13 +20,14 @@ struct OnboardingView: View {
             Color.black.ignoresSafeArea()
             Group {
                 switch step {
-                case .welcome:     welcomeScreen
-                case .permissions: permissionsScreen
+                case .welcome:        welcomeScreen
+                case .modeSelection:  modeSelectionScreen
+                case .permissions:    permissionsScreen
                 }
             }
             .transition(.opacity)
         }
-        .frame(width: 480, height: 520)
+        .frame(width: 520, height: 520)
     }
 
     private var welcomeScreen: some View {
@@ -44,7 +47,7 @@ struct OnboardingView: View {
                 .padding(.top, 8)
             Spacer()
             Button {
-                withAnimation(.easeInOut(duration: 0.25)) { step = .permissions }
+                withAnimation(.easeInOut(duration: 0.25)) { step = .modeSelection }
             } label: {
                 Text("Get started").frame(maxWidth: .infinity)
             }
@@ -52,6 +55,88 @@ struct OnboardingView: View {
             .frame(width: 260)
             .padding(.bottom, 48)
         }
+    }
+
+    private var modeSelectionScreen: some View {
+        VStack(spacing: 0) {
+            Spacer(minLength: 48)
+            Text("Pick a dictation mode")
+                .font(.system(size: 24, weight: .semibold))
+                .foregroundStyle(.white)
+            Text("You can change this anytime from the menu bar.")
+                .font(.system(size: 13))
+                .foregroundStyle(Color.white.opacity(0.55))
+                .padding(.top, 8)
+            Spacer(minLength: 28)
+
+            HStack(spacing: 12) {
+                modeCard(
+                    title: "Streaming",
+                    tagline: "Text as you speak",
+                    body: "Words appear in real time while you talk. Best for everyday dictation and longer recordings — no length limit.",
+                    selected: streamingSelected,
+                    onTap: { streamingSelected = true }
+                )
+                modeCard(
+                    title: "Single-shot",
+                    tagline: "Most accurate",
+                    body: "Transcribes the whole clip when you stop. Slightly better accuracy on short dictations — best under 10 min.",
+                    selected: !streamingSelected,
+                    onTap: { streamingSelected = false }
+                )
+            }
+            .padding(.horizontal, 28)
+
+            Spacer()
+            Button {
+                AppState.shared.streamingMode = streamingSelected
+                withAnimation(.easeInOut(duration: 0.25)) { step = .permissions }
+            } label: {
+                Text("Continue").frame(maxWidth: .infinity)
+            }
+            .buttonStyle(OnboardingButtonStyle())
+            .frame(width: 260)
+            .padding(.bottom, 40)
+        }
+    }
+
+    private func modeCard(
+        title: String,
+        tagline: String,
+        body: String,
+        selected: Bool,
+        onTap: @escaping () -> Void
+    ) -> some View {
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
+                Text(tagline)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(selected
+                                     ? Color.white.opacity(0.80)
+                                     : Color.white.opacity(0.45))
+                Spacer(minLength: 10)
+                Text(body)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.white.opacity(0.55))
+                    .multilineTextAlignment(.leading)
+                    .lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, minHeight: 160, alignment: .topLeading)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.white.opacity(selected ? 0.10 : 0.04))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(Color.white.opacity(selected ? 0.35 : 0.08), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     private var permissionsScreen: some View {
