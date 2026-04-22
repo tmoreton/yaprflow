@@ -44,6 +44,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         shortcutItem.view = HotkeyMenuItemView()
         menu.addItem(shortcutItem)
 
+        menu.addItem(NSMenuItem.separator())
+
+        let redownloadItem = NSMenuItem(
+            title: "Re-download speech model",
+            action: #selector(redownloadModel(_:)),
+            keyEquivalent: ""
+        )
+        redownloadItem.target = self
+        menu.addItem(redownloadItem)
+
+        menu.addItem(NSMenuItem.separator())
+
         menu.addItem(NSMenuItem(
             title: "Quit",
             action: #selector(NSApplication.terminate(_:)),
@@ -52,6 +64,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         item.menu = menu
         self.statusItem = item
+    }
+
+    @objc private func redownloadModel(_ sender: Any?) {
+        let alert = NSAlert()
+        alert.messageText = "Re-download speech model?"
+        alert.informativeText = "This will delete the cached model (~465 MB) and download it again on the next dictation. Use this if transcription stops working or looks corrupted."
+        alert.addButton(withTitle: "Re-download")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+        TranscriptionController.shared.clearModelCache()
+        // Kick off a fresh download now so the user doesn't wait on their next hotkey press.
+        TranscriptionController.shared.preload()
     }
 
     private func registerHotkey() {

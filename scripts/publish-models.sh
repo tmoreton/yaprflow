@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# Packages Models/parakeet-tdt-0.6b-v2 into a tarball and uploads it
-# to the 'models-v2' GitHub Release. Run once; updates in place if the
-# release already exists.
+# Packages just Encoder.mlmodelc (the big ~445MB piece of the Parakeet TDT 0.6B v2
+# Core ML bundle) into a tarball and uploads it to the 'models-v2' GitHub Release.
+# The app ships with the small parts (Preprocessor/Decoder/JointDecision/vocab)
+# bundled, and downloads this encoder tarball on first launch.
 
 set -euo pipefail
 
 REPO_SLUG="tmoreton/yaprflow"
 MODELS_TAG="models-v2"
-TARBALL="parakeet-tdt-0.6b-v2.tar.gz"
+TARBALL="parakeet-v2-encoder.tar.gz"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="$ROOT/Models/parakeet-tdt-0.6b-v2"
@@ -24,18 +25,19 @@ if ! command -v gh >/dev/null 2>&1; then
     exit 1
 fi
 
-tar czf "$STAGE/$TARBALL" -C "$(dirname "$SRC")" "$(basename "$SRC")"
+echo "Packaging $SRC/Encoder.mlmodelc → $TARBALL ..."
+tar czf "$STAGE/$TARBALL" -C "$SRC" "Encoder.mlmodelc"
 ls -lh "$STAGE/$TARBALL"
 
 if gh release view "$MODELS_TAG" --repo "$REPO_SLUG" >/dev/null 2>&1; then
-    echo "Uploading to existing release $MODELS_TAG…"
+    echo "Uploading to existing release ${MODELS_TAG}..."
     gh release upload "$MODELS_TAG" "$STAGE/$TARBALL" --repo "$REPO_SLUG" --clobber
 else
-    echo "Creating release $MODELS_TAG…"
+    echo "Creating release ${MODELS_TAG}..."
     gh release create "$MODELS_TAG" "$STAGE/$TARBALL" \
         --repo "$REPO_SLUG" \
-        --title "Parakeet TDT 0.6B v2 (Core ML)" \
-        --notes "Core ML bundle mirrored from FluidInference/parakeet-tdt-0.6b-v2-coreml for offline app builds."
+        --title "Parakeet TDT 0.6B v2 Encoder (Core ML)" \
+        --notes "Core ML Encoder.mlmodelc for FluidInference/parakeet-tdt-0.6b-v2-coreml. Downloaded on first launch by Yaprflow; small model pieces ship inside the app bundle."
 fi
 
 echo "Done."

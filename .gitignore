@@ -2,6 +2,7 @@
 build/
 DerivedData/
 *.dmg
+*.app
 
 # Xcode user state
 *.xcuserstate
