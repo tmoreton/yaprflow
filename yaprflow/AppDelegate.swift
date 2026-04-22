@@ -12,8 +12,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         registerHotkey()
 
         // Warm the ASR + VAD models in the background so the first hotkey press
-        // doesn't block on the ~30s Encoder compile.
+        // doesn't block on the ~30s Encoder compile. On first launch this also
+        // starts downloading the encoder from GitHub Releases in parallel with
+        // the onboarding flow.
         TranscriptionController.shared.preload()
+
+        if !OnboardingWindowController.hasCompleted {
+            OnboardingWindowController.shared.show()
+        }
 
         NotificationCenter.default.addObserver(
             forName: .yaprflowHotkeyChanged,

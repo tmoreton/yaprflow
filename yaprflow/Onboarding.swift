@@ -1,0 +1,201 @@
+import AppKit
+import AVFoundation
+import SwiftUI
+
+private enum OnboardingStep {
+    case welcome
+    case permissions
+}
+
+struct OnboardingView: View {
+    let onComplete: () -> Void
+
+    @State private var step: OnboardingStep = .welcome
+    @State private var micStatus: AVAuthorizationStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            Group {
+                switch step {
+                case .welcome:     welcomeScreen
+                case .permissions: permissionsScreen
+                }
+            }
+            .transition(.opacity)
+        }
+        .frame(width: 480, height: 520)
+    }
+
+    private var welcomeScreen: some View {
+        VStack(spacing: 0) {
+            Spacer()
+            Image(nsImage: NSWorkspace.shared.icon(forFile: Bundle.main.bundlePath))
+                .resizable()
+                .interpolation(.high)
+                .frame(width: 128, height: 128)
+            Text("Yaprflow")
+                .font(.system(size: 40, weight: .bold))
+                .foregroundStyle(.white)
+                .padding(.top, 24)
+            Text("Private, offline dictation for macOS")
+                .font(.system(size: 14))
+                .foregroundStyle(Color.white.opacity(0.55))
+                .padding(.top, 8)
+            Spacer()
+            Button {
+                withAnimation(.easeInOut(duration: 0.25)) { step = .permissions }
+            } label: {
+                Text("Get started").frame(maxWidth: .infinity)
+            }
+            .buttonStyle(OnboardingButtonStyle())
+            .frame(width: 260)
+            .padding(.bottom, 48)
+        }
+    }
+
+    private var permissionsScreen: some View {
+        VStack(spacing: 0) {
+            Spacer()
+            Image(systemName: "mic.fill")
+                .font(.system(size: 56))
+                .foregroundStyle(.white)
+                .frame(width: 128, height: 128)
+                .background(
+                    RoundedRectangle(cornerRadius: 28)
+                        .fill(Color.white.opacity(0.08))
+                )
+            Text("Enable microphone")
+                .font(.system(size: 26, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.top, 24)
+            Text("Yaprflow needs microphone access to transcribe\nyour voice. Audio never leaves your Mac.")
+                .font(.system(size: 13))
+                .foregroundStyle(Color.white.opacity(0.55))
+                .multilineTextAlignment(.center)
+                .lineSpacing(4)
+                .padding(.top, 8)
+            Spacer()
+            VStack(spacing: 12) {
+                Button {
+                    handlePrimaryAction()
+                } label: {
+                    Text(primaryButtonTitle).frame(maxWidth: .infinity)
+                }
+                .buttonStyle(OnboardingButtonStyle())
+                .frame(width: 260)
+
+                if micStatus != .authorized {
+                    Button("Skip for now") { onComplete() }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.white.opacity(0.45))
+                }
+            }
+            .padding(.bottom, 40)
+        }
+    }
+
+    private var primaryButtonTitle: String {
+        switch micStatus {
+        case .authorized:         return "You're all set"
+        case .denied, .restricted: return "Open System Settings"
+        case .notDetermined:       return "Grant microphone access"
+        @unknown default:          return "Continue"
+        }
+    }
+
+    private func handlePrimaryAction() {
+        switch micStatus {
+        case .authorized:
+            onComplete()
+        case .denied, .restricted:
+            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
+                NSWorkspace.shared.open(url)
+            }
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .audio) { _ in
+                DispatchQueue.main.async {
+                    self.micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+                    if self.micStatus == .authorized {
+                        self.onComplete()
+                    }
+                }
+            }
+        @unknown default:
+            onComplete()
+        }
+    }
+}
+
+private struct OnboardingButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(.black)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color.white.opacity(configuration.isPressed ? 0.85 : 1.0))
+            )
+    }
+}
+
+@MainActor
+final class OnboardingWindowController: NSObject, NSWindowDelegate {
+    static let shared = OnboardingWindowController()
+
+    private static let defaultsKey = "yaprflow.didCompleteOnboarding"
+    private var window: NSWindow?
+
+    static var hasCompleted: Bool {
+        UserDefaults.standard.bool(forKey: defaultsKey)
+    }
+
+    func show() {
+        if let existing = window {
+            existing.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+
+        let rootView = OnboardingView { [weak self] in
+            self?.complete()
+        }
+
+        let hosting = NSHostingController(rootView: rootView)
+        let newWindow = NSWindow(contentViewController: hosting)
+        newWindow.setContentSize(NSSize(width: 480, height: 520))
+        newWindow.styleMask = [.titled, .closable, .fullSizeContentView]
+        newWindow.titlebarAppearsTransparent = true
+        newWindow.titleVisibility = .hidden
+        newWindow.title = ""
+        newWindow.isMovableByWindowBackground = true
+        newWindow.backgroundColor = .black
+        newWindow.isReleasedWhenClosed = false
+        newWindow.delegate = self
+        newWindow.center()
+
+        window = newWindow
+
+        // Temporarily show the app in the Dock so the onboarding window is
+        // focusable; we flip back to .accessory on completion.
+        NSApp.setActivationPolicy(.regular)
+        newWindow.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func complete() {
+        window?.close() // windowWillClose will finish the cleanup.
+    }
+
+    // MARK: - NSWindowDelegate
+
+    nonisolated func windowWillClose(_ notification: Notification) {
+        Task { @MainActor in
+            UserDefaults.standard.set(true, forKey: Self.defaultsKey)
+            self.window = nil
+            NSApp.setActivationPolicy(.accessory)
+        }
+    }
+}

@@ -236,13 +236,13 @@ final class TranscriptionController {
         guard let asr = asrManager else { return }
         do {
             let result = try await asr.transcribe(samples, source: .microphone)
-            let trimmed = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            let cleaned = Self.cleanTranscript(result.text)
             await MainActor.run {
-                if !trimmed.isEmpty {
+                if !cleaned.isEmpty {
                     if self.confirmedText.isEmpty {
-                        self.confirmedText = trimmed
+                        self.confirmedText = cleaned
                     } else {
-                        self.confirmedText += " " + trimmed
+                        self.confirmedText += " " + cleaned
                     }
                 }
                 // This segment is confirmed — drop any volatile text that was
@@ -270,17 +270,46 @@ final class TranscriptionController {
         guard let asr = asrManager else { return }
         do {
             let result = try await asr.transcribe(samples, source: .microphone)
-            let trimmed = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            let cleaned = Self.cleanTranscript(result.text)
             await MainActor.run {
                 // Re-check relevance: the segment may have ended or a new one
                 // started by the time the transcribe returned.
                 guard self.isActive, self.currentSpeechStart == segmentStart else { return }
-                self.volatileText = trimmed
+                self.volatileText = cleaned
                 self.state.liveTranscript = self.displayText()
             }
         } catch {
             log.error("Speculative transcribe failed: \(error.localizedDescription)")
         }
+    }
+
+    /// Regex matching filler words ("uh", "um", "er", "ah", "hmm", "mm"
+    /// and obvious repetitions like "uhhh") as standalone words — not
+    /// substrings — so we don't eat real tokens like "umbrella" or "ermine".
+    /// Optional trailing comma or period gets swallowed with the filler.
+    private static let fillerWordRegex: NSRegularExpression = {
+        let pattern = #"(?i)\b(?:u+h+m*|u+m+h*|e+r+h*|a+h+m*|hmm+|mm+|mhm+)\b[,\.]?\s*"#
+        return try! NSRegularExpression(pattern: pattern)
+    }()
+
+    private static func cleanTranscript(_ raw: String) -> String {
+        let range = NSRange(raw.startIndex..., in: raw)
+        var text = fillerWordRegex.stringByReplacingMatches(
+            in: raw,
+            options: [],
+            range: range,
+            withTemplate: ""
+        )
+        // Tidy up double spaces and stranded leading punctuation the model may
+        // leave behind (e.g. "um, hello" → ", hello" → "hello").
+        while text.contains("  ") {
+            text = text.replacingOccurrences(of: "  ", with: " ")
+        }
+        text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let first = text.first, ",.;:!?".contains(first) {
+            text = String(text.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return text
     }
 
     private func displayText() -> String {
