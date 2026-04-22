@@ -43,6 +43,9 @@ hdiutil attach "$RW_DMG" -mountpoint "$MOUNT_DIR" -nobrowse -noautoopen
 echo "==> Copying app into DMG..."
 ditto "$STAGE/yaprflow.app" "$MOUNT_DIR/yaprflow.app"
 
+echo "==> Adding /Applications shortcut..."
+ln -s /Applications "$MOUNT_DIR/Applications"
+
 echo "==> Detaching..."
 hdiutil detach "$MOUNT_DIR" -quiet
 
