@@ -319,12 +319,30 @@ final class TranscriptionController {
             mlConfig.computeUnits = .cpuAndNeuralEngine
 
             let modelDir = try await self.ensureModelsLocally()
+
+            state.status = .preparing("Preparing speech model for your Mac…")
             log.info("Loading ASR model from \(modelDir.path, privacy: .public)")
-            let asrModels = try await AsrModels.load(
-                from: modelDir,
-                configuration: mlConfig,
-                version: .v2
-            )
+
+            let asrModels: AsrModels
+            do {
+                asrModels = try await AsrModels.load(
+                    from: modelDir,
+                    configuration: mlConfig,
+                    version: .v2
+                )
+            } catch {
+                // A freshly-downloaded model that fails to load is almost
+                // always bytes on disk that CoreML can't parse — wipe and
+                // retry once before giving up.
+                log.error("Initial model load failed (\(error.localizedDescription)); clearing cache and retrying.")
+                try? FileManager.default.removeItem(at: Self.cachedModelDir())
+                let freshModelDir = try await self.ensureModelsLocally()
+                asrModels = try await AsrModels.load(
+                    from: freshModelDir,
+                    configuration: mlConfig,
+                    version: .v2
+                )
+            }
 
             let asr = AsrManager(config: .default)
             try await asr.loadModels(asrModels)
@@ -339,6 +357,13 @@ final class TranscriptionController {
                 log.info("Bundled VAD missing, downloading Silero VAD from HuggingFace")
                 vad = try await VadManager(config: vadConfig)
             }
+
+            // Warm up first-inference compile paths. Without this, the user's
+            // first real transcribe on a fresh install pays a 5–10s CoreML
+            // warmup cost and feels broken. One silent chunk each is enough.
+            state.status = .preparing("Warming up…")
+            log.info("Warming up ASR + VAD with silent chunks")
+            await Self.warmUp(asr: asr, vad: vad)
 
             return (asr, vad)
         }
@@ -416,22 +441,6 @@ final class TranscriptionController {
             return false
         }
         return true
-    }
-
-    /// User-facing cache path (shown in logs, used for "Clear model cache" action).
-    static var modelCachePath: String {
-        Self.cachedModelDir().path
-    }
-
-    /// Deletes the cached encoder/small files so the next launch re-downloads.
-    /// Safe to call at any time; harmless if cache is empty.
-    func clearModelCache() {
-        try? FileManager.default.removeItem(at: Self.cachedModelDir())
-        // Force the next start() to reload.
-        asrManager = nil
-        vadManager = nil
-        loadingTask = nil
-        log.info("Model cache cleared; next launch will re-download.")
     }
 
     private func ensureModelsLocally() async throws -> URL {
@@ -513,6 +522,27 @@ final class TranscriptionController {
         // Download + extract Encoder if not already there.
         if !fm.fileExists(atPath: cacheDir.appendingPathComponent("Encoder.mlmodelc").path) {
             try await downloadAndExtractEncoder(into: cacheDir)
+        }
+    }
+
+    /// Run a silent chunk through both models so CoreML's per-device
+    /// compile + first-inference warmup happens during preload, not on the
+    /// user's first real dictation. Any error here is swallowed — the worst
+    /// case is the original slow-first-call behaviour.
+    private static func warmUp(asr: AsrManager, vad: VadManager) async {
+        do {
+            let oneSecondOfSilence = [Float](repeating: 0.0, count: 16_000)
+            _ = try await asr.transcribe(oneSecondOfSilence, source: .microphone)
+        } catch {
+            log.info("ASR warmup skipped: \(error.localizedDescription, privacy: .public)")
+        }
+
+        do {
+            let chunk = [Float](repeating: 0.0, count: VadManager.chunkSize)
+            let state = await vad.makeStreamState()
+            _ = try await vad.processStreamingChunk(chunk, state: state)
+        } catch {
+            log.info("VAD warmup skipped: \(error.localizedDescription, privacy: .public)")
         }
     }
 
