@@ -15,6 +15,7 @@ final class AppState: ObservableObject {
     static let shared = AppState()
 
     private static let streamingModeKey = "yaprflow.streamingMode"
+    private static let lastTranscriptKey = "yaprflow.lastTranscript"
 
     @Published var status: TranscriptionStatus = .idle
     @Published var liveTranscript: String = ""
@@ -30,12 +31,21 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Most recent finalized transcript. Persisted so it survives restarts and
+    /// can be re-copied from the menu bar after the clipboard has been replaced.
+    @Published var lastTranscript: String {
+        didSet {
+            UserDefaults.standard.set(lastTranscript, forKey: Self.lastTranscriptKey)
+        }
+    }
+
     private init() {
         if let stored = UserDefaults.standard.object(forKey: Self.streamingModeKey) as? Bool {
             self.streamingMode = stored
         } else {
             self.streamingMode = true
         }
+        self.lastTranscript = UserDefaults.standard.string(forKey: Self.lastTranscriptKey) ?? ""
     }
 }
 

@@ -160,6 +160,7 @@ final class TranscriptionController {
             let pb = NSPasteboard.general
             pb.clearContents()
             pb.setString(finalText, forType: .string)
+            state.lastTranscript = finalText
             state.status = .copied
         } else {
             state.status = .idle

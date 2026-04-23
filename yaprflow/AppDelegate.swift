@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var statusItem: NSStatusItem?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -59,6 +59,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(NSMenuItem.separator())
 
+        let copyItem = NSMenuItem(
+            title: "Copy Last Transcript",
+            action: #selector(copyLastTranscript),
+            keyEquivalent: ""
+        )
+        copyItem.target = self
+        let copyIcon = NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: nil)
+        copyIcon?.isTemplate = true
+        copyItem.image = copyIcon?.withSymbolConfiguration(
+            NSImage.SymbolConfiguration(pointSize: 12, weight: .regular)
+        )
+        menu.addItem(copyItem)
+
+        menu.addItem(NSMenuItem.separator())
+
         menu.addItem(NSMenuItem(
             title: "Quit",
             action: #selector(NSApplication.terminate(_:)),
@@ -67,6 +82,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         item.menu = menu
         self.statusItem = item
+    }
+
+    @objc private func copyLastTranscript() {
+        let transcript = AppState.shared.lastTranscript
+        guard !transcript.isEmpty else { return }
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.setString(transcript, forType: .string)
+    }
+
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(copyLastTranscript) {
+            return !AppState.shared.lastTranscript.isEmpty
+        }
+        return true
     }
 
     private func registerHotkey() {
