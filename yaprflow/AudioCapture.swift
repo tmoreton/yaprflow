@@ -1,4 +1,4 @@
-import AVFoundation
+@preconcurrency import AVFoundation
 
 nonisolated final class AudioCapture: @unchecked Sendable {
     private let engine = AVAudioEngine()

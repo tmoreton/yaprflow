@@ -4,6 +4,7 @@ struct NotchOverlayView: View {
     @ObservedObject var state: AppState
 
     private static let transcriptFont = Font.system(size: 15, weight: .medium)
+    private static let subtitleFont = Font.system(size: 12, weight: .regular)
     private static let maxCharsPerLine = 56
     private static let cornerRadius: CGFloat = 22
 
@@ -13,12 +14,23 @@ struct NotchOverlayView: View {
                 .frame(width: 14, height: 14)
                 .padding(.top, 3)
 
-            Text(displayText)
-                .font(Self.transcriptFont)
-                .foregroundStyle(.white)
-                .multilineTextAlignment(.leading)
-                .lineLimit(2)
-                .fixedSize(horizontal: true, vertical: true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(displayText)
+                    .font(Self.transcriptFont)
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: true, vertical: true)
+
+                if showSubtitle {
+                    Text(subtitleText)
+                        .font(Self.subtitleFont)
+                        .foregroundStyle(.white.opacity(0.5))
+                        .multilineTextAlignment(.leading)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: true)
+                }
+            }
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 10)
@@ -47,11 +59,34 @@ struct NotchOverlayView: View {
             return state.liveTranscript.isEmpty ? "Listening…" : Self.wrappedTail(of: state.liveTranscript)
         case .finishing:
             return state.liveTranscript.isEmpty ? "Processing…" : Self.wrappedTail(of: state.liveTranscript)
+        case .correcting(let message):
+            return message
         case .copied:
-            return "Copied to clipboard"
+            if state.liveTranscript.isEmpty {
+                return "Copied to clipboard"
+            }
+            return Self.wrappedTail(of: state.liveTranscript)
         case .error(let message):
             return message
         }
+    }
+
+    private var showSubtitle: Bool {
+        if case .copied = state.status,
+           !state.lastOriginalTranscript.isEmpty,
+           state.lastOriginalTranscript != state.liveTranscript {
+            return true
+        }
+        return false
+    }
+
+    private var subtitleText: String {
+        guard showSubtitle else { return "" }
+        let original = state.lastOriginalTranscript
+        let wrapped = Self.wrapLines("Original: " + original, maxCharsPerLine: Self.maxCharsPerLine)
+            .suffix(1)
+            .joined(separator: "\n")
+        return wrapped
     }
 
     private static func wrappedTail(of text: String) -> String {
@@ -85,6 +120,10 @@ struct NotchOverlayView: View {
                 .fill(Color.red)
                 .frame(width: 10, height: 10)
                 .modifier(RecordingPulse())
+        case .correcting:
+            ProgressView()
+                .controlSize(.small)
+                .tint(.white)
         case .copied:
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(.green)

@@ -17,6 +17,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         // the onboarding flow.
         TranscriptionController.shared.preload()
 
+        // Preload the grammar model in the background so the first correction
+        // doesn't block on download + compile.
+        GrammarController.shared.preload()
+
         if !OnboardingWindowController.hasCompleted {
             OnboardingWindowController.shared.show()
         }
@@ -57,10 +61,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         streamingItem.toolTip = "Show live partials while you speak. Turn off for single-shot mode — more accurate on longer dictations, but no text appears until you stop."
         menu.addItem(streamingItem)
 
+        let grammarItem = NSMenuItem()
+        grammarItem.view = GrammarModeMenuItemView()
+        grammarItem.toolTip = "Run each transcript through an on-device LLM for grammar and punctuation correction."
+        menu.addItem(grammarItem)
+
         menu.addItem(NSMenuItem.separator())
 
         let copyItem = NSMenuItem(
-            title: "Copy Last Transcript",
+            title: "Copy Corrected Text",
             action: #selector(copyLastTranscript),
             keyEquivalent: ""
         )
@@ -71,6 +80,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             NSImage.SymbolConfiguration(pointSize: 12, weight: .regular)
         )
         menu.addItem(copyItem)
+
+        let copyOriginalItem = NSMenuItem(
+            title: "Copy Original Text",
+            action: #selector(copyOriginalTranscript),
+            keyEquivalent: ""
+        )
+        copyOriginalItem.target = self
+        let copyOriginalIcon = NSImage(systemSymbolName: "doc.text", accessibilityDescription: nil)
+        copyOriginalIcon?.isTemplate = true
+        copyOriginalItem.image = copyOriginalIcon?.withSymbolConfiguration(
+            NSImage.SymbolConfiguration(pointSize: 12, weight: .regular)
+        )
+        menu.addItem(copyOriginalItem)
 
         menu.addItem(NSMenuItem.separator())
 
@@ -92,9 +114,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         pb.setString(transcript, forType: .string)
     }
 
+    @objc private func copyOriginalTranscript() {
+        let transcript = AppState.shared.lastOriginalTranscript
+        guard !transcript.isEmpty else { return }
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.setString(transcript, forType: .string)
+    }
+
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         if menuItem.action == #selector(copyLastTranscript) {
             return !AppState.shared.lastTranscript.isEmpty
+        }
+        if menuItem.action == #selector(copyOriginalTranscript) {
+            return !AppState.shared.lastOriginalTranscript.isEmpty
         }
         return true
     }

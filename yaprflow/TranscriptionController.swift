@@ -1,4 +1,4 @@
-import AVFoundation
+@preconcurrency import AVFoundation
 import AppKit
 import CoreML
 import FluidAudio
@@ -161,11 +161,36 @@ final class TranscriptionController {
             pb.clearContents()
             pb.setString(finalText, forType: .string)
             state.lastTranscript = finalText
-            state.status = .copied
+
+            if state.grammarMode {
+                state.status = .correcting("Improving grammar…")
+                autoHideTask?.cancel()
+                autoHideTask = nil
+
+                Task { @MainActor in
+                    do {
+                        let corrected = try await GrammarController.shared.correct(text: finalText) { msg in
+                            self.state.status = .correcting(msg)
+                        }
+                        self.state.liveTranscript = corrected
+                        self.state.lastTranscript = corrected
+                        self.state.lastOriginalTranscript = finalText
+                        self.state.status = .copied
+                        self.scheduleAutoHide(after: 2.5)
+                    } catch {
+                        log.error("Grammar correction failed: \(error.localizedDescription)")
+                        self.state.status = .copied
+                        self.scheduleAutoHide(after: 1.2)
+                    }
+                }
+            } else {
+                state.status = .copied
+                scheduleAutoHide(after: 1.2)
+            }
         } else {
             state.status = .idle
+            scheduleAutoHide(after: 1.2)
         }
-        scheduleAutoHide(after: 1.2)
     }
 
     private func feed(_ buffer: AVAudioPCMBuffer) async {
