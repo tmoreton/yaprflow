@@ -104,8 +104,9 @@ enum GrammarError: LocalizedError {
 final class GrammarController {
     static let shared = GrammarController()
 
-    /// Qwen3 1.7B 4-bit from mlx-community.
-    private let modelID = "mlx-community/Qwen3-1.7B-4bit"
+    /// Qwen2.5 1.5B 4-bit from mlx-community — no thinking mode, clean output.
+    /// Switched from Qwen3 to avoid thinking blocks entirely.
+    private let modelID = "mlx-community/Qwen2.5-1.5B-Instruct-4bit"
 
     private var modelContainer: ModelContainer?
     private var idleReleaseTask: Task<Void, Never>?
@@ -115,11 +116,6 @@ final class GrammarController {
         Fix grammar, spelling, and punctuation. Preserve meaning. \
         Do not explain. Return only corrected text.
         """
-
-    private static let thinkTagRegex: NSRegularExpression = {
-        let pattern = #"</?think>"#
-        return try! NSRegularExpression(pattern: pattern, options: [.caseInsensitive])
-    }()
 
     private init() {}
 
@@ -161,7 +157,10 @@ final class GrammarController {
             }
         }
 
-        corrected = Self.cleanOutput(corrected)
+        corrected = corrected.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Log for testing/debugging
+        log.info("Grammar: '\(text)' -> '\(corrected)'")
 
         if corrected.isEmpty {
             return text
@@ -202,22 +201,5 @@ final class GrammarController {
             self.modelContainer = nil
             log.info("Grammar model released after idle timeout")
         }
-    }
-
-    private static func cleanOutput(_ raw: String) -> String {
-        var text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        let range = NSRange(text.startIndex..., in: text)
-        text = Self.thinkTagRegex.stringByReplacingMatches(
-            in: text,
-            options: [],
-            range: range,
-            withTemplate: ""
-        )
-
-        while text.contains("  ") {
-            text = text.replacingOccurrences(of: "  ", with: " ")
-        }
-        return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
