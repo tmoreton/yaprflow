@@ -62,31 +62,48 @@ struct NotchOverlayView: View {
         case .correcting(let message):
             return message
         case .copied:
-            if state.liveTranscript.isEmpty {
-                return "Copied to clipboard"
-            }
-            return Self.wrappedTail(of: state.liveTranscript)
+            return copiedDisplayText
         case .error(let message):
             return message
         }
     }
 
-    private var showSubtitle: Bool {
-        if case .copied = state.status,
-           !state.lastOriginalTranscript.isEmpty,
-           state.lastOriginalTranscript != state.liveTranscript {
-            return true
+    /// Shows appropriate text for the copied state.
+    /// For long transcripts, shows a simple confirmation instead of truncated text.
+    private var copiedDisplayText: String {
+        // If we have a grammar-corrected version different from original, show that
+        if !state.lastTranscript.isEmpty &&
+           !state.lastOriginalTranscript.isEmpty &&
+           state.lastTranscript != state.lastOriginalTranscript {
+            return "Grammar corrected"
         }
-        return false
+
+        // For regular transcription, show tail or confirmation
+        if state.liveTranscript.isEmpty {
+            return "Copied to clipboard"
+        }
+
+        // For short text, show the actual content
+        if state.liveTranscript.count <= Self.maxCharsPerLine * 2 {
+            return state.liveTranscript
+        }
+
+        // For long text, just show confirmation
+        return "Copied to clipboard"
+    }
+
+    private var showSubtitle: Bool {
+        guard case .copied = state.status else { return false }
+        // Show subtitle when we have grammar correction results
+        return !state.lastTranscript.isEmpty &&
+               !state.lastOriginalTranscript.isEmpty &&
+               state.lastTranscript != state.lastOriginalTranscript
     }
 
     private var subtitleText: String {
         guard showSubtitle else { return "" }
-        let original = state.lastOriginalTranscript
-        let wrapped = Self.wrapLines("Original: " + original, maxCharsPerLine: Self.maxCharsPerLine)
-            .suffix(1)
-            .joined(separator: "\n")
-        return wrapped
+        // Show a hint that original is available in menu
+        return "View original in menu ⌄"
     }
 
     private static func wrappedTail(of text: String) -> String {

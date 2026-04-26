@@ -1,19 +1,17 @@
 import Foundation
 import MLXLLM
 import MLXLMCommon
-import HuggingFace
 import Tokenizers
 import OSLog
 
 private let log = Logger(subsystem: "com.tmoreton.yaprflow", category: "Grammar")
 
-/// Bridges HuggingFace.HubClient to MLXLMCommon.Downloader
-private struct HubDownloader: MLXLMCommon.Downloader {
-    private let upstream: HuggingFace.HubClient
+// MARK: - GitHub Releases Downloader
 
-    init(_ upstream: HuggingFace.HubClient = HubClient()) {
-        self.upstream = upstream
-    }
+/// Downloads and extracts the grammar model from GitHub releases
+private struct GitHubReleasesDownloader: MLXLMCommon.Downloader, @unchecked Sendable {
+    let releaseURL: URL
+    let modelDirName: String
 
     func download(
         id: String,
@@ -22,20 +20,89 @@ private struct HubDownloader: MLXLMCommon.Downloader {
         useLatest: Bool,
         progressHandler: @Sendable @escaping (Progress) -> Void
     ) async throws -> URL {
-        guard let repoID = HuggingFace.Repo.ID(rawValue: id) else {
-            throw GrammarError.invalidRepositoryID(id)
-        }
-        let rev = revision ?? "main"
-        return try await upstream.downloadSnapshot(
-            of: repoID,
-            revision: rev,
-            matching: patterns,
-            progressHandler: { @MainActor progress in
-                progressHandler(progress)
+        // Determine cache location
+        let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("com.tmoreton.yaprflow/models", isDirectory: true)
+        let modelDir = cacheDir.appendingPathComponent(modelDirName, isDirectory: true)
+        let tarballPath = cacheDir.appendingPathComponent("\(modelDirName).tar.gz")
+
+        // Check if already extracted
+        if FileManager.default.fileExists(atPath: modelDir.path) {
+            let configPath = modelDir.appendingPathComponent("config.json")
+            if FileManager.default.fileExists(atPath: configPath.path) {
+                return modelDir
             }
-        )
+        }
+
+        // Create cache directory
+        try FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
+
+        let progress = Progress(totalUnitCount: 100)
+
+        // Download if not already present
+        if !FileManager.default.fileExists(atPath: tarballPath.path) {
+            progress.completedUnitCount = 0
+            progressHandler(progress)
+
+            let (localURL, _) = try await URLSession.shared.download(from: releaseURL)
+
+            // Move to cache location
+            if FileManager.default.fileExists(atPath: tarballPath.path) {
+                try FileManager.default.removeItem(at: tarballPath)
+            }
+            try FileManager.default.moveItem(at: localURL, to: tarballPath)
+
+            progress.completedUnitCount = 50
+            progressHandler(progress)
+        }
+
+        // Extract if not already done
+        return try await extract(tarball: tarballPath, to: modelDir, progress: progress, progressHandler: progressHandler)
+    }
+
+    private func extract(
+        tarball: URL,
+        to destination: URL,
+        progress: Progress,
+        progressHandler: @Sendable @escaping (Progress) -> Void
+    ) async throws -> URL {
+        // Remove existing directory if present
+        if FileManager.default.fileExists(atPath: destination.path) {
+            try FileManager.default.removeItem(at: destination)
+        }
+
+        // Create extraction directory
+        try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+
+        // Extract tar.gz using tar command
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/tar")
+        process.arguments = ["-xzf", tarball.path, "-C", destination.path, "--strip-components=1"]
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+
+        try process.run()
+        process.waitUntilExit()
+
+        if process.terminationStatus != 0 {
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            let error = String(data: data, encoding: .utf8) ?? "Unknown error"
+            throw GrammarError.extractionFailed(error)
+        }
+
+        // Clean up tarball after successful extraction
+        try FileManager.default.removeItem(at: tarball)
+
+        progress.completedUnitCount = 100
+        progressHandler(progress)
+
+        return destination
     }
 }
+
+// MARK: - Tokenizer Bridge
 
 /// Bridges Tokenizers.Tokenizer to MLXLMCommon.Tokenizer
 private struct TokenizerBridge: MLXLMCommon.Tokenizer {
@@ -89,31 +156,37 @@ private struct TransformersLoader: MLXLMCommon.TokenizerLoader {
     }
 }
 
+// MARK: - Errors
+
 enum GrammarError: LocalizedError {
-    case invalidRepositoryID(String)
+    case extractionFailed(String)
 
     var errorDescription: String? {
         switch self {
-        case .invalidRepositoryID(let id):
-            return "Invalid HuggingFace repository ID: \(id)"
+        case .extractionFailed(let reason):
+            return "Failed to extract model: \(reason)"
         }
     }
 }
+
+// MARK: - GrammarController
 
 @MainActor
 final class GrammarController {
     static let shared = GrammarController()
 
-    /// Qwen2.5 1.5B 4-bit from mlx-community — no thinking mode, clean output.
-    /// Switched from Qwen3 to avoid thinking blocks entirely.
-    private let modelID = "mlx-community/Qwen2.5-1.5B-Instruct-4bit"
+    /// GitHub releases URL for the Qwen2.5-1.5B-4bit model
+    private let modelURL = URL(string: "https://github.com/tmoreton/yaprflow/releases/download/v0.1.0-grammar-model/qwen25-1.5b-4bit-mlx.tar.gz")!
+    private let modelDirName = "grammar-model-qwen25-1.5b"
 
     private var modelContainer: ModelContainer?
     private var idleReleaseTask: Task<Void, Never>?
     private let idleTimeout: TimeInterval = 300
 
     private let systemPrompt = """
-        Fix grammar, spelling, and punctuation. Preserve meaning. \
+        Fix grammar, spelling, and punctuation. Preserve meaning, intent, and structure. \
+        Do NOT restructure sentences or change their flow. \
+        Sentences beginning with "Because" are valid — do not change them. \
         Do not explain. Return only corrected text.
         """
 
@@ -138,9 +211,9 @@ final class GrammarController {
 
         let params = GenerateParameters(
             maxTokens: 256,
-            temperature: 0,
-            topP: 1.0,
-            topK: 0
+            temperature: 0.3,
+            topP: 0.9,
+            topK: 40
         )
 
         let stream = try await container.generate(input: input, parameters: params)
@@ -159,9 +232,6 @@ final class GrammarController {
 
         corrected = corrected.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        // Log for testing/debugging
-        log.info("Grammar: '\(text)' -> '\(corrected)'")
-
         if corrected.isEmpty {
             return text
         }
@@ -175,16 +245,23 @@ final class GrammarController {
             return existing
         }
 
-        progress("Loading grammar model…")
+        progress("Downloading grammar model…")
 
-        let config = LLMRegistry.shared.configuration(id: modelID)
+        let downloader = GitHubReleasesDownloader(
+            releaseURL: modelURL,
+            modelDirName: modelDirName
+        )
+
+        // Use Qwen2.5 configuration from LLMRegistry
+        let config = LLMRegistry.shared.configuration(id: "mlx-community/Qwen2.5-1.5B-Instruct-4bit")
+
         let container = try await loadModelContainer(
-            from: HubDownloader(),
+            from: downloader,
             using: TransformersLoader(),
             configuration: config
         )
 
-        log.info("Grammar model loaded: \(self.modelID)")
+        log.info("Grammar model loaded from GitHub releases")
         self.modelContainer = container
         resetIdleTimer()
         return container
