@@ -184,10 +184,9 @@ final class GrammarController {
     private let idleTimeout: TimeInterval = 300
 
     private let systemPrompt = """
-        Fix grammar, spelling, and punctuation. Preserve meaning, intent, and structure. \
-        Do NOT restructure sentences or change their flow. \
-        Sentences beginning with "Because" are valid — do not change them. \
-        Do not explain. Return only corrected text.
+        Fix grammar, spelling, and punctuation. Ensure fragments become \
+        complete, standalone sentences that make sense on their own. \
+        Preserve meaning and intent. Do not explain. Return only corrected text.
         """
 
     private init() {}
