@@ -189,11 +189,26 @@ final class GrammarController {
         Preserve meaning and intent. Do not explain. Return only corrected text.
         """
 
+    private let summaryPrompt = """
+        Summarize the following text concisely. Capture the main points \
+        and key takeaways. Match summary length to input complexity. \
+        Do not explain. Return only the summary.
+        """
+
     private init() {}
 
+    /// Preloads the grammar model on app launch so first use doesn't block on download.
+    /// Call from AppDelegate.applicationDidFinishLaunching().
     func preload() {
         Task { @MainActor in
-            _ = try? await ensureLoaded()
+            do {
+                log.info("Preloading grammar model...")
+                _ = try await ensureLoaded()
+                log.info("Grammar model preloaded successfully")
+            } catch {
+                log.error("Grammar model preload failed: \(error.localizedDescription)")
+                // Model will be lazily loaded on first use with UI progress
+            }
         }
     }
 
@@ -237,6 +252,49 @@ final class GrammarController {
 
         resetIdleTimer()
         return corrected
+    }
+
+    /// Summarizes text on-demand. Called from menu action, not during transcription.
+    func summarize(text: String) async throws -> String {
+        let container = try await ensureLoaded()
+
+        let chat: [Chat.Message] = [
+            .system(summaryPrompt),
+            .user(text),
+        ]
+        let userInput = UserInput(chat: chat)
+
+        let input = try await container.prepare(input: userInput)
+
+        let params = GenerateParameters(
+            maxTokens: 512,
+            temperature: 0.3,
+            topP: 0.9,
+            topK: 40
+        )
+
+        let stream = try await container.generate(input: input, parameters: params)
+
+        var summary = ""
+        for await generation in stream {
+            switch generation {
+            case .chunk(let string):
+                summary += string
+            case .info:
+                break
+            @unknown default:
+                break
+            }
+        }
+
+        summary = summary.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if summary.isEmpty {
+            return text
+        }
+
+        resetIdleTimer()
+        return summary
     }
 
     private func ensureLoaded(progress: @escaping @MainActor (String) -> Void = { _ in }) async throws -> ModelContainer {

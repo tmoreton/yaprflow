@@ -68,9 +68,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
         menu.addItem(NSMenuItem.separator())
 
+        // Copy text: original first, then corrected if grammar mode was on
         let copyItem = NSMenuItem(
-            title: "Copy Corrected Text",
-            action: #selector(copyLastTranscript),
+            title: "Copy Transcript",
+            action: #selector(copyTranscript),
             keyEquivalent: ""
         )
         copyItem.target = self
@@ -81,18 +82,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         )
         menu.addItem(copyItem)
 
-        let copyOriginalItem = NSMenuItem(
-            title: "Copy Original Text",
-            action: #selector(copyOriginalTranscript),
+        // Summarize on demand
+        let summarizeItem = NSMenuItem(
+            title: "Copy Summary",
+            action: #selector(copySummary),
             keyEquivalent: ""
         )
-        copyOriginalItem.target = self
-        let copyOriginalIcon = NSImage(systemSymbolName: "doc.text", accessibilityDescription: nil)
-        copyOriginalIcon?.isTemplate = true
-        copyOriginalItem.image = copyOriginalIcon?.withSymbolConfiguration(
+        summarizeItem.target = self
+        let summarizeIcon = NSImage(systemSymbolName: "text.bullet.list", accessibilityDescription: nil)
+        summarizeIcon?.isTemplate = true
+        summarizeItem.image = summarizeIcon?.withSymbolConfiguration(
             NSImage.SymbolConfiguration(pointSize: 12, weight: .regular)
         )
-        menu.addItem(copyOriginalItem)
+        menu.addItem(summarizeItem)
 
         menu.addItem(NSMenuItem.separator())
 
@@ -106,28 +108,48 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         self.statusItem = item
     }
 
-    @objc private func copyLastTranscript() {
-        let transcript = AppState.shared.lastTranscript
-        guard !transcript.isEmpty else { return }
+    /// Copies original first, then corrected if available (overwrites clipboard)
+    @objc private func copyTranscript() {
+        let original = AppState.shared.lastOriginalTranscript
+        let corrected = AppState.shared.lastTranscript
+
         let pb = NSPasteboard.general
         pb.clearContents()
-        pb.setString(transcript, forType: .string)
+
+        // Put original first
+        if !original.isEmpty {
+            pb.setString(original, forType: .string)
+        }
+
+        // Overwrite with corrected if available and different
+        if !corrected.isEmpty && corrected != original {
+            pb.setString(corrected, forType: .string)
+        }
     }
 
-    @objc private func copyOriginalTranscript() {
-        let transcript = AppState.shared.lastOriginalTranscript
-        guard !transcript.isEmpty else { return }
-        let pb = NSPasteboard.general
-        pb.clearContents()
-        pb.setString(transcript, forType: .string)
+    /// Generates and copies a summary of the last transcript (on-demand)
+    @objc private func copySummary() {
+        let text = AppState.shared.lastTranscript
+        guard !text.isEmpty else { return }
+
+        Task { @MainActor in
+            do {
+                let summary = try await GrammarController.shared.summarize(text: text)
+                let pb = NSPasteboard.general
+                pb.clearContents()
+                pb.setString(summary, forType: .string)
+            } catch {
+                // Silent fail — don't disrupt user workflow
+            }
+        }
     }
 
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
-        if menuItem.action == #selector(copyLastTranscript) {
-            return !AppState.shared.lastTranscript.isEmpty
+        if menuItem.action == #selector(copyTranscript) {
+            return !AppState.shared.lastTranscript.isEmpty || !AppState.shared.lastOriginalTranscript.isEmpty
         }
-        if menuItem.action == #selector(copyOriginalTranscript) {
-            return !AppState.shared.lastOriginalTranscript.isEmpty
+        if menuItem.action == #selector(copySummary) {
+            return !AppState.shared.lastTranscript.isEmpty
         }
         return true
     }

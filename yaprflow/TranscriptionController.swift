@@ -157,12 +157,14 @@ final class TranscriptionController {
         state.liveTranscript = finalText
 
         if !finalText.isEmpty {
+            state.lastOriginalTranscript = finalText
             let pb = NSPasteboard.general
             pb.clearContents()
-            pb.setString(finalText, forType: .string)
-            state.lastTranscript = finalText
 
             if state.grammarMode {
+                // Grammar mode: copy original first, then corrected overwrites it
+                pb.setString(finalText, forType: .string)
+
                 state.status = .correcting("Improving grammar…")
                 autoHideTask?.cancel()
                 autoHideTask = nil
@@ -172,18 +174,25 @@ final class TranscriptionController {
                         let corrected = try await GrammarController.shared.correct(text: finalText) { msg in
                             self.state.status = .correcting(msg)
                         }
+                        // Overwrite clipboard with corrected version
+                        pb.setString(corrected, forType: .string)
+
                         self.state.liveTranscript = corrected
                         self.state.lastTranscript = corrected
-                        self.state.lastOriginalTranscript = finalText
                         self.state.status = .copied
                         self.scheduleAutoHide(after: 2.5)
                     } catch {
                         log.error("Grammar correction failed: \(error.localizedDescription)")
+                        // Keep original on clipboard, update state
+                        self.state.lastTranscript = finalText
                         self.state.status = .copied
                         self.scheduleAutoHide(after: 1.2)
                     }
                 }
             } else {
+                // Regular mode: just copy the transcript
+                pb.setString(finalText, forType: .string)
+                state.lastTranscript = finalText
                 state.status = .copied
                 scheduleAutoHide(after: 1.2)
             }
