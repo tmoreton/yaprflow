@@ -70,31 +70,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
         menu.addItem(NSMenuItem.separator())
 
-        // Copy text: original first, then corrected if grammar mode was on
-        let copyItem = NSMenuItem(
+        // Copy text: original first, then corrected if grammar mode was on.
+        // Custom view so the icon lines up with Shortcut/Streaming/Grammar above.
+        let copyItem = NSMenuItem()
+        copyItem.view = IconActionMenuItemView(
+            symbolName: "doc.on.clipboard",
             title: "Copy Transcript",
+            target: self,
             action: #selector(copyTranscript),
-            keyEquivalent: ""
-        )
-        copyItem.target = self
-        let copyIcon = NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: nil)
-        copyIcon?.isTemplate = true
-        copyItem.image = copyIcon?.withSymbolConfiguration(
-            NSImage.SymbolConfiguration(pointSize: 12, weight: .regular)
+            isEnabled: {
+                !AppState.shared.lastTranscript.isEmpty
+                    || !AppState.shared.lastOriginalTranscript.isEmpty
+            }
         )
         menu.addItem(copyItem)
 
         // Summarize on demand
-        let summarizeItem = NSMenuItem(
+        let summarizeItem = NSMenuItem()
+        summarizeItem.view = IconActionMenuItemView(
+            symbolName: "text.alignleft",
             title: "Copy Summary",
+            target: self,
             action: #selector(copySummary),
-            keyEquivalent: ""
-        )
-        summarizeItem.target = self
-        let summarizeIcon = NSImage(systemSymbolName: "text.bullet.list", accessibilityDescription: nil)
-        summarizeIcon?.isTemplate = true
-        summarizeItem.image = summarizeIcon?.withSymbolConfiguration(
-            NSImage.SymbolConfiguration(pointSize: 12, weight: .regular)
+            isEnabled: { !AppState.shared.lastTranscript.isEmpty }
         )
         menu.addItem(summarizeItem)
 

@@ -184,10 +184,15 @@ final class TranscriptionController {
                         self.scheduleAutoHide(after: 2.5)
                     } catch {
                         log.error("Grammar correction failed: \(error.localizedDescription)")
-                        // Keep original on clipboard, update state
+                        // Original is already on the clipboard. Surface the
+                        // failure briefly so the user notices grammar didn't
+                        // run — most often this is a fresh install where the
+                        // model download failed (network, 404 release tag,
+                        // etc.) and silent fallback would let it go undetected
+                        // forever.
                         self.state.lastTranscript = finalText
-                        self.state.status = .copied
-                        self.scheduleAutoHide(after: 1.2)
+                        self.state.status = .error("Grammar unavailable — copied original")
+                        self.scheduleAutoHide(after: 3.0)
                     }
                 }
             } else {

@@ -64,6 +64,12 @@ final class GrammarModeMenuItemView: NSView {
 
     override func mouseDown(with event: NSEvent) {
         AppState.shared.grammarMode.toggle()
+        // Kick off the model download in the background when the user flips
+        // grammar on from the menu bar — otherwise the download wouldn't
+        // start until their next dictation (or next app launch).
+        if AppState.shared.grammarMode {
+            GrammarController.shared.preload()
+        }
         // refresh() fires automatically via the Combine subscription above.
         enclosingMenuItem?.menu?.cancelTracking()
     }

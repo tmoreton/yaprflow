@@ -131,6 +131,13 @@ struct OnboardingView: View {
             Spacer()
             Button {
                 AppState.shared.grammarMode = grammarSelected
+                // Kick off the 788 MB grammar model download in the background
+                // as soon as the user opts in. AppDelegate's launch-time check
+                // already ran by the time we get here, so without this the
+                // download wouldn't start until first dictation (or next launch).
+                if grammarSelected {
+                    GrammarController.shared.preload()
+                }
                 withAnimation(.easeInOut(duration: 0.25)) { step = .permissions }
             } label: {
                 Text("Continue").frame(maxWidth: .infinity)
