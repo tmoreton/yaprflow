@@ -316,6 +316,10 @@
       gap: 16px;
     }
 
+    @media (max-width: 900px) {
+      .feature-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
     @media (max-width: 640px) {
       .feature-grid { grid-template-columns: 1fr; }
     }
@@ -433,7 +437,7 @@
       <a href="https://www.producthunt.com/products/yaprflow?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-yaprflow" target="_blank" rel="noopener noreferrer" class="producthunt-badge">
         <img alt="Yaprflow - Free, private transcription that lives in your Mac menu bar | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1131877&amp;theme=light&amp;t=1777078958435">
       </a>
-      <h1>Don't type.<br>Just speak.</h1>
+      <h1>Say it.<br>Paste it.</h1>
       <p class="subtitle">Private, offline voice-to-text for macOS. Press a hotkey, talk, and your words appear — anywhere.</p>
       <div class="cta-group">
         <a href="https://github.com/tmoreton/yaprflow/releases/latest/download/yaprflow.dmg" class="btn-primary" onclick="gtag('event', 'download', {'event_category': 'engagement', 'event_label': 'yaprflow.dmg'});">
@@ -480,6 +484,28 @@
           </div>
           <h3>Open source</h3>
           <p>Apache 2.0, no accounts, no subscriptions. Read the code, audit it, build it yourself.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+              <path d="M8 12h.01"/>
+              <path d="M12 12h.01"/>
+              <path d="M16 12h.01"/>
+            </svg>
+          </div>
+          <h3>Grammar correction</h3>
+          <p>Optional AI polish that cleans up "ums," fixes grammar, and makes your dictation read like clean prose — all local, no API calls.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+          </div>
+          <h3>Summarize & copy</h3>
+          <p>One-click summaries that condense long rambles into key points. Copied to clipboard instantly — ready to paste anywhere.</p>
         </div>
       </div>
     </section>

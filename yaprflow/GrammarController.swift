@@ -8,76 +8,49 @@ private let log = Logger(subsystem: "com.tmoreton.yaprflow", category: "Grammar"
 
 // MARK: - GitHub Releases Downloader
 
-/// Downloads and extracts the grammar model from GitHub releases
-private struct GitHubReleasesDownloader: MLXLMCommon.Downloader, @unchecked Sendable {
+/// Downloads and extracts the grammar model from GitHub releases (no HuggingFace)
+private actor GrammarModelDownloader {
     let releaseURL: URL
     let modelDirName: String
 
-    func download(
-        id: String,
-        revision: String?,
-        matching patterns: [String],
-        useLatest: Bool,
-        progressHandler: @Sendable @escaping (Progress) -> Void
-    ) async throws -> URL {
-        // Determine cache location
+    init(releaseURL: URL, modelDirName: String) {
+        self.releaseURL = releaseURL
+        self.modelDirName = modelDirName
+    }
+
+    /// Returns local directory URL (downloads if needed). Safe to call multiple times.
+    func downloadIfNeeded() async throws -> URL {
         let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("com.tmoreton.yaprflow/models", isDirectory: true)
         let modelDir = cacheDir.appendingPathComponent(modelDirName, isDirectory: true)
         let tarballPath = cacheDir.appendingPathComponent("\(modelDirName).tar.gz")
 
-        // Check if already extracted
-        if FileManager.default.fileExists(atPath: modelDir.path) {
-            let configPath = modelDir.appendingPathComponent("config.json")
-            if FileManager.default.fileExists(atPath: configPath.path) {
-                return modelDir
-            }
+        // Already extracted?
+        let configPath = modelDir.appendingPathComponent("config.json")
+        if FileManager.default.fileExists(atPath: configPath.path) {
+            return modelDir
         }
 
-        // Create cache directory
         try FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
 
-        let progress = Progress(totalUnitCount: 100)
-
-        // Download if not already present
+        // Download tarball if needed
         if !FileManager.default.fileExists(atPath: tarballPath.path) {
-            progress.completedUnitCount = 0
-            progressHandler(progress)
-
             let (localURL, _) = try await URLSession.shared.download(from: releaseURL)
-
-            // Move to cache location
             if FileManager.default.fileExists(atPath: tarballPath.path) {
-                try FileManager.default.removeItem(at: tarballPath)
+                try? FileManager.default.removeItem(at: tarballPath)
             }
             try FileManager.default.moveItem(at: localURL, to: tarballPath)
-
-            progress.completedUnitCount = 50
-            progressHandler(progress)
         }
 
-        // Extract if not already done
-        return try await extract(tarball: tarballPath, to: modelDir, progress: progress, progressHandler: progressHandler)
-    }
-
-    private func extract(
-        tarball: URL,
-        to destination: URL,
-        progress: Progress,
-        progressHandler: @Sendable @escaping (Progress) -> Void
-    ) async throws -> URL {
-        // Remove existing directory if present
-        if FileManager.default.fileExists(atPath: destination.path) {
-            try FileManager.default.removeItem(at: destination)
+        // Extract
+        if FileManager.default.fileExists(atPath: modelDir.path) {
+            try? FileManager.default.removeItem(at: modelDir)
         }
+        try FileManager.default.createDirectory(at: modelDir, withIntermediateDirectories: true)
 
-        // Create extraction directory
-        try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
-
-        // Extract tar.gz using tar command
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/tar")
-        process.arguments = ["-xzf", tarball.path, "-C", destination.path, "--strip-components=1"]
+        process.arguments = ["-xzf", tarballPath.path, "-C", modelDir.path, "--strip-components=1"]
 
         let pipe = Pipe()
         process.standardOutput = pipe
@@ -92,19 +65,15 @@ private struct GitHubReleasesDownloader: MLXLMCommon.Downloader, @unchecked Send
             throw GrammarError.extractionFailed(error)
         }
 
-        // Clean up tarball after successful extraction
-        try FileManager.default.removeItem(at: tarball)
+        // Cleanup
+        try? FileManager.default.removeItem(at: tarballPath)
 
-        progress.completedUnitCount = 100
-        progressHandler(progress)
-
-        return destination
+        return modelDir
     }
 }
 
 // MARK: - Tokenizer Bridge
 
-/// Bridges Tokenizers.Tokenizer to MLXLMCommon.Tokenizer
 private struct TokenizerBridge: MLXLMCommon.Tokenizer {
     private let upstream: any Tokenizers.Tokenizer
 
@@ -120,13 +89,8 @@ private struct TokenizerBridge: MLXLMCommon.Tokenizer {
         upstream.decode(tokens: tokenIds, skipSpecialTokens: skipSpecialTokens)
     }
 
-    func convertTokenToId(_ token: String) -> Int? {
-        upstream.convertTokenToId(token)
-    }
-
-    func convertIdToToken(_ id: Int) -> String? {
-        upstream.convertIdToToken(id)
-    }
+    func convertTokenToId(_ token: String) -> Int? { upstream.convertTokenToId(token) }
+    func convertIdToToken(_ id: Int) -> String? { upstream.convertIdToToken(id) }
 
     var bosToken: String? { upstream.bosToken }
     var eosToken: String? { upstream.eosToken }
@@ -146,13 +110,9 @@ private struct TokenizerBridge: MLXLMCommon.Tokenizer {
     }
 }
 
-/// Loads tokenizers from local directories using swift-transformers
 private struct TransformersLoader: MLXLMCommon.TokenizerLoader {
-    init() {}
-
     func load(from directory: URL) async throws -> any MLXLMCommon.Tokenizer {
-        let upstream = try await Tokenizers.AutoTokenizer.from(modelFolder: directory)
-        return TokenizerBridge(upstream)
+        TokenizerBridge(try await Tokenizers.AutoTokenizer.from(modelFolder: directory))
     }
 }
 
@@ -163,8 +123,7 @@ enum GrammarError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .extractionFailed(let reason):
-            return "Failed to extract model: \(reason)"
+        case .extractionFailed(let reason): return "Failed to extract model: \(reason)"
         }
     }
 }
@@ -175,13 +134,16 @@ enum GrammarError: LocalizedError {
 final class GrammarController {
     static let shared = GrammarController()
 
-    /// GitHub releases URL for the Qwen2.5-1.5B-4bit model
     private let modelURL = URL(string: "https://github.com/tmoreton/yaprflow/releases/download/v0.1.0-grammar-model/qwen25-1.5b-4bit-mlx.tar.gz")!
     private let modelDirName = "grammar-model-qwen25-1.5b"
+    private let modelID = "mlx-community/Qwen2.5-1.5B-Instruct-4bit"
 
     private var modelContainer: ModelContainer?
     private var idleReleaseTask: Task<Void, Never>?
     private let idleTimeout: TimeInterval = 300
+
+    private let downloader: GrammarModelDownloader
+    private var modelDirectory: URL?
 
     private let systemPrompt = """
         Fix grammar, spelling, and punctuation. Ensure fragments become \
@@ -190,24 +152,28 @@ final class GrammarController {
         """
 
     private let summaryPrompt = """
-        Summarize the following text concisely. Capture the main points \
-        and key takeaways. Match summary length to input complexity. \
-        Do not explain. Return only the summary.
+        Summarize the following text as a coherent paragraph. Capture the \
+        main points and key takeaways in flowing prose. Match summary length \
+        to input complexity. Do not use bullet points or lists. \
+        Do not explain. Return only the summary paragraph.
         """
 
-    private init() {}
+    private init() {
+        self.downloader = GrammarModelDownloader(
+            releaseURL: modelURL,
+            modelDirName: modelDirName
+        )
+    }
 
-    /// Preloads the grammar model on app launch so first use doesn't block on download.
-    /// Call from AppDelegate.applicationDidFinishLaunching().
+    /// Downloads model on app launch WITHOUT loading into memory.
     func preload() {
         Task { @MainActor in
             do {
-                log.info("Preloading grammar model...")
-                _ = try await ensureLoaded()
-                log.info("Grammar model preloaded successfully")
+                log.info("Pre-downloading grammar model...")
+                modelDirectory = try await downloader.downloadIfNeeded()
+                log.info("Grammar model downloaded and ready (not loaded into memory)")
             } catch {
-                log.error("Grammar model preload failed: \(error.localizedDescription)")
-                // Model will be lazily loaded on first use with UI progress
+                log.error("Grammar model download failed: \(error.localizedDescription)")
             }
         }
     }
@@ -215,110 +181,62 @@ final class GrammarController {
     func correct(text: String, progress: @escaping @MainActor (String) -> Void) async throws -> String {
         let container = try await ensureLoaded(progress: progress)
 
-        let chat: [Chat.Message] = [
-            .system(systemPrompt),
-            .user(text),
-        ]
-        let userInput = UserInput(chat: chat)
+        let chat: [Chat.Message] = [.system(systemPrompt), .user(text)]
+        let input = try await container.prepare(input: UserInput(chat: chat))
 
-        let input = try await container.prepare(input: userInput)
-
-        let params = GenerateParameters(
-            maxTokens: 256,
-            temperature: 0.3,
-            topP: 0.9,
-            topK: 40
-        )
-
+        let params = GenerateParameters(maxTokens: 1024, temperature: 0.3, topP: 0.9, topK: 40)
         let stream = try await container.generate(input: input, parameters: params)
 
         var corrected = ""
         for await generation in stream {
-            switch generation {
-            case .chunk(let string):
-                corrected += string
-            case .info:
-                break
-            @unknown default:
-                break
-            }
+            if case .chunk(let string) = generation { corrected += string }
         }
 
         corrected = corrected.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        if corrected.isEmpty {
-            return text
-        }
+        guard !corrected.isEmpty else { return text }
 
         resetIdleTimer()
         return corrected
     }
 
-    /// Summarizes text on-demand. Called from menu action, not during transcription.
     func summarize(text: String) async throws -> String {
         let container = try await ensureLoaded()
 
-        let chat: [Chat.Message] = [
-            .system(summaryPrompt),
-            .user(text),
-        ]
-        let userInput = UserInput(chat: chat)
+        let chat: [Chat.Message] = [.system(summaryPrompt), .user(text)]
+        let input = try await container.prepare(input: UserInput(chat: chat))
 
-        let input = try await container.prepare(input: userInput)
-
-        let params = GenerateParameters(
-            maxTokens: 512,
-            temperature: 0.3,
-            topP: 0.9,
-            topK: 40
-        )
-
+        let params = GenerateParameters(maxTokens: 512, temperature: 0.3, topP: 0.9, topK: 40)
         let stream = try await container.generate(input: input, parameters: params)
 
         var summary = ""
         for await generation in stream {
-            switch generation {
-            case .chunk(let string):
-                summary += string
-            case .info:
-                break
-            @unknown default:
-                break
-            }
+            if case .chunk(let string) = generation { summary += string }
         }
 
         summary = summary.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        if summary.isEmpty {
-            return text
-        }
+        guard !summary.isEmpty else { return text }
 
         resetIdleTimer()
         return summary
     }
 
     private func ensureLoaded(progress: @escaping @MainActor (String) -> Void = { _ in }) async throws -> ModelContainer {
-        if let existing = modelContainer {
-            return existing
+        if let existing = modelContainer { return existing }
+
+        progress("Loading grammar model…")
+
+        // Ensure downloaded
+        if modelDirectory == nil {
+            modelDirectory = try await downloader.downloadIfNeeded()
         }
 
-        progress("Downloading grammar model…")
-
-        let downloader = GitHubReleasesDownloader(
-            releaseURL: modelURL,
-            modelDirName: modelDirName
-        )
-
-        // Use Qwen2.5 configuration from LLMRegistry
-        let config = LLMRegistry.shared.configuration(id: "mlx-community/Qwen2.5-1.5B-Instruct-4bit")
-
+        // Load into memory from local directory (this is the expensive part)
         let container = try await loadModelContainer(
-            from: downloader,
-            using: TransformersLoader(),
-            configuration: config
+            from: modelDirectory!,
+            using: TransformersLoader()
         )
 
-        log.info("Grammar model loaded from GitHub releases")
+        log.info("Grammar model loaded into memory")
         self.modelContainer = container
         resetIdleTimer()
         return container
@@ -327,13 +245,9 @@ final class GrammarController {
     private func resetIdleTimer() {
         idleReleaseTask?.cancel()
         idleReleaseTask = Task { @MainActor in
-            do {
-                try await Task.sleep(for: .seconds(idleTimeout))
-            } catch {
-                return
-            }
+            try? await Task.sleep(for: .seconds(idleTimeout))
             self.modelContainer = nil
-            log.info("Grammar model released after idle timeout")
+            log.info("Grammar model released from memory")
         }
     }
 }

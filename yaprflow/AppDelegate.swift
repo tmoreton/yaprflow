@@ -132,14 +132,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let text = AppState.shared.lastTranscript
         guard !text.isEmpty else { return }
 
+        // Show overlay and loading state
+        NotchOverlayWindowController.shared.show()
+        AppState.shared.status = .summarizing
+
         Task { @MainActor in
             do {
                 let summary = try await GrammarController.shared.summarize(text: text)
                 let pb = NSPasteboard.general
                 pb.clearContents()
                 pb.setString(summary, forType: .string)
+
+                // Show completion
+                AppState.shared.status = .copied
+
+                // Auto-hide after delay
+                try? await Task.sleep(for: .seconds(2.0))
+                if AppState.shared.status == .copied {
+                    AppState.shared.status = .idle
+                    NotchOverlayWindowController.shared.hide()
+                }
             } catch {
-                // Silent fail — don't disrupt user workflow
+                // Silent fail — hide overlay
+                AppState.shared.status = .idle
+                NotchOverlayWindowController.shared.hide()
             }
         }
     }

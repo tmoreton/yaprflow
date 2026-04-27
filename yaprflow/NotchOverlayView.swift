@@ -61,6 +61,8 @@ struct NotchOverlayView: View {
             return state.liveTranscript.isEmpty ? "Processing…" : Self.wrappedTail(of: state.liveTranscript)
         case .correcting(let message):
             return message
+        case .summarizing:
+            return "Summarizing…"
         case .copied:
             return copiedDisplayText
         case .error(let message):
@@ -69,41 +71,18 @@ struct NotchOverlayView: View {
     }
 
     /// Shows appropriate text for the copied state.
-    /// For long transcripts, shows a simple confirmation instead of truncated text.
     private var copiedDisplayText: String {
-        // If we have a grammar-corrected version different from original, show that
-        if !state.lastTranscript.isEmpty &&
-           !state.lastOriginalTranscript.isEmpty &&
-           state.lastTranscript != state.lastOriginalTranscript {
-            return "Grammar corrected"
-        }
-
-        // For regular transcription, show tail or confirmation
-        if state.liveTranscript.isEmpty {
-            return "Copied to clipboard"
-        }
-
-        // For short text, show the actual content
-        if state.liveTranscript.count <= Self.maxCharsPerLine * 2 {
-            return state.liveTranscript
-        }
-
-        // For long text, just show confirmation
         return "Copied to clipboard"
     }
 
     private var showSubtitle: Bool {
         guard case .copied = state.status else { return false }
-        // Show subtitle when we have grammar correction results
-        return !state.lastTranscript.isEmpty &&
-               !state.lastOriginalTranscript.isEmpty &&
-               state.lastTranscript != state.lastOriginalTranscript
+        return true
     }
 
     private var subtitleText: String {
         guard showSubtitle else { return "" }
-        // Show a hint that original is available in menu
-        return "View original in menu ⌄"
+        return "Ready to paste"
     }
 
     private static func wrappedTail(of text: String) -> String {
@@ -137,7 +116,7 @@ struct NotchOverlayView: View {
                 .fill(Color.red)
                 .frame(width: 10, height: 10)
                 .modifier(RecordingPulse())
-        case .correcting:
+        case .correcting, .summarizing:
             ProgressView()
                 .controlSize(.small)
                 .tint(.white)

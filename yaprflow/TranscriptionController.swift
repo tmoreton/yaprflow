@@ -45,18 +45,19 @@ final class TranscriptionController {
     private var sessionIsStreaming = true
     private var autoHideTask: Task<Void, Never>?
 
-    // Tighter than SDK default (0.75s) so dictation feels snappy.
+    // Long maxSpeechDuration (60s) for continuous dictation without forced chunks.
+    // Silence-based segmentation handles natural pauses.
     private let segmentationConfig = VadSegmentationConfig(
         minSpeechDuration: 0.15,
         minSilenceDuration: 0.3,
-        maxSpeechDuration: 12.0,
+        maxSpeechDuration: 60.0,
         speechPadding: 0.1
     )
 
-    // Speculative partials: while the user is still speaking, re-transcribe the
-    // in-progress segment every N seconds and show as volatile text.
-    private let speculativeIntervalSamples = Int(1.2 * 16000)
-    private let speculativeMinSpeechSamples = Int(0.6 * 16000)
+    // Speculative partials: re-transcribe in-progress speech every 2.0s.
+    // Less frequent = fewer re-transcriptions for long recordings.
+    private let speculativeIntervalSamples = Int(2.0 * 16000)
+    private let speculativeMinSpeechSamples = Int(1.0 * 16000)
 
     private init() {
         let bufferHandler: @Sendable (AVAudioPCMBuffer) -> Void = { buffer in

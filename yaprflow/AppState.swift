@@ -7,6 +7,7 @@ enum TranscriptionStatus: Equatable {
     case listening
     case finishing
     case correcting(String)
+    case summarizing  // New: on-demand summary in progress
     case copied
     case error(String)
 }
