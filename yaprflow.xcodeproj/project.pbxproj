@@ -8,9 +8,9 @@
 
 /* Begin PBXBuildFile section */
 		0B0395C516E1474CB72199FBAD4D957C /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = 1448D962472A4F5F934E79127342E0A7 /* MLXLLM */; };
+		503EF7FBEACF40F2A0C1E72EDC371FF1 /* HuggingFace in Frameworks */ = {isa = PBXBuildFile; productRef = CA3CFA89799945AD9144A38DAA185B62 /* HuggingFace */; };
 		AFA2BCB22F97E6F00048D99B /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = AFA2BCB12F97E6F00048D99B /* FluidAudio */; };
 		C1BCF94423984EAE8EC70E77A8DC317 /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 926005BF412042D79D280EB2577380E9 /* MLXLMCommon */; };
-		503EF7FBEACF40F2A0C1E72EDC371FF1 /* HuggingFace in Frameworks */ = {isa = PBXBuildFile; productRef = CA3CFA89799945AD9144A38DAA185B62 /* HuggingFace */; };
 		EEA41191C01E4A8AA186F91416C6FCB8 /* Tokenizers in Frameworks */ = {isa = PBXBuildFile; productRef = 8D39FE45C6204DB7AA2248431F7EB830 /* Tokenizers */; };
 /* End PBXBuildFile section */
 
@@ -301,7 +301,7 @@
 				CODE_SIGN_ENTITLEMENTS = yaprflow/yaprflow.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = GVXC5FQ2RP;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -316,7 +316,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 2.1.0;
+				MARKETING_VERSION = 3.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tmoreton.yaprflow;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -337,7 +337,7 @@
 				CODE_SIGN_ENTITLEMENTS = yaprflow/yaprflow.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = GVXC5FQ2RP;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -352,7 +352,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 2.1.0;
+				MARKETING_VERSION = 3.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tmoreton.yaprflow;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -397,6 +397,14 @@
 				minimumVersion = 3.31.3;
 			};
 		};
+		9053E14180234838912C765DC2778018 /* XCRemoteSwiftPackageReference "swift-transformers" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/huggingface/swift-transformers";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.3.0;
+			};
+		};
 		AFA2BCB02F97E6F00048D99B /* XCRemoteSwiftPackageReference "FluidAudio" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/FluidInference/FluidAudio";
@@ -413,14 +421,6 @@
 				minimumVersion = 0.9.0;
 			};
 		};
-		9053E14180234838912C765DC2778018 /* XCRemoteSwiftPackageReference "swift-transformers" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/huggingface/swift-transformers";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 1.3.0;
-			};
-		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -428,6 +428,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 09E89398BCA04F6691BA93F1E680EC48 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
 			productName = MLXLLM;
+		};
+		8D39FE45C6204DB7AA2248431F7EB830 /* Tokenizers */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9053E14180234838912C765DC2778018 /* XCRemoteSwiftPackageReference "swift-transformers" */;
+			productName = Tokenizers;
 		};
 		926005BF412042D79D280EB2577380E9 /* MLXLMCommon */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -443,11 +448,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B4CCC6855A514A8EA08AE0EEDA594791 /* XCRemoteSwiftPackageReference "swift-huggingface" */;
 			productName = HuggingFace;
-		};
-		8D39FE45C6204DB7AA2248431F7EB830 /* Tokenizers */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 9053E14180234838912C765DC2778018 /* XCRemoteSwiftPackageReference "swift-transformers" */;
-			productName = Tokenizers;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

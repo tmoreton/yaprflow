@@ -5,6 +5,7 @@ import SwiftUI
 private enum OnboardingStep {
     case welcome
     case modeSelection
+    case grammarMode
     case permissions
 }
 
@@ -13,6 +14,7 @@ struct OnboardingView: View {
 
     @State private var step: OnboardingStep = .welcome
     @State private var streamingSelected: Bool = AppState.shared.streamingMode
+    @State private var grammarSelected: Bool = false
     @State private var micStatus: AVAuthorizationStatus = AVCaptureDevice.authorizationStatus(for: .audio)
 
     var body: some View {
@@ -22,6 +24,7 @@ struct OnboardingView: View {
                 switch step {
                 case .welcome:        welcomeScreen
                 case .modeSelection:  modeSelectionScreen
+                case .grammarMode:    grammarModeScreen
                 case .permissions:    permissionsScreen
                 }
             }
@@ -90,6 +93,44 @@ struct OnboardingView: View {
             Spacer()
             Button {
                 AppState.shared.streamingMode = streamingSelected
+                withAnimation(.easeInOut(duration: 0.25)) { step = .grammarMode }
+            } label: {
+                Text("Continue").frame(maxWidth: .infinity)
+            }
+            .buttonStyle(OnboardingButtonStyle())
+            .frame(width: 260)
+            .padding(.bottom, 40)
+        }
+    }
+
+    private var grammarModeScreen: some View {
+        VStack(spacing: 0) {
+            Spacer(minLength: 48)
+            Text("Polish your dictation")
+                .font(.system(size: 24, weight: .semibold))
+                .foregroundStyle(.white)
+            Text("Optional on-device AI features. Your text never leaves your Mac.")
+                .font(.system(size: 13))
+                .foregroundStyle(Color.white.opacity(0.55))
+                .padding(.top, 8)
+            Spacer(minLength: 28)
+
+            VStack(spacing: 12) {
+                featureToggleCard(
+                    title: "Auto-correct grammar",
+                    body: "Fixes spelling, punctuation, and sentence structure after each dictation. The first use may take a moment to download the model.",
+                    isOn: $grammarSelected
+                )
+                infoCard(
+                    title: "Summarize on demand",
+                    body: "Condense any transcript into a concise paragraph — available anytime from the menu bar after you dictate."
+                )
+            }
+            .padding(.horizontal, 28)
+
+            Spacer()
+            Button {
+                AppState.shared.grammarMode = grammarSelected
                 withAnimation(.easeInOut(duration: 0.25)) { step = .permissions }
             } label: {
                 Text("Continue").frame(maxWidth: .infinity)
@@ -98,6 +139,81 @@ struct OnboardingView: View {
             .frame(width: 260)
             .padding(.bottom, 40)
         }
+    }
+
+    private func featureToggleCard(
+        title: String,
+        body: String,
+        isOn: Binding<Bool>
+    ) -> some View {
+        Button(action: { isOn.wrappedValue.toggle() }) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.white)
+                    Text(body)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.white.opacity(0.55))
+                        .multilineTextAlignment(.leading)
+                        .lineSpacing(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer()
+                ZStack {
+                    Circle()
+                        .strokeBorder(Color.white.opacity(isOn.wrappedValue ? 0.35 : 0.08), lineWidth: 1)
+                        .frame(width: 20, height: 20)
+                    if isOn.wrappedValue {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.white)
+                    }
+                }
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.white.opacity(isOn.wrappedValue ? 0.10 : 0.04))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(Color.white.opacity(isOn.wrappedValue ? 0.35 : 0.08), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func infoCard(title: String, body: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
+                Text(body)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.white.opacity(0.55))
+                    .multilineTextAlignment(.leading)
+                    .lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+            Image(systemName: "text.bullet.list")
+                .font(.system(size: 14, weight: .regular))
+                .foregroundStyle(Color.white.opacity(0.25))
+                .frame(width: 20, height: 20)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.white.opacity(0.04))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
+        )
     }
 
     private func modeCard(

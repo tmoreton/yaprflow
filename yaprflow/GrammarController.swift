@@ -134,7 +134,7 @@ enum GrammarError: LocalizedError {
 final class GrammarController {
     static let shared = GrammarController()
 
-    private let modelURL = URL(string: "https://github.com/tmoreton/yaprflow/releases/download/v0.1.0-grammar-model/qwen25-1.5b-4bit-mlx.tar.gz")!
+    private let modelURL = URL(string: "https://github.com/tmoreton/yaprflow/releases/download/v3.0.0-grammar-model/qwen25-1.5b-4bit-mlx.tar.gz")!
     private let modelDirName = "grammar-model-qwen25-1.5b"
     private let modelID = "mlx-community/Qwen2.5-1.5B-Instruct-4bit"
 

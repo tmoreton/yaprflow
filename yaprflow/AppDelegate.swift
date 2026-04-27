@@ -17,9 +17,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         // the onboarding flow.
         TranscriptionController.shared.preload()
 
-        // Preload the grammar model in the background so the first correction
-        // doesn't block on download + compile.
-        GrammarController.shared.preload()
+        // Preload the grammar model in the background if the user has enabled
+        // grammar mode (either via onboarding or from a prior session).
+        if AppState.shared.grammarMode {
+            GrammarController.shared.preload()
+        }
 
         if !OnboardingWindowController.hasCompleted {
             OnboardingWindowController.shared.show()

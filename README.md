@@ -9,12 +9,14 @@
 
 - 🔒 **100% local** — audio never leaves your Mac
 - ⚡ **Accurate** — NVIDIA Parakeet TDT 0.6B on the Neural Engine, with live partials
+- ✍️ **Grammar correction** — optional on-device AI polishes your transcripts
+- 📝 **Summarize** — condense any transcript into a concise paragraph
 - 🎛️ **Menu bar** — out of your way, one hotkey away
 - 🆓 **Open source** — Apache 2.0, no accounts, no telemetry
 
 ## Install
 
-Download the latest [`yaprflow.dmg`](https://github.com/tmoreton/yaprflow/releases/latest), drag Yaprflow.app to `/Applications`, launch, and grant microphone access. The speech model is bundled — no extra downloads.
+Download the latest [`yaprflow.dmg`](https://github.com/tmoreton/yaprflow/releases/latest), drag Yaprflow.app to `/Applications`, launch, and grant microphone access. The speech model downloads automatically on first launch; grammar correction requires a one-time optional model download.
 
 **Requires macOS 14 (Sonoma) or later.**
 
