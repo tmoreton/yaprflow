@@ -43,6 +43,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         GlobalHotkey.shared.unregister()
     }
 
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
+    }
+
     private func installStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = item.button {
