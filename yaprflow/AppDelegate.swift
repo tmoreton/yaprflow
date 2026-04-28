@@ -72,6 +72,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         grammarItem.toolTip = "Run each transcript through an on-device LLM for grammar and punctuation correction."
         menu.addItem(grammarItem)
 
+        let launchAtLoginItem = NSMenuItem()
+        launchAtLoginItem.view = LaunchAtLoginMenuItemView()
+        launchAtLoginItem.toolTip = "Open Yaprflow automatically when you log in to your Mac."
+        menu.addItem(launchAtLoginItem)
+
         menu.addItem(NSMenuItem.separator())
 
         // Copy text: original first, then corrected if grammar mode was on.
