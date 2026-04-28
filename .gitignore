@@ -13,3 +13,5 @@ xcuserdata/
 
 # Model weights — hosted in GitHub Releases, fetched via scripts/fetch-models.sh
 Models/
+
+.env
