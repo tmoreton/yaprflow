@@ -135,6 +135,55 @@ fi
 
 CODESIGN_IDENTITY="${DEVELOPER_ID_APPLICATION:-Developer ID Application: Tim Moreton (GVXC5FQ2RP)}"
 
+# ---- Notarization helpers ----------------------------------------------------
+# `notarytool submit --wait` intermittently crashes with `Bus error: 10` while
+# polling, even though the upload succeeded. We submit without --wait, capture
+# the submission id, and poll `notarytool info` ourselves. Set NOTARIZE_APP_ID
+# or NOTARIZE_DMG_ID to resume a previous run without re-uploading.
+
+notarize_status() {
+    xcrun notarytool info "$1" "${NOTARY_AUTH[@]}" 2>/dev/null \
+        | sed -n 's/^[[:space:]]*status:[[:space:]]*//p' \
+        | head -n1
+}
+
+notarize_wait() {
+    local sub_id="$1"
+    local label="$2"
+    local status
+    while :; do
+        sleep 20
+        status=$(notarize_status "$sub_id" || true)
+        echo "    $label: ${status:-unknown} (id: $sub_id)"
+        case "$status" in
+            Accepted) return 0 ;;
+            "In Progress"|"") continue ;;
+            *)
+                echo "error: $label notarization finished with status: $status" >&2
+                xcrun notarytool log "$sub_id" "${NOTARY_AUTH[@]}" >&2 || true
+                return 1
+                ;;
+        esac
+    done
+}
+
+notarize_submit_and_wait() {
+    local file="$1"
+    local label="$2"
+    local submit_output sub_id
+    if ! submit_output=$(xcrun notarytool submit "$file" "${NOTARY_AUTH[@]}" 2>&1); then
+        echo "$submit_output" >&2
+        return 1
+    fi
+    echo "$submit_output"
+    sub_id=$(echo "$submit_output" | sed -n 's/^[[:space:]]*id:[[:space:]]*//p' | head -n1)
+    if [[ -z "$sub_id" ]]; then
+        echo "error: could not parse submission id from notarytool output" >&2
+        return 1
+    fi
+    notarize_wait "$sub_id" "$label"
+}
+
 # ---- Pre-publish guards ------------------------------------------------------
 
 if [[ "$PUBLISH" == true ]]; then
@@ -153,36 +202,46 @@ if [[ "$PUBLISH" == true ]]; then
     fi
 fi
 
-# ---- Ensure model files are on disk -----------------------------------------
+if [[ -n "${USE_APP:-}" ]]; then
+    if [[ ! -d "$USE_APP" ]]; then
+        echo "error: USE_APP=$USE_APP not found" >&2
+        exit 1
+    fi
+    APP_PATH="$USE_APP"
+    rm -rf "$STAGING_DIR" "$DMG_PATH" "$TEMP_DMG"
+    mkdir -p "$BUILD_DIR"
+    echo "==> Using pre-built .app: $APP_PATH (skipping build + .app notarization)"
+else
+    # ---- Ensure model files are on disk -------------------------------------
 
-# The Xcode build phase rsyncs ./Models into the bundle. If a fresh clone
-# hasn't run scripts/fetch-models.sh, the resulting .app would ship without
-# the Parakeet small files / Silero VAD and silently fail at first launch.
-if [[ ! -f "Models/parakeet-tdt-0.6b-v2/parakeet_vocab.json" ]]; then
-    echo "==> Models missing — running scripts/fetch-models.sh"
-    scripts/fetch-models.sh
-fi
+    # The Xcode build phase rsyncs ./Models into the bundle. If a fresh clone
+    # hasn't run scripts/fetch-models.sh, the resulting .app would ship without
+    # the Parakeet small files / Silero VAD and silently fail at first launch.
+    if [[ ! -f "Models/parakeet-tdt-0.6b-v2/parakeet_vocab.json" ]]; then
+        echo "==> Models missing — running scripts/fetch-models.sh"
+        scripts/fetch-models.sh
+    fi
 
-# ---- Build -------------------------------------------------------------------
+    # ---- Build --------------------------------------------------------------
 
-echo "==> Building $APP_NAME $VERSION"
-rm -rf "$ARCHIVE_PATH" "$EXPORT_DIR" "$STAGING_DIR" "$DMG_PATH" "$TEMP_DMG" "$APP_ZIP"
-mkdir -p "$BUILD_DIR"
+    echo "==> Building $APP_NAME $VERSION"
+    rm -rf "$ARCHIVE_PATH" "$EXPORT_DIR" "$STAGING_DIR" "$DMG_PATH" "$TEMP_DMG" "$APP_ZIP"
+    mkdir -p "$BUILD_DIR"
 
-echo "==> Archiving"
-xcodebuild \
-    -project "$PROJECT" \
-    -scheme "$SCHEME" \
-    -configuration "$CONFIGURATION" \
-    -archivePath "$ARCHIVE_PATH" \
-    -destination "generic/platform=macOS" \
-    archive
+    echo "==> Archiving"
+    xcodebuild \
+        -project "$PROJECT" \
+        -scheme "$SCHEME" \
+        -configuration "$CONFIGURATION" \
+        -archivePath "$ARCHIVE_PATH" \
+        -destination "generic/platform=macOS" \
+        archive
 
-# ---- Get a Developer-ID-signed .app -----------------------------------------
+    # ---- Get a Developer-ID-signed .app -------------------------------------
 
-if [[ "$NOTARIZE" == true ]]; then
-    echo "==> Exporting with developer-id signing"
-    cat > "$EXPORT_OPTIONS" <<EOF
+    if [[ "$NOTARIZE" == true ]]; then
+        echo "==> Exporting with developer-id signing"
+        cat > "$EXPORT_OPTIONS" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -198,36 +257,42 @@ if [[ "$NOTARIZE" == true ]]; then
 </dict>
 </plist>
 EOF
-    xcodebuild -exportArchive \
-        -archivePath "$ARCHIVE_PATH" \
-        -exportPath "$EXPORT_DIR" \
-        -exportOptionsPlist "$EXPORT_OPTIONS"
-    APP_PATH="$EXPORT_DIR/$APP_NAME.app"
-else
-    APP_PATH="$ARCHIVE_PATH/Products/Applications/$APP_NAME.app"
-fi
+        xcodebuild -exportArchive \
+            -archivePath "$ARCHIVE_PATH" \
+            -exportPath "$EXPORT_DIR" \
+            -exportOptionsPlist "$EXPORT_OPTIONS"
+        APP_PATH="$EXPORT_DIR/$APP_NAME.app"
+    else
+        APP_PATH="$ARCHIVE_PATH/Products/Applications/$APP_NAME.app"
+    fi
 
-if [[ ! -d "$APP_PATH" ]]; then
-    echo "error: $APP_PATH not found" >&2
-    exit 1
-fi
+    if [[ ! -d "$APP_PATH" ]]; then
+        echo "error: $APP_PATH not found" >&2
+        exit 1
+    fi
 
-# ---- Notarize + staple the .app ---------------------------------------------
+    # ---- Notarize + staple the .app -----------------------------------------
 
-if [[ "$NOTARIZE" == true ]]; then
-    echo "==> Verifying .app signature"
-    codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+    if [[ "$NOTARIZE" == true ]]; then
+        if [[ -n "${NOTARIZE_APP_ID:-}" ]]; then
+            echo "==> Resuming .app notarization: $NOTARIZE_APP_ID"
+            notarize_wait "$NOTARIZE_APP_ID" ".app"
+        else
+            echo "==> Verifying .app signature"
+            codesign --verify --deep --strict --verbose=2 "$APP_PATH"
 
-    echo "==> Zipping .app for notarization"
-    /usr/bin/ditto -c -k --keepParent "$APP_PATH" "$APP_ZIP"
+            echo "==> Zipping .app for notarization"
+            /usr/bin/ditto -c -k --keepParent "$APP_PATH" "$APP_ZIP"
 
-    echo "==> Submitting .app to Apple notary service (this can take a few minutes)"
-    xcrun notarytool submit "$APP_ZIP" "${NOTARY_AUTH[@]}" --wait
-    rm -f "$APP_ZIP"
+            echo "==> Submitting .app to Apple notary service (this can take a few minutes)"
+            notarize_submit_and_wait "$APP_ZIP" ".app"
+            rm -f "$APP_ZIP"
+        fi
 
-    echo "==> Stapling .app"
-    xcrun stapler staple "$APP_PATH"
-    xcrun stapler validate "$APP_PATH"
+        echo "==> Stapling .app"
+        xcrun stapler staple "$APP_PATH"
+        xcrun stapler validate "$APP_PATH"
+    fi
 fi
 
 # ---- Build DMG ---------------------------------------------------------------
@@ -297,8 +362,13 @@ if [[ "$NOTARIZE" == true ]]; then
     codesign --force --sign "$CODESIGN_IDENTITY" --timestamp "$DMG_PATH"
     codesign --verify --verbose=2 "$DMG_PATH"
 
-    echo "==> Submitting DMG to Apple notary service"
-    xcrun notarytool submit "$DMG_PATH" "${NOTARY_AUTH[@]}" --wait
+    if [[ -n "${NOTARIZE_DMG_ID:-}" ]]; then
+        echo "==> Resuming DMG notarization: $NOTARIZE_DMG_ID"
+        notarize_wait "$NOTARIZE_DMG_ID" "DMG"
+    else
+        echo "==> Submitting DMG to Apple notary service"
+        notarize_submit_and_wait "$DMG_PATH" "DMG"
+    fi
 
     echo "==> Stapling DMG"
     xcrun stapler staple "$DMG_PATH"
