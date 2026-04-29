@@ -57,7 +57,31 @@ echo "==> Signing DMG..."
 codesign --sign "$SIGNING_IDENTITY" --timestamp "$DMG"
 
 echo "==> Submitting for notarization (this can take 1-5 min)..."
-xcrun notarytool submit "$DMG" --keychain-profile "$KEYCHAIN_PROFILE" --wait
+# `notarytool submit --wait` intermittently crashes with `Bus error: 10` while
+# polling. Submit, capture the id, and poll `notarytool info` ourselves.
+SUBMIT_OUTPUT=$(xcrun notarytool submit "$DMG" --keychain-profile "$KEYCHAIN_PROFILE")
+echo "$SUBMIT_OUTPUT"
+SUB_ID=$(echo "$SUBMIT_OUTPUT" | sed -n 's/^[[:space:]]*id:[[:space:]]*//p' | head -n1)
+if [ -z "$SUB_ID" ]; then
+    echo "error: could not parse submission id" >&2
+    exit 1
+fi
+
+while :; do
+    sleep 20
+    STATUS=$(xcrun notarytool info "$SUB_ID" --keychain-profile "$KEYCHAIN_PROFILE" 2>/dev/null \
+        | sed -n 's/^[[:space:]]*status:[[:space:]]*//p' | head -n1)
+    echo "    DMG: ${STATUS:-unknown} (id: $SUB_ID)"
+    case "$STATUS" in
+        Accepted) break ;;
+        "In Progress"|"") continue ;;
+        *)
+            echo "error: notarization finished with status: $STATUS" >&2
+            xcrun notarytool log "$SUB_ID" --keychain-profile "$KEYCHAIN_PROFILE" >&2 || true
+            exit 1
+            ;;
+    esac
+done
 
 echo "==> Stapling ticket..."
 xcrun stapler staple "$DMG"
