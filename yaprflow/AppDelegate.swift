@@ -34,6 +34,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         ) { _ in
             MainActor.assumeIsolated {
                 let config = AppState.shared.hotkey
+                self.wireHotkeyCallbacks(for: config.mode)
                 GlobalHotkey.shared.register(keyCode: config.keyCode, modifiers: config.modifiers)
             }
         }
@@ -60,6 +61,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         shortcutItem.view = HotkeyMenuItemView()
         menu.addItem(shortcutItem)
 
+        let triggerItem = NSMenuItem()
+        triggerItem.view = HotkeyModeMenuItemView()
+        triggerItem.toolTip = "Tap to Toggle: press once to start, again to stop. Hold to Talk: hold the shortcut while you speak, release to stop."
+        menu.addItem(triggerItem)
+
         menu.addItem(NSMenuItem.separator())
 
         let streamingItem = NSMenuItem()
@@ -71,6 +77,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         grammarItem.view = GrammarModeMenuItemView()
         grammarItem.toolTip = "Run each transcript through an on-device LLM for grammar and punctuation correction."
         menu.addItem(grammarItem)
+
+        let autoPasteItem = NSMenuItem()
+        autoPasteItem.view = AutoPasteMenuItemView()
+        autoPasteItem.toolTip = "After transcription, automatically paste into the focused text field. Requires Accessibility permission (System Settings → Privacy & Security → Accessibility)."
+        menu.addItem(autoPasteItem)
+
+        let soundEffectsItem = NSMenuItem()
+        soundEffectsItem.view = SoundEffectsMenuItemView()
+        soundEffectsItem.toolTip = "Play a short system sound when recording starts and stops."
+        menu.addItem(soundEffectsItem)
 
         let launchAtLoginItem = NSMenuItem()
         launchAtLoginItem.view = LaunchAtLoginMenuItemView()
@@ -180,12 +196,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     private func registerHotkey() {
-        GlobalHotkey.onFire = {
-            Task { @MainActor in
-                TranscriptionController.shared.toggle()
+        let config = AppState.shared.hotkey
+        wireHotkeyCallbacks(for: config.mode)
+        GlobalHotkey.shared.register(keyCode: config.keyCode, modifiers: config.modifiers)
+    }
+
+    private func wireHotkeyCallbacks(for mode: HotkeyMode) {
+        switch mode {
+        case .tapToToggle:
+            GlobalHotkey.onPressed = {
+                Task { @MainActor in
+                    TranscriptionController.shared.toggle()
+                }
+            }
+            GlobalHotkey.onReleased = nil
+        case .holdToTalk:
+            GlobalHotkey.onPressed = {
+                Task { @MainActor in
+                    TranscriptionController.shared.setActive(true)
+                }
+            }
+            GlobalHotkey.onReleased = {
+                Task { @MainActor in
+                    TranscriptionController.shared.setActive(false)
+                }
             }
         }
-        let config = AppState.shared.hotkey
-        GlobalHotkey.shared.register(keyCode: config.keyCode, modifiers: config.modifiers)
     }
 }

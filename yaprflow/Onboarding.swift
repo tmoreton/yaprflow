@@ -6,6 +6,7 @@ private enum OnboardingStep {
     case welcome
     case modeSelection
     case grammarMode
+    case autoPaste
     case permissions
 }
 
@@ -15,6 +16,7 @@ struct OnboardingView: View {
     @State private var step: OnboardingStep = .welcome
     @State private var streamingSelected: Bool = AppState.shared.streamingMode
     @State private var grammarSelected: Bool = false
+    @State private var autoPasteSelected: Bool = false
     @State private var micStatus: AVAuthorizationStatus = AVCaptureDevice.authorizationStatus(for: .audio)
 
     var body: some View {
@@ -25,6 +27,7 @@ struct OnboardingView: View {
                 case .welcome:        welcomeScreen
                 case .modeSelection:  modeSelectionScreen
                 case .grammarMode:    grammarModeScreen
+                case .autoPaste:      autoPasteScreen
                 case .permissions:    permissionsScreen
                 }
             }
@@ -137,6 +140,48 @@ struct OnboardingView: View {
                 // download wouldn't start until first dictation (or next launch).
                 if grammarSelected {
                     GrammarController.shared.preload()
+                }
+                withAnimation(.easeInOut(duration: 0.25)) { step = .autoPaste }
+            } label: {
+                Text("Continue").frame(maxWidth: .infinity)
+            }
+            .buttonStyle(OnboardingButtonStyle())
+            .frame(width: 260)
+            .padding(.bottom, 40)
+        }
+    }
+
+    private var autoPasteScreen: some View {
+        VStack(spacing: 0) {
+            Spacer(minLength: 48)
+            Text("Skip the manual ⌘V")
+                .font(.system(size: 24, weight: .semibold))
+                .foregroundStyle(.white)
+            Text("Drop transcripts straight into whatever text field you're in.")
+                .font(.system(size: 13))
+                .foregroundStyle(Color.white.opacity(0.55))
+                .padding(.top, 8)
+            Spacer(minLength: 28)
+
+            VStack(spacing: 12) {
+                featureToggleCard(
+                    title: "Auto-paste after each dictation",
+                    body: "Yaprflow will press ⌘V for you when transcription finishes. Needs Accessibility permission — you'll be asked next. Your transcript is always copied to the clipboard either way.",
+                    isOn: $autoPasteSelected
+                )
+            }
+            .padding(.horizontal, 28)
+
+            Spacer()
+            Button {
+                AppState.shared.autoPasteMode = autoPasteSelected
+                // Fire the AX prompt now so the system sheet appears
+                // while the user is still in onboarding context, instead
+                // of surprising them on first dictation. The call returns
+                // false synchronously; the user's actual answer arrives
+                // asynchronously and is rechecked at paste time.
+                if autoPasteSelected {
+                    _ = AutoPaste.promptForAccessibility()
                 }
                 withAnimation(.easeInOut(duration: 0.25)) { step = .permissions }
             } label: {

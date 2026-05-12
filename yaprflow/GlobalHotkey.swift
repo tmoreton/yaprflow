@@ -8,7 +8,12 @@ private let log = Logger(subsystem: "com.tmoreton.yaprflow", category: "GlobalHo
 final class GlobalHotkey {
     static let shared = GlobalHotkey()
 
-    nonisolated(unsafe) static var onFire: (@Sendable () -> Void)?
+    /// Fires on key-down. Used by tap-to-toggle mode (calls toggle()).
+    nonisolated(unsafe) static var onPressed: (@Sendable () -> Void)?
+
+    /// Fires on key-up. Used by hold-to-talk mode (calls setActive(false)).
+    /// Tap-to-toggle leaves this nil.
+    nonisolated(unsafe) static var onReleased: (@Sendable () -> Void)?
 
     private var hotKeyRef: EventHotKeyRef?
     private var eventHandlerRef: EventHandlerRef?
@@ -53,19 +58,34 @@ final class GlobalHotkey {
 
     private func installEventHandlerIfNeeded() {
         guard eventHandlerRef == nil else { return }
-        var eventType = EventTypeSpec(
-            eventClass: OSType(kEventClassKeyboard),
-            eventKind: UInt32(kEventHotKeyPressed)
-        )
+        var eventTypes = [
+            EventTypeSpec(
+                eventClass: OSType(kEventClassKeyboard),
+                eventKind: UInt32(kEventHotKeyPressed)
+            ),
+            EventTypeSpec(
+                eventClass: OSType(kEventClassKeyboard),
+                eventKind: UInt32(kEventHotKeyReleased)
+            ),
+        ]
         InstallEventHandler(
             GetApplicationEventTarget(),
-            { _, _, _ in
-                let handler = GlobalHotkey.onFire
+            { _, event, _ in
+                let kind = GetEventKind(event)
+                let handler: (@Sendable () -> Void)?
+                switch Int(kind) {
+                case kEventHotKeyPressed:
+                    handler = GlobalHotkey.onPressed
+                case kEventHotKeyReleased:
+                    handler = GlobalHotkey.onReleased
+                default:
+                    handler = nil
+                }
                 DispatchQueue.main.async { handler?() }
                 return noErr
             },
-            1,
-            &eventType,
+            eventTypes.count,
+            &eventTypes,
             nil,
             &eventHandlerRef
         )

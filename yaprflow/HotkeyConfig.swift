@@ -1,16 +1,40 @@
 import Carbon.HIToolbox
 import Foundation
 
+enum HotkeyMode: String, Codable {
+    case tapToToggle
+    case holdToTalk
+}
+
 struct HotkeyConfig: Codable, Equatable {
     var keyCode: UInt32
     var modifiers: UInt32
+    var mode: HotkeyMode
+
+    init(keyCode: UInt32, modifiers: UInt32, mode: HotkeyMode = .tapToToggle) {
+        self.keyCode = keyCode
+        self.modifiers = modifiers
+        self.mode = mode
+    }
 
     static let defaultHotkey = HotkeyConfig(
         keyCode: UInt32(kVK_ANSI_T),
-        modifiers: UInt32(cmdKey)
+        modifiers: UInt32(cmdKey),
+        mode: .tapToToggle
     )
 
     private static let defaultsKey = "yaprflow.hotkey.v1"
+
+    private enum CodingKeys: String, CodingKey {
+        case keyCode, modifiers, mode
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.keyCode = try c.decode(UInt32.self, forKey: .keyCode)
+        self.modifiers = try c.decode(UInt32.self, forKey: .modifiers)
+        self.mode = try c.decodeIfPresent(HotkeyMode.self, forKey: .mode) ?? .tapToToggle
+    }
 
     func save() {
         guard let data = try? JSONEncoder().encode(self) else { return }
@@ -29,6 +53,7 @@ struct HotkeyConfig: Codable, Equatable {
         if modifiers & UInt32(shiftKey) != 0   { s += "⇧" }
         if modifiers & UInt32(cmdKey) != 0     { s += "⌘" }
         s += Self.name(for: keyCode)
+        if mode == .holdToTalk { s += "  (hold)" }
         return s
     }
 
@@ -74,6 +99,16 @@ struct HotkeyConfig: Codable, Equatable {
         case kVK_Return: return "Return"
         case kVK_Tab: return "Tab"
         case kVK_Escape: return "Esc"
+        case kVK_Delete: return "⌫"
+        case kVK_ForwardDelete: return "⌦"
+        case kVK_LeftArrow: return "←"
+        case kVK_RightArrow: return "→"
+        case kVK_UpArrow: return "↑"
+        case kVK_DownArrow: return "↓"
+        case kVK_Home: return "↖"
+        case kVK_End: return "↘"
+        case kVK_PageUp: return "⇞"
+        case kVK_PageDown: return "⇟"
         case kVK_F1: return "F1"
         case kVK_F2: return "F2"
         case kVK_F3: return "F3"
@@ -86,6 +121,14 @@ struct HotkeyConfig: Codable, Equatable {
         case kVK_F10: return "F10"
         case kVK_F11: return "F11"
         case kVK_F12: return "F12"
+        case kVK_F13: return "F13"
+        case kVK_F14: return "F14"
+        case kVK_F15: return "F15"
+        case kVK_F16: return "F16"
+        case kVK_F17: return "F17"
+        case kVK_F18: return "F18"
+        case kVK_F19: return "F19"
+        case kVK_F20: return "F20"
         case kVK_ANSI_Comma: return ","
         case kVK_ANSI_Period: return "."
         case kVK_ANSI_Slash: return "/"

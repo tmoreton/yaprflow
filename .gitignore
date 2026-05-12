@@ -15,3 +15,7 @@ xcuserdata/
 Models/
 
 .env
+
+# Personal Claude Code workflow files (not relevant to the project)
+.claude/
+CLAUDE.md

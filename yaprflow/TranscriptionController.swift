@@ -42,8 +42,27 @@ final class TranscriptionController {
 
     private var isActive = false
     private var isStarting = false
+    /// What the caller most recently asked for. Diverges from isActive while
+    /// start() is awaiting mic/model load — if the user releases push-to-talk
+    /// during that window, start() will see desiredActive == false and bail.
+    private var desiredActive = false
     private var sessionIsStreaming = true
     private var autoHideTask: Task<Void, Never>?
+
+    /// Monotonic per-recording session ID. Bumped in start() before any await.
+    /// Async work (notably the grammar correction Task that outlives stop())
+    /// captures this value at launch time and bails if it no longer matches —
+    /// otherwise a slow grammar pass from session 1 can overwrite session 2's
+    /// clipboard, or worse, auto-paste session 1's transcript into session 2's
+    /// target window.
+    private var currentSessionID = UUID()
+
+    /// PID of the frontmost app at the moment the user fired the hotkey for
+    /// THIS session, with yaprflow itself filtered out. The auto-paste site
+    /// re-reads `NSWorkspace.shared.frontmostApplication?.processIdentifier`
+    /// and compares against this value, aborting on mismatch. nil → auto-paste
+    /// suppressed for this session (yaprflow was frontmost, or capture failed).
+    private var sessionFrontmostPID: pid_t?
 
     // Long maxSpeechDuration (60s) for continuous dictation without forced chunks.
     // Silence-based segmentation handles natural pauses.
@@ -69,11 +88,58 @@ final class TranscriptionController {
     }
 
     func toggle() {
+        setActive(!desiredActive)
+    }
+
+    /// Reads the frontmost-app PID with yaprflow itself filtered out — when we
+    /// are foreground (status item click, onboarding window, focused menu) we
+    /// must NOT auto-paste, because the target "field" would be our own UI.
+    /// Returns nil when frontmost is unavailable or is us; callers treat nil
+    /// as "do not auto-paste this session."
+    private static func captureFrontmostExcludingSelf() -> pid_t? {
+        let mine = ProcessInfo.processInfo.processIdentifier
+        guard let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier else {
+            return nil
+        }
+        return pid == mine ? nil : pid
+    }
+
+    /// Send the ⌘V if every guard passes; log + skip silently otherwise. The
+    /// transcript is already on the clipboard regardless, so a skipped paste
+    /// degrades to current (pre-feature) behaviour.
+    private func performAutoPasteIfAllowed(targetPID: pid_t?, enabled: Bool) {
+        guard enabled else { return }
+        guard let target = targetPID else {
+            log.info("Auto-paste skipped: no captured target (yaprflow was frontmost at start, or capture failed)")
+            return
+        }
+        guard AutoPaste.hasAccessibility else {
+            log.info("Auto-paste skipped: Accessibility permission not granted")
+            return
+        }
+        guard !AutoPaste.isSecureInputEnabled else {
+            log.info("Auto-paste skipped: secure event input is enabled (password field?)")
+            return
+        }
+        guard NSWorkspace.shared.frontmostApplication?.processIdentifier == target else {
+            log.info("Auto-paste skipped: focus changed since recording started")
+            return
+        }
+        AutoPaste.sendCmdV()
+    }
+
+    /// Drive recording from desired state. Safe to call rapidly from push-to-talk:
+    /// if the user presses-and-releases during start()'s async warmup, start()
+    /// observes desiredActive == false post-await and bails out cleanly.
+    func setActive(_ active: Bool) {
+        desiredActive = active
         Task { @MainActor in
-            if isActive {
-                await stop()
+            if active {
+                if !isActive, !isStarting { await start() }
             } else {
-                await start()
+                // If start() is still in-flight, it will see desiredActive=false
+                // post-await and bail. Otherwise stop normally.
+                if isActive { await stop() }
             }
         }
     }
@@ -109,11 +175,28 @@ final class TranscriptionController {
         // Snapshot the mode for this session so toggling the menu mid-recording
         // doesn't corrupt the pipeline.
         sessionIsStreaming = state.streamingMode
+
+        // Per-session capture for auto-paste. Done BEFORE any await: by the
+        // time ensureLoaded() returns (up to 30s on cold launch) frontmost may
+        // have drifted, but we want "the app the user was in when they fired
+        // the hotkey," not "wherever they happen to be after the model loads."
+        currentSessionID = UUID()
+        sessionFrontmostPID = Self.captureFrontmostExcludingSelf()
+
         NotchOverlayWindowController.shared.show()
 
         do {
             try await ensureMicPermission()
             let (_, vad) = try await ensureLoaded()
+
+            // Push-to-talk race guard: if the user released the hotkey while
+            // we were awaiting mic permission / model load, abandon the start
+            // instead of stranding capture running with no way to stop it.
+            guard desiredActive else {
+                state.status = .idle
+                scheduleAutoHide(after: 0.1)
+                return
+            }
 
             sessionSamples.removeAll(keepingCapacity: true)
             vadPending.removeAll(keepingCapacity: true)
@@ -123,6 +206,7 @@ final class TranscriptionController {
             state.status = .listening
             try capture.start()
             isActive = true
+            SoundEffect.start.play()
         } catch {
             log.error("Start failed: \(error.localizedDescription)")
             state.status = .error(error.localizedDescription)
@@ -134,6 +218,8 @@ final class TranscriptionController {
         guard isActive else { return }
         isActive = false
         capture.stop()
+        SoundEffect.stop.play()
+        state.inputLevel = 0
         state.status = .finishing
 
         if sessionIsStreaming {
@@ -162,8 +248,20 @@ final class TranscriptionController {
             let pb = NSPasteboard.general
             pb.clearContents()
 
+            // Snapshot session-scoped values for any async work below — never
+            // read `self.currentSessionID` / `self.sessionFrontmostPID` from
+            // inside the grammar Task closure, since a new dictation could
+            // mutate them before the Task resumes.
+            let sessionID = currentSessionID
+            let targetPID = sessionFrontmostPID
+            let autoPasteEnabled = state.autoPasteMode
+
             if state.grammarMode {
-                // Grammar mode: copy original first, then corrected overwrites it
+                // Grammar mode: copy original first, then corrected overwrites
+                // it. The original write is NOT auto-pasted — auto-paste only
+                // fires on the final value the user expects to land in their
+                // text field (corrected on success, or original on failure
+                // below).
                 pb.setString(finalText, forType: .string)
 
                 state.status = .correcting("Improving grammar…")
@@ -175,15 +273,33 @@ final class TranscriptionController {
                         let corrected = try await GrammarController.shared.correct(text: finalText) { msg in
                             self.state.status = .correcting(msg)
                         }
-                        // Overwrite clipboard with corrected version
-                        pb.setString(corrected, forType: .string)
+                        // Stale-session guard: a new dictation may have
+                        // started (and even finished) while we were awaiting
+                        // the grammar model. Pasting / writing the clipboard
+                        // now would clobber the newer session's transcript
+                        // — and, for auto-paste, would deliver this
+                        // session's text to whatever app the user has moved
+                        // on to. Drop the result entirely.
+                        guard sessionID == self.currentSessionID else {
+                            log.info("Dropping stale grammar correction (newer session in flight)")
+                            return
+                        }
+                        let writeOK = pb.setString(corrected, forType: .string)
 
                         self.state.liveTranscript = corrected
                         self.state.lastTranscript = corrected
                         self.state.status = .copied
                         self.scheduleAutoHide(after: 2.5)
+
+                        if writeOK {
+                            self.performAutoPasteIfAllowed(
+                                targetPID: targetPID,
+                                enabled: autoPasteEnabled
+                            )
+                        }
                     } catch {
                         log.error("Grammar correction failed: \(error.localizedDescription)")
+                        guard sessionID == self.currentSessionID else { return }
                         // Original is already on the clipboard. Surface the
                         // failure briefly so the user notices grammar didn't
                         // run — most often this is a fresh install where the
@@ -193,14 +309,30 @@ final class TranscriptionController {
                         self.state.lastTranscript = finalText
                         self.state.status = .error("Grammar unavailable — copied original")
                         self.scheduleAutoHide(after: 3.0)
+
+                        // Auto-paste the original anyway — the user invoked
+                        // dictation expecting text to appear in their field,
+                        // and silently disabling the feature on grammar
+                        // failure is worse than pasting uncorrected text.
+                        self.performAutoPasteIfAllowed(
+                            targetPID: targetPID,
+                            enabled: autoPasteEnabled
+                        )
                     }
                 }
             } else {
                 // Regular mode: just copy the transcript
-                pb.setString(finalText, forType: .string)
+                let writeOK = pb.setString(finalText, forType: .string)
                 state.lastTranscript = finalText
                 state.status = .copied
                 scheduleAutoHide(after: 1.2)
+
+                if writeOK {
+                    performAutoPasteIfAllowed(
+                        targetPID: targetPID,
+                        enabled: autoPasteEnabled
+                    )
+                }
             }
         } else {
             state.status = .idle
@@ -210,6 +342,11 @@ final class TranscriptionController {
 
     private func feed(_ buffer: AVAudioPCMBuffer) async {
         guard isActive else { return }
+
+        // Publish a normalized input-level reading for the overlay's bouncing
+        // bars. Cheap (single pass over the buffer's floats) and fires at the
+        // engine's tap rate, which is roughly 20–50 Hz — plenty smooth for UI.
+        state.inputLevel = Self.rmsLevel(of: buffer)
 
         let samples: [Float]
         do {
@@ -337,6 +474,37 @@ final class TranscriptionController {
         } catch {
             log.error("Speculative transcribe failed: \(error.localizedDescription)")
         }
+    }
+
+    /// RMS amplitude of the first channel of `buffer`. Returns roughly 0 for
+    /// silence; typical speech reads 0.02–0.3 on a typical built-in mic. Used
+    /// purely for the overlay's level visualizer; not in the ASR path. Handles
+    /// both float and int16 input formats — the engine tap on Apple Silicon is
+    /// almost always float, but Intel Macs and external interfaces can deliver
+    /// int16 and we shouldn't go silent in the UI.
+    private static func rmsLevel(of buffer: AVAudioPCMBuffer) -> Float {
+        let frameCount = Int(buffer.frameLength)
+        guard frameCount > 0 else { return 0 }
+
+        if let channelData = buffer.floatChannelData {
+            let samples = channelData[0]
+            var sumSquares: Float = 0
+            for i in 0..<frameCount {
+                let s = samples[i]
+                sumSquares += s * s
+            }
+            return sqrtf(sumSquares / Float(frameCount))
+        }
+        if let channelData = buffer.int16ChannelData {
+            let samples = channelData[0]
+            var sumSquares: Float = 0
+            for i in 0..<frameCount {
+                let s = Float(samples[i]) / Float(Int16.max)
+                sumSquares += s * s
+            }
+            return sqrtf(sumSquares / Float(frameCount))
+        }
+        return 0
     }
 
     /// Regex matching filler words ("uh", "um", "er", "ah", "hmm", "mm"

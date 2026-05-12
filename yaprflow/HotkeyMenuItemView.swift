@@ -118,11 +118,11 @@ final class HotkeyMenuItemView: NSView {
         if flags.contains(.control)  { carbonMods |= UInt32(controlKey) }
         if flags.contains(.shift)    { carbonMods |= UInt32(shiftKey) }
 
-        guard carbonMods != 0 else {
-            return true
-        }
-
-        let newConfig = HotkeyConfig(keyCode: UInt32(event.keyCode), modifiers: carbonMods)
+        let newConfig = HotkeyConfig(
+            keyCode: UInt32(event.keyCode),
+            modifiers: carbonMods,
+            mode: AppState.shared.hotkey.mode
+        )
         AppState.shared.hotkey = newConfig
         newConfig.save()
         NotificationCenter.default.post(name: .yaprflowHotkeyChanged, object: nil)
