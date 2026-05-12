@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# Packages just Encoder.mlmodelc (the big ~445MB piece of the Parakeet TDT 0.6B v2
-# Core ML bundle) into a tarball and uploads it to the 'models-v2' GitHub Release.
+# Packages just Encoder.mlmodelc (the big piece of the Parakeet TDT 0.6B v3
+# Core ML bundle) into a tarball and uploads it to the 'models-v3' GitHub Release.
 # The app ships with the small parts (Preprocessor/Decoder/JointDecision/vocab)
 # bundled, and downloads this encoder tarball on first launch.
 
 set -euo pipefail
 
 REPO_SLUG="tmoreton/yaprflow"
-MODELS_TAG="models-v2"
-TARBALL="parakeet-v2-encoder.tar.gz"
+MODELS_TAG="models-v3"
+TARBALL="parakeet-v3-encoder.tar.gz"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SRC="$ROOT/Models/parakeet-tdt-0.6b-v2"
+SRC="$ROOT/Models/parakeet-tdt-0.6b-v3"
 STAGE="$(mktemp -d -t yaprflow-models.XXXXXX)"
 trap 'rm -rf "$STAGE"' EXIT
 
@@ -36,8 +36,8 @@ else
     echo "Creating release ${MODELS_TAG}..."
     gh release create "$MODELS_TAG" "$STAGE/$TARBALL" \
         --repo "$REPO_SLUG" \
-        --title "Parakeet TDT 0.6B v2 Encoder (Core ML)" \
-        --notes "Core ML Encoder.mlmodelc for FluidInference/parakeet-tdt-0.6b-v2-coreml. Downloaded on first launch by Yaprflow; small model pieces ship inside the app bundle."
+        --title "Parakeet TDT 0.6B v3 Encoder (Core ML)" \
+        --notes "Core ML Encoder.mlmodelc for FluidInference/parakeet-tdt-0.6b-v3-coreml. Downloaded on first launch by Yaprflow; small model pieces ship inside the app bundle."
 fi
 
 echo "Done."

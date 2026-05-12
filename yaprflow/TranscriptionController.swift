@@ -42,7 +42,6 @@ final class TranscriptionController {
 
     private var isActive = false
     private var isStarting = false
-    private var sessionIsStreaming = true
     private var autoHideTask: Task<Void, Never>?
 
     // Long maxSpeechDuration (60s) for continuous dictation without forced chunks.
@@ -85,8 +84,6 @@ final class TranscriptionController {
         Task { @MainActor in
             do {
                 _ = try await ensureLoaded()
-                // Don't leave the overlay/menu showing a stale "preparing…"
-                // status once preload finishes if the user hasn't started yet.
                 if !isActive, !isStarting {
                     state.status = .idle
                 }
@@ -106,9 +103,6 @@ final class TranscriptionController {
         volatileText = ""
         lastSpeculativeSampleCount = 0
         state.liveTranscript = ""
-        // Snapshot the mode for this session so toggling the menu mid-recording
-        // doesn't corrupt the pipeline.
-        sessionIsStreaming = state.streamingMode
         NotchOverlayWindowController.shared.show()
 
         do {
@@ -136,72 +130,25 @@ final class TranscriptionController {
         capture.stop()
         state.status = .finishing
 
-        if sessionIsStreaming {
-            // Streaming: flush any pending speech segment so we don't lose the
-            // tail of what the user was saying.
-            if let start = currentSpeechStart, start < sessionSamples.count {
-                let tail = Array(sessionSamples[start..<sessionSamples.count])
-                currentSpeechStart = nil
-                enqueueTranscribe(samples: tail)
-            }
-            await transcribeChain?.value
-        } else {
-            // Single-shot: transcribe the whole clip in one pass. The overlay
-            // has been showing "Listening…" / "Processing…" the whole time; the
-            // final text will land below.
-            if !sessionSamples.isEmpty {
-                await performTranscribe(samples: sessionSamples)
-            }
+        // Flush any pending speech segment so we don't lose the tail of what
+        // the user was saying.
+        if let start = currentSpeechStart, start < sessionSamples.count {
+            let tail = Array(sessionSamples[start..<sessionSamples.count])
+            currentSpeechStart = nil
+            enqueueTranscribe(samples: tail)
         }
+        await transcribeChain?.value
 
         let finalText = confirmedText.trimmingCharacters(in: .whitespacesAndNewlines)
         state.liveTranscript = finalText
 
         if !finalText.isEmpty {
-            state.lastOriginalTranscript = finalText
             let pb = NSPasteboard.general
             pb.clearContents()
-
-            if state.grammarMode {
-                // Grammar mode: copy original first, then corrected overwrites it
-                pb.setString(finalText, forType: .string)
-
-                state.status = .correcting("Improving grammar…")
-                autoHideTask?.cancel()
-                autoHideTask = nil
-
-                Task { @MainActor in
-                    do {
-                        let corrected = try await GrammarController.shared.correct(text: finalText) { msg in
-                            self.state.status = .correcting(msg)
-                        }
-                        // Overwrite clipboard with corrected version
-                        pb.setString(corrected, forType: .string)
-
-                        self.state.liveTranscript = corrected
-                        self.state.lastTranscript = corrected
-                        self.state.status = .copied
-                        self.scheduleAutoHide(after: 2.5)
-                    } catch {
-                        log.error("Grammar correction failed: \(error.localizedDescription)")
-                        // Original is already on the clipboard. Surface the
-                        // failure briefly so the user notices grammar didn't
-                        // run — most often this is a fresh install where the
-                        // model download failed (network, 404 release tag,
-                        // etc.) and silent fallback would let it go undetected
-                        // forever.
-                        self.state.lastTranscript = finalText
-                        self.state.status = .error("Grammar unavailable — copied original")
-                        self.scheduleAutoHide(after: 3.0)
-                    }
-                }
-            } else {
-                // Regular mode: just copy the transcript
-                pb.setString(finalText, forType: .string)
-                state.lastTranscript = finalText
-                state.status = .copied
-                scheduleAutoHide(after: 1.2)
-            }
+            pb.setString(finalText, forType: .string)
+            state.lastTranscript = finalText
+            state.status = .copied
+            scheduleAutoHide(after: 1.2)
         } else {
             state.status = .idle
             scheduleAutoHide(after: 1.2)
@@ -220,9 +167,6 @@ final class TranscriptionController {
         }
 
         sessionSamples.append(contentsOf: samples)
-
-        // Single-shot mode: just accumulate, transcribe everything in stop().
-        guard sessionIsStreaming else { return }
 
         guard let vad = vadManager, var currentVadState = vadState else { return }
         vadPending.append(contentsOf: samples)
@@ -301,8 +245,6 @@ final class TranscriptionController {
                         self.confirmedText += " " + cleaned
                     }
                 }
-                // This segment is confirmed — drop any volatile text that was
-                // showing a preview of it.
                 self.volatileText = ""
                 self.state.liveTranscript = self.displayText()
             }
@@ -320,16 +262,12 @@ final class TranscriptionController {
     }
 
     private func performSpeculative(samples: [Float], segmentStart: Int) async {
-        // Skip if the user already paused (speechEnd fired) — the confirmed
-        // transcribe is about to run and supersede this anyway.
         guard currentSpeechStart == segmentStart, isActive else { return }
         guard let asr = asrManager else { return }
         do {
             let result = try await asr.transcribe(samples, source: .microphone)
             let cleaned = Self.cleanTranscript(result.text)
             await MainActor.run {
-                // Re-check relevance: the segment may have ended or a new one
-                // started by the time the transcribe returned.
                 guard self.isActive, self.currentSpeechStart == segmentStart else { return }
                 self.volatileText = cleaned
                 self.state.liveTranscript = self.displayText()
@@ -356,8 +294,6 @@ final class TranscriptionController {
             range: range,
             withTemplate: ""
         )
-        // Tidy up double spaces and stranded leading punctuation the model may
-        // leave behind (e.g. "um, hello" → ", hello" → "hello").
         while text.contains("  ") {
             text = text.replacingOccurrences(of: "  ", with: " ")
         }
@@ -401,7 +337,12 @@ final class TranscriptionController {
 
         let task = Task<(AsrManager, VadManager), Error> { @MainActor in
             let mlConfig = MLModelConfiguration()
-            mlConfig.computeUnits = .cpuAndNeuralEngine
+            // .cpuAndGPU instead of .cpuAndNeuralEngine: ANE forces a heavy
+            // AOT compile (~30s, ~2GB of disk writes) on every launch when the
+            // app is sandboxed, because the e5 bundle cache doesn't survive
+            // in the container's Caches dir. That tripped macOS disk-write
+            // throttling and Jetsam (silent kills).
+            mlConfig.computeUnits = .cpuAndGPU
 
             let modelDir = try await self.ensureModelsLocally()
 
@@ -413,7 +354,7 @@ final class TranscriptionController {
                 asrModels = try await AsrModels.load(
                     from: modelDir,
                     configuration: mlConfig,
-                    version: .v2
+                    version: .v3
                 )
             } catch {
                 // A freshly-downloaded model that fails to load is almost
@@ -425,7 +366,7 @@ final class TranscriptionController {
                 asrModels = try await AsrModels.load(
                     from: freshModelDir,
                     configuration: mlConfig,
-                    version: .v2
+                    version: .v3
                 )
             }
 
@@ -433,7 +374,7 @@ final class TranscriptionController {
             try await asr.loadModels(asrModels)
 
             state.status = .preparing("Loading voice detector…")
-            let vadConfig = VadConfig(computeUnits: .cpuAndNeuralEngine)
+            let vadConfig = VadConfig(computeUnits: .cpuAndGPU)
             let vad: VadManager
             if let vadBase = Self.bundledVADBaseURL() {
                 log.info("Loading bundled VAD from \(vadBase.path, privacy: .public)")
@@ -465,7 +406,7 @@ final class TranscriptionController {
         }
     }
 
-    private static let modelSubpath = "Models/parakeet-tdt-0.6b-v2"
+    private static let modelSubpath = "Models/parakeet-tdt-0.6b-v3"
     private static let requiredModelFiles = [
         "Preprocessor.mlmodelc",
         "Encoder.mlmodelc",
@@ -475,8 +416,7 @@ final class TranscriptionController {
     ]
 
     /// Small model pieces that ship inside the app bundle. The big
-    /// `Encoder.mlmodelc` (~445MB) is downloaded on first launch so the DMG
-    /// stays small.
+    /// `Encoder.mlmodelc` is downloaded on first launch so the DMG stays small.
     private static let bundledSmallModelFiles = [
         "Preprocessor.mlmodelc",
         "Decoder.mlmodelc",
@@ -485,7 +425,7 @@ final class TranscriptionController {
     ]
 
     private static let encoderDownloadURL = URL(string:
-        "https://github.com/tmoreton/yaprflow/releases/download/models-v2/parakeet-v2-encoder.tar.gz"
+        "https://github.com/tmoreton/yaprflow/releases/download/models-v3/parakeet-v3-encoder.tar.gz"
     )!
 
     /// Full bundle (dev builds with the encoder still in the repo). If every
@@ -517,7 +457,7 @@ final class TranscriptionController {
         return appSupport
             .appendingPathComponent("FluidAudio", isDirectory: true)
             .appendingPathComponent("Models", isDirectory: true)
-            .appendingPathComponent("parakeet-tdt-0.6b-v2", isDirectory: true)
+            .appendingPathComponent("parakeet-tdt-0.6b-v3", isDirectory: true)
     }
 
     private static func allModelFilesPresent(in dir: URL) -> Bool {
@@ -541,8 +481,8 @@ final class TranscriptionController {
         }
 
         // Anything less than a healthy cache — partial download, partial
-        // extraction, corrupt bytes — wipe and start over. Re-downloading 400MB
-        // is slower than shipping with a broken model.
+        // extraction, corrupt bytes — wipe and start over. Re-downloading is
+        // slower than shipping with a broken model.
         if FileManager.default.fileExists(atPath: cacheDir.path) {
             log.info("Cache at \(cacheDir.path, privacy: .public) is incomplete; clearing before re-populating.")
             try? FileManager.default.removeItem(at: cacheDir)
@@ -551,8 +491,6 @@ final class TranscriptionController {
         try await populateModelCache(cacheDir)
 
         guard Self.cacheLooksHealthy(cacheDir) else {
-            // Populate succeeded but the files still don't look right — fail
-            // loudly rather than load a broken model.
             try? FileManager.default.removeItem(at: cacheDir)
             throw NSError(domain: "yaprflow.model", code: 2, userInfo: [
                 NSLocalizedDescriptionKey:
@@ -563,9 +501,8 @@ final class TranscriptionController {
     }
 
     /// A "healthy" cache has all required files AND the encoder's weight file
-    /// is at least 100 MB (uncompressed encoder weights are ~400 MB). This
-    /// catches partial extractions where the directory exists but its contents
-    /// are truncated.
+    /// is at least 100 MB. Catches partial extractions where the directory
+    /// exists but its contents are truncated.
     private static func cacheLooksHealthy(_ dir: URL) -> Bool {
         guard allModelFilesPresent(in: dir) else { return false }
         let weightFile = dir
@@ -592,19 +529,13 @@ final class TranscriptionController {
             ])
         }
 
-        // Copy small pieces from bundle → cache (only ones not already present).
         for name in Self.bundledSmallModelFiles {
             let src = partial.appendingPathComponent(name)
             let dst = cacheDir.appendingPathComponent(name)
             if fm.fileExists(atPath: dst.path) { continue }
-            if src.hasDirectoryPath {
-                try fm.copyItem(at: src, to: dst)
-            } else {
-                try fm.copyItem(at: src, to: dst)
-            }
+            try fm.copyItem(at: src, to: dst)
         }
 
-        // Download + extract Encoder if not already there.
         if !fm.fileExists(atPath: cacheDir.appendingPathComponent("Encoder.mlmodelc").path) {
             try await downloadAndExtractEncoder(into: cacheDir)
         }
@@ -654,8 +585,8 @@ final class TranscriptionController {
         state.status = .preparing("Extracting speech model...")
 
         // Extract into a staging sibling directory first; only move into the
-        // real cache if tar succeeds AND the expected files are there. This
-        // way a crashed/killed extract can never leave a half-written
+        // real cache if tar succeeds AND the expected files are there. Way to
+        // ensure a crashed/killed extract can never leave a half-written
         // Encoder.mlmodelc that fools cacheLooksHealthy on the next launch.
         let fm = FileManager.default
         let stagingDir = cacheDir
@@ -686,7 +617,6 @@ final class TranscriptionController {
             ])
         }
 
-        // Verify the encoder extracted correctly before promoting.
         let extractedEncoder = stagingDir.appendingPathComponent("Encoder.mlmodelc", isDirectory: true)
         let extractedWeight = extractedEncoder
             .appendingPathComponent("weights", isDirectory: true)
@@ -701,7 +631,6 @@ final class TranscriptionController {
             ])
         }
 
-        // Atomic-ish promote. Same filesystem, rename is atomic.
         let finalEncoder = cacheDir.appendingPathComponent("Encoder.mlmodelc", isDirectory: true)
         try? fm.removeItem(at: finalEncoder)
         try fm.moveItem(at: extractedEncoder, to: finalEncoder)

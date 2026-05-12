@@ -59,10 +59,6 @@ struct NotchOverlayView: View {
             return state.liveTranscript.isEmpty ? "Listening…" : Self.wrappedTail(of: state.liveTranscript)
         case .finishing:
             return state.liveTranscript.isEmpty ? "Processing…" : Self.wrappedTail(of: state.liveTranscript)
-        case .correcting(let message):
-            return message
-        case .summarizing:
-            return "Summarizing…"
         case .copied:
             return copiedDisplayText
         case .error(let message):
@@ -116,10 +112,6 @@ struct NotchOverlayView: View {
                 .fill(Color.red)
                 .frame(width: 10, height: 10)
                 .modifier(RecordingPulse())
-        case .correcting, .summarizing:
-            ProgressView()
-                .controlSize(.small)
-                .tint(.white)
         case .copied:
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(.green)
