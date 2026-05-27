@@ -146,7 +146,7 @@ final class TranscriptionController {
             let pb = NSPasteboard.general
             pb.clearContents()
             pb.setString(finalText, forType: .string)
-            state.lastTranscript = finalText
+            state.recordTranscript(finalText)
             state.status = .copied
             scheduleAutoHide(after: 1.2)
         } else {

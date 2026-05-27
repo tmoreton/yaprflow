@@ -7,11 +7,119 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		141A88C2EE1D1F5D0F84C537 /* KeyboardLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D8756D93B819BE460A549E2 /* KeyboardLayout.swift */; };
+		21F5D6BE12500B2C05C03C9D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = DE6C15A83BCAB236AB4D31C3 /* Assets.xcassets */; };
+		345BF08A898701455A2F3680 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 100E5DDB9C6B071BABBE061E /* Foundation.framework */; };
+		3E29AAE02481578F3DEADB32 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 100E5DDB9C6B071BABBE061E /* Foundation.framework */; };
+		48A0CC84FFCF8C12D5FF97CF /* KeyboardSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = E39F3128960D0F448243D290 /* KeyboardSession.swift */; };
+		5F4B86669106A3DC52AB7271 /* yaprflow-iOS-Keyboard.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 0BE1EB80E7FB7EA813DF9D8E /* yaprflow-iOS-Keyboard.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		8B758ABCB9B54EF92AB9246C /* KeyboardViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BC2D230182D0A15DB4695FE /* KeyboardViewController.swift */; };
+		8C7A18FCDA66C92FA3E0F8F4 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEE8B6ADF5ACFBCED341D24E /* ContentView.swift */; };
+		8FADA1EF707898B72E315E15 /* AudioCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6843916C14C177A41165D16 /* AudioCapture.swift */; };
 		AFA2BCB22F97E6F00048D99B /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = AFA2BCB12F97E6F00048D99B /* FluidAudio */; };
+		B21E4D0C5A51E7F58BD5FFB8 /* HistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8DB5A205EACDB4ACD590805 /* HistoryStore.swift */; };
+		C10B5421858BE487C6D030C5 /* Models in Resources */ = {isa = PBXBuildFile; fileRef = 337B04531E80195033F21D96 /* Models */; };
+		D6FAF0F4AC10E7C72E4E0E7A /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = 16E2594D1C0B316B72574924 /* FluidAudio */; };
+		E3FFA860792C84B288FB9E2B /* TranscriptionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DF35452BDB52F57619F70A5 /* TranscriptionEngine.swift */; };
+		E8B1666ED700EDFBA5C576D3 /* YaprflowApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ACE08087D0D03B45508ADEF /* YaprflowApp.swift */; };
+		EEA50F9AB8DD4141F1C9AAC0 /* KeyboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 172B2334115EF3CE087566F1 /* KeyboardView.swift */; };
+		F42E3BA388AB6D2CC1308FE9 /* AppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 267022CB1B74A888CC8685FD /* AppGroup.swift */; };
+		F4C3EC541D13122A97CAA044 /* AppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 267022CB1B74A888CC8685FD /* AppGroup.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		E7F509E8642548BDCE4D71D0 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AFA2BC8F2F97E6F00048D99B /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C2822FA0CBAF6C4BC2B95065;
+			remoteInfo = "yaprflow-iOS-Keyboard";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		53F12E7D7094261ED013FAA2 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				5F4B86669106A3DC52AB7271 /* yaprflow-iOS-Keyboard.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		0050F2657F3E1B2C23C11AA1 /* HistoryStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HistoryStore.swift; sourceTree = "<group>"; };
+		01B9F3CA97F12303F51C3977 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		036137CEEF4D5D5803A317EA /* ContentView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		06AD1A99B7FBAA7C08F02165 /* yaprflow-iOS.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = "yaprflow-iOS.entitlements"; sourceTree = "<group>"; };
+		07388515B57546B7D9A9AC20 /* KeyboardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeyboardView.swift; sourceTree = "<group>"; };
+		0883DA0A8908AC0F653F09F7 /* AudioCapture.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AudioCapture.swift; sourceTree = "<group>"; };
+		0ACE08087D0D03B45508ADEF /* YaprflowApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = YaprflowApp.swift; sourceTree = "<group>"; };
+		0BE1EB80E7FB7EA813DF9D8E /* yaprflow-iOS-Keyboard.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "yaprflow-iOS-Keyboard.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+		0DF35452BDB52F57619F70A5 /* TranscriptionEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TranscriptionEngine.swift; sourceTree = "<group>"; };
+		100E5DDB9C6B071BABBE061E /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		1031C07E5E219A320E305737 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		172B2334115EF3CE087566F1 /* KeyboardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeyboardView.swift; sourceTree = "<group>"; };
+		1A3B663A2E2C7821496E3B93 /* KeyboardRecorder.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeyboardRecorder.swift; sourceTree = "<group>"; };
+		1BC2D230182D0A15DB4695FE /* KeyboardViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeyboardViewController.swift; sourceTree = "<group>"; };
+		1D8756D93B819BE460A549E2 /* KeyboardLayout.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeyboardLayout.swift; sourceTree = "<group>"; };
+		1D93AE18D2DABD5783ABF1C2 /* YaprflowApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = YaprflowApp.swift; sourceTree = "<group>"; };
+		267022CB1B74A888CC8685FD /* AppGroup.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppGroup.swift; sourceTree = "<group>"; };
+		2BBC7401760F32F23D975F18 /* AudioCapture.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AudioCapture.swift; sourceTree = "<group>"; };
+		337B04531E80195033F21D96 /* Models */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder; path = Models; sourceTree = "<group>"; };
+		35036A513F3819FB8FF5977C /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		3C417919167010F94A7045F6 /* YaprflowApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = YaprflowApp.swift; sourceTree = "<group>"; };
+		42B64BAE37B9CCA8D02EDE83 /* KeyboardLayout.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeyboardLayout.swift; sourceTree = "<group>"; };
+		463B78C17255D62287646292 /* yaprflow-iOS.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = "yaprflow-iOS.entitlements"; sourceTree = "<group>"; };
+		47F0F42F6ACD5626EFA16C5B /* HistoryStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HistoryStore.swift; sourceTree = "<group>"; };
+		4A67DA8BAE769F9AE15CA1D8 /* AudioChunkFile.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AudioChunkFile.swift; sourceTree = "<group>"; };
+		51D6B562E5D01F3540F173D3 /* AudioCapture.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AudioCapture.swift; sourceTree = "<group>"; };
+		53DC3A24A867A298737893A1 /* KeyboardRecorder.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeyboardRecorder.swift; sourceTree = "<group>"; };
+		58659CF96918CA321FD61F5D /* AppGroup.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppGroup.swift; sourceTree = "<group>"; };
+		5ABAF1AD096780D80154EF0D /* HistoryStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HistoryStore.swift; sourceTree = "<group>"; };
+		5AD6DD19E428CBC18816B947 /* ContentView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		610346AFC7E7FC0FF0978469 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		62A3629562E77DD95AF83F79 /* ContentView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		67AA1568E918C5E3ED10A991 /* yaprflow-iOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "yaprflow-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		6C8ECF155E20409B106D3409 /* KeyboardSession.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeyboardSession.swift; sourceTree = "<group>"; };
+		7619103AD922E62C19F763BA /* yaprflow-iOS-Keyboard.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = "yaprflow-iOS-Keyboard.entitlements"; sourceTree = "<group>"; };
+		77B98DA57F7EDE34755E4B24 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		7C99AF0BF00A319C0C81D4E7 /* TranscriptionEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TranscriptionEngine.swift; sourceTree = "<group>"; };
+		7E3AC7FBCF878FF27954ED43 /* KeyboardViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeyboardViewController.swift; sourceTree = "<group>"; };
+		88B45FA867A1ABF009AC4EC5 /* yaprflow-iOS-Keyboard.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "yaprflow-iOS-Keyboard.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+		8AC764B726D8D52670A9D93A /* yaprflow-iOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "yaprflow-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		8E35F33CF743CAFDD158DBB7 /* YaprflowApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = YaprflowApp.swift; sourceTree = "<group>"; };
+		8F7F23AB28CFDAB633F31960 /* yaprflow-iOS.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = "yaprflow-iOS.entitlements"; sourceTree = "<group>"; };
+		94D047D7A9DB1C96BBDD9A31 /* AudioChunkFile.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AudioChunkFile.swift; sourceTree = "<group>"; };
+		9D7845F53F019CEBA30DAF8E /* yaprflow-iOS-Keyboard.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = "yaprflow-iOS-Keyboard.entitlements"; sourceTree = "<group>"; };
+		A45AFCA2E0FDD2B74D9C4C5D /* IPCBridge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = IPCBridge.swift; sourceTree = "<group>"; };
+		A63BA2F784330EBEE635B9D2 /* yaprflow-iOS.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = "yaprflow-iOS.entitlements"; sourceTree = "<group>"; };
+		AEE8B6ADF5ACFBCED341D24E /* ContentView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		AFA2BC972F97E6F00048D99B /* yaprflow.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = yaprflow.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B161A32DDC19C2555710BA28 /* yaprflow-iOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "yaprflow-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		B42427E90AE53A9531858503 /* IPCBridge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = IPCBridge.swift; sourceTree = "<group>"; };
+		B6843916C14C177A41165D16 /* AudioCapture.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AudioCapture.swift; sourceTree = "<group>"; };
+		C8DB5A205EACDB4ACD590805 /* HistoryStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HistoryStore.swift; sourceTree = "<group>"; };
+		C97FEF0DD7AEFD31908D75DC /* KeyboardViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeyboardViewController.swift; sourceTree = "<group>"; };
+		CDE1020F4E8C96F7A027CDDD /* yaprflow-iOS-Keyboard.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "yaprflow-iOS-Keyboard.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+		D4347B9EC17B71FEAED22F24 /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		D6760B69FBFE9CEF123337E9 /* yaprflow-iOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "yaprflow-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		D74CD19E17733BC484ECCBFB /* yaprflow-iOS-Keyboard.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = "yaprflow-iOS-Keyboard.entitlements"; sourceTree = "<group>"; };
+		D85789FD3773556139F0C860 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		D95E3896D698AF701768174D /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		DAD562525B86E7D29FE1F513 /* TranscriptionEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TranscriptionEngine.swift; sourceTree = "<group>"; };
+		DB4D0CA56AA42EC6A21E1088 /* yaprflow-iOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "yaprflow-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		DBC6E16093FFBA815BBC93D1 /* KeyboardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeyboardView.swift; sourceTree = "<group>"; };
+		DE6C15A83BCAB236AB4D31C3 /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		E39F3128960D0F448243D290 /* KeyboardSession.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeyboardSession.swift; sourceTree = "<group>"; };
+		E5D0F84ED345D9C417A27381 /* KeyboardSession.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeyboardSession.swift; sourceTree = "<group>"; };
+		F038D9413EBDDCBEC952D54A /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		F41E5E67ADF151547C4F600C /* TranscriptionEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TranscriptionEngine.swift; sourceTree = "<group>"; };
+		FF4BB969D12EEDAE0E7EAB94 /* AppGroup.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppGroup.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -23,6 +131,15 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		A04E7ACACC5D97D6961000D6 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3E29AAE02481578F3DEADB32 /* Foundation.framework in Frameworks */,
+				D6FAF0F4AC10E7C72E4E0E7A /* FluidAudio in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		AFA2BC942F97E6F00048D99B /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -31,14 +148,131 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		FF277EC51D3EA1108F4B3AE8 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				345BF08A898701455A2F3680 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		04B33F7763F95B46AC45F0F0 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				FF4BB969D12EEDAE0E7EAB94 /* AppGroup.swift */,
+				4A67DA8BAE769F9AE15CA1D8 /* AudioChunkFile.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		0D4751C544FC6ABAC9BD7991 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				100E5DDB9C6B071BABBE061E /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
+		1D403E5B8725F36990D5AC53 /* yaprflow-iOS */ = {
+			isa = PBXGroup;
+			children = (
+				8E35F33CF743CAFDD158DBB7 /* YaprflowApp.swift */,
+				036137CEEF4D5D5803A317EA /* ContentView.swift */,
+				7C99AF0BF00A319C0C81D4E7 /* TranscriptionEngine.swift */,
+				51D6B562E5D01F3540F173D3 /* AudioCapture.swift */,
+				0050F2657F3E1B2C23C11AA1 /* HistoryStore.swift */,
+				B42427E90AE53A9531858503 /* IPCBridge.swift */,
+				04B33F7763F95B46AC45F0F0 /* Shared */,
+				D95E3896D698AF701768174D /* Assets.xcassets */,
+				35036A513F3819FB8FF5977C /* Info.plist */,
+				463B78C17255D62287646292 /* yaprflow-iOS.entitlements */,
+			);
+			path = "yaprflow-iOS";
+			sourceTree = "<group>";
+		};
+		271DB51A262F1FD8944F496E /* yaprflow-iOS */ = {
+			isa = PBXGroup;
+			children = (
+				1D93AE18D2DABD5783ABF1C2 /* YaprflowApp.swift */,
+				62A3629562E77DD95AF83F79 /* ContentView.swift */,
+				DAD562525B86E7D29FE1F513 /* TranscriptionEngine.swift */,
+				2BBC7401760F32F23D975F18 /* AudioCapture.swift */,
+				5ABAF1AD096780D80154EF0D /* HistoryStore.swift */,
+				F038D9413EBDDCBEC952D54A /* Info.plist */,
+				06AD1A99B7FBAA7C08F02165 /* yaprflow-iOS.entitlements */,
+			);
+			path = "yaprflow-iOS";
+			sourceTree = "<group>";
+		};
+		3ED8DD9688A8461B7CB8F3D7 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				267022CB1B74A888CC8685FD /* AppGroup.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		3FA50FDE1DB2BC317981040A /* yaprflow-iOS-Keyboard */ = {
+			isa = PBXGroup;
+			children = (
+				C97FEF0DD7AEFD31908D75DC /* KeyboardViewController.swift */,
+				07388515B57546B7D9A9AC20 /* KeyboardView.swift */,
+				E5D0F84ED345D9C417A27381 /* KeyboardSession.swift */,
+				1A3B663A2E2C7821496E3B93 /* KeyboardRecorder.swift */,
+				42B64BAE37B9CCA8D02EDE83 /* KeyboardLayout.swift */,
+				77B98DA57F7EDE34755E4B24 /* Info.plist */,
+				D74CD19E17733BC484ECCBFB /* yaprflow-iOS-Keyboard.entitlements */,
+			);
+			path = "yaprflow-iOS-Keyboard";
+			sourceTree = "<group>";
+		};
+		519E06C8972359EFB6E4023C /* yaprflow-iOS-Keyboard */ = {
+			isa = PBXGroup;
+			children = (
+				1BC2D230182D0A15DB4695FE /* KeyboardViewController.swift */,
+				172B2334115EF3CE087566F1 /* KeyboardView.swift */,
+				E39F3128960D0F448243D290 /* KeyboardSession.swift */,
+				1D8756D93B819BE460A549E2 /* KeyboardLayout.swift */,
+				610346AFC7E7FC0FF0978469 /* Info.plist */,
+				7619103AD922E62C19F763BA /* yaprflow-iOS-Keyboard.entitlements */,
+			);
+			path = "yaprflow-iOS-Keyboard";
+			sourceTree = "<group>";
+		};
+		6A4CAF77ED81E83BAE1ED575 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				58659CF96918CA321FD61F5D /* AppGroup.swift */,
+				94D047D7A9DB1C96BBDD9A31 /* AudioChunkFile.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		9FCF741E84A3FCE23F5294E4 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				0D4751C544FC6ABAC9BD7991 /* iOS */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		AFA2BC8E2F97E6F00048D99B = {
 			isa = PBXGroup;
 			children = (
 				AFA2BC992F97E6F00048D99B /* yaprflow */,
 				AFA2BC982F97E6F00048D99B /* Products */,
+				9FCF741E84A3FCE23F5294E4 /* Frameworks */,
+				271DB51A262F1FD8944F496E /* yaprflow-iOS */,
+				337B04531E80195033F21D96 /* Models */,
+				1D403E5B8725F36990D5AC53 /* yaprflow-iOS */,
+				C44E5DC11796D4D0BB0B47F8 /* yaprflow-iOS-Keyboard */,
+				FB5F2BD337316D1CDE383695 /* yaprflow-iOS */,
+				3FA50FDE1DB2BC317981040A /* yaprflow-iOS-Keyboard */,
+				E79D4C2D141B796EBFF0A0F5 /* yaprflow-iOS */,
+				519E06C8972359EFB6E4023C /* yaprflow-iOS-Keyboard */,
 			);
 			sourceTree = "<group>";
 		};
@@ -46,13 +280,89 @@
 			isa = PBXGroup;
 			children = (
 				AFA2BC972F97E6F00048D99B /* yaprflow.app */,
+				67AA1568E918C5E3ED10A991 /* yaprflow-iOS.app */,
+				D6760B69FBFE9CEF123337E9 /* yaprflow-iOS.app */,
+				B161A32DDC19C2555710BA28 /* yaprflow-iOS.app */,
+				CDE1020F4E8C96F7A027CDDD /* yaprflow-iOS-Keyboard.appex */,
+				DB4D0CA56AA42EC6A21E1088 /* yaprflow-iOS.app */,
+				88B45FA867A1ABF009AC4EC5 /* yaprflow-iOS-Keyboard.appex */,
+				8AC764B726D8D52670A9D93A /* yaprflow-iOS.app */,
+				0BE1EB80E7FB7EA813DF9D8E /* yaprflow-iOS-Keyboard.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		C44E5DC11796D4D0BB0B47F8 /* yaprflow-iOS-Keyboard */ = {
+			isa = PBXGroup;
+			children = (
+				7E3AC7FBCF878FF27954ED43 /* KeyboardViewController.swift */,
+				DBC6E16093FFBA815BBC93D1 /* KeyboardView.swift */,
+				6C8ECF155E20409B106D3409 /* KeyboardSession.swift */,
+				53DC3A24A867A298737893A1 /* KeyboardRecorder.swift */,
+				D85789FD3773556139F0C860 /* Info.plist */,
+				9D7845F53F019CEBA30DAF8E /* yaprflow-iOS-Keyboard.entitlements */,
+			);
+			path = "yaprflow-iOS-Keyboard";
+			sourceTree = "<group>";
+		};
+		E79D4C2D141B796EBFF0A0F5 /* yaprflow-iOS */ = {
+			isa = PBXGroup;
+			children = (
+				0ACE08087D0D03B45508ADEF /* YaprflowApp.swift */,
+				AEE8B6ADF5ACFBCED341D24E /* ContentView.swift */,
+				0DF35452BDB52F57619F70A5 /* TranscriptionEngine.swift */,
+				B6843916C14C177A41165D16 /* AudioCapture.swift */,
+				C8DB5A205EACDB4ACD590805 /* HistoryStore.swift */,
+				3ED8DD9688A8461B7CB8F3D7 /* Shared */,
+				DE6C15A83BCAB236AB4D31C3 /* Assets.xcassets */,
+				01B9F3CA97F12303F51C3977 /* Info.plist */,
+				A63BA2F784330EBEE635B9D2 /* yaprflow-iOS.entitlements */,
+			);
+			path = "yaprflow-iOS";
+			sourceTree = "<group>";
+		};
+		FB5F2BD337316D1CDE383695 /* yaprflow-iOS */ = {
+			isa = PBXGroup;
+			children = (
+				3C417919167010F94A7045F6 /* YaprflowApp.swift */,
+				5AD6DD19E428CBC18816B947 /* ContentView.swift */,
+				F41E5E67ADF151547C4F600C /* TranscriptionEngine.swift */,
+				0883DA0A8908AC0F653F09F7 /* AudioCapture.swift */,
+				47F0F42F6ACD5626EFA16C5B /* HistoryStore.swift */,
+				A45AFCA2E0FDD2B74D9C4C5D /* IPCBridge.swift */,
+				6A4CAF77ED81E83BAE1ED575 /* Shared */,
+				D4347B9EC17B71FEAED22F24 /* Assets.xcassets */,
+				1031C07E5E219A320E305737 /* Info.plist */,
+				8F7F23AB28CFDAB633F31960 /* yaprflow-iOS.entitlements */,
+			);
+			path = "yaprflow-iOS";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		7C7AFE524881F5527E0A0BBA /* yaprflow-iOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 01485293EBB3EC73757D33BD /* Build configuration list for PBXNativeTarget "yaprflow-iOS" */;
+			buildPhases = (
+				F0C57C0BD4CD888E432A8FB8 /* Sources */,
+				A04E7ACACC5D97D6961000D6 /* Frameworks */,
+				D7112767503008F01FB5ADD8 /* Resources */,
+				53F12E7D7094261ED013FAA2 /* Embed App Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				ED3653657A057F40E01A56D3 /* PBXTargetDependency */,
+			);
+			name = "yaprflow-iOS";
+			packageProductDependencies = (
+				16E2594D1C0B316B72574924 /* FluidAudio */,
+			);
+			productName = "yaprflow-iOS";
+			productReference = 8AC764B726D8D52670A9D93A /* yaprflow-iOS.app */;
+			productType = "com.apple.product-type.application";
+		};
 		AFA2BC962F97E6F00048D99B /* yaprflow */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = AFA2BCA22F97E6F10048D99B /* Build configuration list for PBXNativeTarget "yaprflow" */;
@@ -76,6 +386,23 @@
 			productName = yaprflow;
 			productReference = AFA2BC972F97E6F00048D99B /* yaprflow.app */;
 			productType = "com.apple.product-type.application";
+		};
+		C2822FA0CBAF6C4BC2B95065 /* yaprflow-iOS-Keyboard */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 98F94C8D1CEF02270F8C2B2A /* Build configuration list for PBXNativeTarget "yaprflow-iOS-Keyboard" */;
+			buildPhases = (
+				DBFE293FCD7347122B9351AD /* Sources */,
+				FF277EC51D3EA1108F4B3AE8 /* Frameworks */,
+				1099AFF17FE6AF9286B64AA0 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "yaprflow-iOS-Keyboard";
+			productName = "yaprflow-iOS-Keyboard";
+			productReference = 0BE1EB80E7FB7EA813DF9D8E /* yaprflow-iOS-Keyboard.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -110,15 +437,33 @@
 			projectRoot = "";
 			targets = (
 				AFA2BC962F97E6F00048D99B /* yaprflow */,
+				7C7AFE524881F5527E0A0BBA /* yaprflow-iOS */,
+				C2822FA0CBAF6C4BC2B95065 /* yaprflow-iOS-Keyboard */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		1099AFF17FE6AF9286B64AA0 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		AFA2BC952F97E6F00048D99B /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D7112767503008F01FB5ADD8 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				21F5D6BE12500B2C05C03C9D /* Assets.xcassets in Resources */,
+				C10B5421858BE487C6D030C5 /* Models in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -155,9 +500,132 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		DBFE293FCD7347122B9351AD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8B758ABCB9B54EF92AB9246C /* KeyboardViewController.swift in Sources */,
+				EEA50F9AB8DD4141F1C9AAC0 /* KeyboardView.swift in Sources */,
+				48A0CC84FFCF8C12D5FF97CF /* KeyboardSession.swift in Sources */,
+				141A88C2EE1D1F5D0F84C537 /* KeyboardLayout.swift in Sources */,
+				F4C3EC541D13122A97CAA044 /* AppGroup.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F0C57C0BD4CD888E432A8FB8 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E8B1666ED700EDFBA5C576D3 /* YaprflowApp.swift in Sources */,
+				8C7A18FCDA66C92FA3E0F8F4 /* ContentView.swift in Sources */,
+				E3FFA860792C84B288FB9E2B /* TranscriptionEngine.swift in Sources */,
+				8FADA1EF707898B72E315E15 /* AudioCapture.swift in Sources */,
+				B21E4D0C5A51E7F58BD5FFB8 /* HistoryStore.swift in Sources */,
+				F42E3BA388AB6D2CC1308FE9 /* AppGroup.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		ED3653657A057F40E01A56D3 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = "yaprflow-iOS-Keyboard";
+			target = C2822FA0CBAF6C4BC2B95065 /* yaprflow-iOS-Keyboard */;
+			targetProxy = E7F509E8642548BDCE4D71D0 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		5F6A8EE00412D495290AACE9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = "yaprflow-iOS-Keyboard/yaprflow-iOS-Keyboard.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = GVXC5FQ2RP;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "yaprflow-iOS-Keyboard/Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tmoreton.yaprflow.ios.keyboard;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		6D97BAAB347A1A392629BAD5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = "yaprflow-iOS/yaprflow-iOS.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = GVXC5FQ2RP;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "yaprflow-iOS/Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tmoreton.yaprflow.ios;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		77B4447415B149175CF1563D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = "yaprflow-iOS/yaprflow-iOS.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = GVXC5FQ2RP;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "yaprflow-iOS/Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tmoreton.yaprflow.ios;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 		AFA2BCA02F97E6F10048D99B /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -350,9 +818,56 @@
 			};
 			name = Release;
 		};
+		F90E6EA886D5C22A8EE145B5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = "yaprflow-iOS-Keyboard/yaprflow-iOS-Keyboard.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = GVXC5FQ2RP;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "yaprflow-iOS-Keyboard/Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tmoreton.yaprflow.ios.keyboard;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		01485293EBB3EC73757D33BD /* Build configuration list for PBXNativeTarget "yaprflow-iOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				77B4447415B149175CF1563D /* Release */,
+				6D97BAAB347A1A392629BAD5 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		98F94C8D1CEF02270F8C2B2A /* Build configuration list for PBXNativeTarget "yaprflow-iOS-Keyboard" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F90E6EA886D5C22A8EE145B5 /* Release */,
+				5F6A8EE00412D495290AACE9 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		AFA2BC922F97E6F00048D99B /* Build configuration list for PBXProject "yaprflow" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -385,6 +900,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		16E2594D1C0B316B72574924 /* FluidAudio */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AFA2BCB02F97E6F00048D99B /* XCRemoteSwiftPackageReference "FluidAudio" */;
+			productName = FluidAudio;
+		};
 		AFA2BCB12F97E6F00048D99B /* FluidAudio */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = AFA2BCB02F97E6F00048D99B /* XCRemoteSwiftPackageReference "FluidAudio" */;
