@@ -158,11 +158,11 @@ final class BottomMenuActionsView: NSView {
         addSubview(quitButton)
 
         NSLayoutConstraint.activate([
+            folderButton.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14),
+            folderButton.centerYAnchor.constraint(equalTo: centerYAnchor),
+
             quitButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
             quitButton.centerYAnchor.constraint(equalTo: centerYAnchor),
-
-            folderButton.trailingAnchor.constraint(equalTo: quitButton.leadingAnchor, constant: -6),
-            folderButton.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
     }
 

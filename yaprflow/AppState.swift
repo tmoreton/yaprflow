@@ -15,40 +15,32 @@ enum TranscriptionStatus: Equatable {
 final class AppState: ObservableObject {
     static let shared = AppState()
 
-    private static let historyKey = "yaprflow.history"
-    private static let maxHistory = 3
+    private static let lastTranscriptKey = "yaprflow.lastTranscript"
     private static let transcriptsFolderName = "Transcripts"
 
     @Published var status: TranscriptionStatus = .idle
     @Published var liveTranscript: String = ""
     @Published var hotkey: HotkeyConfig = HotkeyConfig.load() ?? .defaultHotkey
 
-    /// Most recent finalized transcripts (newest first), capped at 3. Persists
-    /// across restarts so the status-bar menu can offer them as quick re-copy
-    /// items.
-    @Published var history: [String] {
+    /// Most recent finalized transcript. Persisted so it survives restarts and
+    /// can be re-copied from the menu bar after the clipboard has been replaced.
+    @Published var lastTranscript: String {
         didSet {
-            UserDefaults.standard.set(history, forKey: Self.historyKey)
+            UserDefaults.standard.set(lastTranscript, forKey: Self.lastTranscriptKey)
         }
     }
 
     private init() {
-        self.history = UserDefaults.standard.stringArray(forKey: Self.historyKey) ?? []
+        self.lastTranscript = UserDefaults.standard.string(forKey: Self.lastTranscriptKey) ?? ""
     }
 
-    /// Insert text at the head of history, dedup, cap at maxHistory, and persist
-    /// each finalized transcript as a standalone Markdown file.
+    /// Store the newest transcript for quick re-copy and persist each finalized
+    /// transcript as a standalone Markdown file.
     func recordTranscript(_ text: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         try? Self.writeTranscriptMarkdown(trimmed)
-
-        var next = history.filter { $0 != trimmed }
-        next.insert(trimmed, at: 0)
-        if next.count > Self.maxHistory {
-            next = Array(next.prefix(Self.maxHistory))
-        }
-        history = next
+        lastTranscript = trimmed
     }
 
     func transcriptsDirectory() throws -> URL {
@@ -113,5 +105,4 @@ final class AppState: ObservableObject {
 
 extension Notification.Name {
     static let yaprflowHotkeyChanged = Notification.Name("yaprflow.hotkey.changed")
-    static let yaprflowHistoryChanged = Notification.Name("yaprflow.history.changed")
 }
