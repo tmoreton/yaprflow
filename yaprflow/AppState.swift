@@ -1,4 +1,5 @@
 import Combine
+import Foundation
 import SwiftUI
 
 enum TranscriptionStatus: Equatable {
@@ -16,6 +17,7 @@ final class AppState: ObservableObject {
 
     private static let historyKey = "yaprflow.history"
     private static let maxHistory = 3
+    private static let transcriptsFolderName = "Transcripts"
 
     @Published var status: TranscriptionStatus = .idle
     @Published var liveTranscript: String = ""
@@ -34,10 +36,13 @@ final class AppState: ObservableObject {
         self.history = UserDefaults.standard.stringArray(forKey: Self.historyKey) ?? []
     }
 
-    /// Insert text at the head of history, dedup, cap at maxHistory.
+    /// Insert text at the head of history, dedup, cap at maxHistory, and persist
+    /// each finalized transcript as a standalone Markdown file.
     func recordTranscript(_ text: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
+        try? Self.writeTranscriptMarkdown(trimmed)
+
         var next = history.filter { $0 != trimmed }
         next.insert(trimmed, at: 0)
         if next.count > Self.maxHistory {
@@ -45,6 +50,65 @@ final class AppState: ObservableObject {
         }
         history = next
     }
+
+    func transcriptsDirectory() throws -> URL {
+        try Self.ensureTranscriptsDirectory()
+    }
+
+    private static func writeTranscriptMarkdown(_ text: String) throws {
+        let directory = try ensureTranscriptsDirectory()
+        let date = Date()
+        let fileURL = uniqueTranscriptURL(in: directory, date: date)
+        let recordedAt = displayTimestampFormatter.string(from: date)
+        let markdown = """
+        # Transcript
+
+        Recorded: \(recordedAt)
+
+        \(text)
+        """
+        try markdown.write(to: fileURL, atomically: true, encoding: .utf8)
+    }
+
+    private static func ensureTranscriptsDirectory() throws -> URL {
+        let appSupport = FileManager.default.urls(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask
+        ).first!
+        let directory = appSupport
+            .appendingPathComponent("Yaprflow", isDirectory: true)
+            .appendingPathComponent(transcriptsFolderName, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
+    }
+
+    private static func uniqueTranscriptURL(in directory: URL, date: Date) -> URL {
+        let baseName = "transcript-\(filenameTimestampFormatter.string(from: date))"
+        var candidate = directory.appendingPathComponent(baseName).appendingPathExtension("md")
+        var suffix = 2
+        while FileManager.default.fileExists(atPath: candidate.path) {
+            candidate = directory
+                .appendingPathComponent("\(baseName)-\(suffix)")
+                .appendingPathExtension("md")
+            suffix += 1
+        }
+        return candidate
+    }
+
+    private static let filenameTimestampFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd_HH-mm-ss-SSS"
+        return formatter
+    }()
+
+    private static let displayTimestampFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .medium
+        return formatter
+    }()
 }
 
 extension Notification.Name {

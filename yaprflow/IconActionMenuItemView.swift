@@ -120,3 +120,87 @@ final class IconActionMenuItemView: NSView {
         needsDisplay = true
     }
 }
+
+@MainActor
+final class BottomMenuActionsView: NSView {
+    private weak var actionTarget: AnyObject?
+    private let openFolderAction: Selector
+    private let quitAction: Selector
+
+    init(target: AnyObject, openFolderAction: Selector, quitAction: Selector) {
+        self.actionTarget = target
+        self.openFolderAction = openFolderAction
+        self.quitAction = quitAction
+        super.init(frame: NSRect(x: 0, y: 0, width: 220, height: 30))
+        autoresizingMask = [.width]
+        setupLayout()
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: NSView.noIntrinsicMetric, height: 30)
+    }
+
+    private func setupLayout() {
+        let folderButton = makeButton(
+            symbolName: "folder",
+            accessibilityDescription: "Open transcripts folder",
+            action: #selector(openFolder)
+        )
+        let quitButton = makeButton(
+            symbolName: "power",
+            accessibilityDescription: "Quit Yaprflow",
+            action: #selector(quit)
+        )
+
+        addSubview(folderButton)
+        addSubview(quitButton)
+
+        NSLayoutConstraint.activate([
+            quitButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
+            quitButton.centerYAnchor.constraint(equalTo: centerYAnchor),
+
+            folderButton.trailingAnchor.constraint(equalTo: quitButton.leadingAnchor, constant: -6),
+            folderButton.centerYAnchor.constraint(equalTo: centerYAnchor),
+        ])
+    }
+
+    private func makeButton(
+        symbolName: String,
+        accessibilityDescription: String,
+        action: Selector
+    ) -> NSButton {
+        let button = NSButton()
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: accessibilityDescription)
+        button.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
+        button.imagePosition = .imageOnly
+        button.isBordered = false
+        button.bezelStyle = .regularSquare
+        button.target = self
+        button.action = action
+        button.toolTip = accessibilityDescription
+        button.setAccessibilityLabel(accessibilityDescription)
+        button.contentTintColor = .labelColor
+        NSLayoutConstraint.activate([
+            button.widthAnchor.constraint(equalToConstant: 28),
+            button.heightAnchor.constraint(equalToConstant: 24),
+        ])
+        return button
+    }
+
+    @objc private func openFolder() {
+        send(action: openFolderAction)
+    }
+
+    @objc private func quit() {
+        send(action: quitAction)
+    }
+
+    private func send(action: Selector) {
+        guard let target = actionTarget else { return }
+        NSApp.sendAction(action, to: target, from: self)
+        enclosingMenuItem?.menu?.cancelTracking()
+    }
+}

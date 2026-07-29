@@ -4,7 +4,6 @@ import SwiftUI
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem?
-    private var historySectionEnd: NSMenuItem? // separator below history items
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -106,14 +105,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         menu.addItem(NSMenuItem.separator())
 
-        menu.addItem(NSMenuItem(
-            title: "Quit",
-            action: #selector(NSApplication.terminate(_:)),
-            keyEquivalent: "q"
-        ))
+        let footerItem = NSMenuItem()
+        footerItem.view = BottomMenuActionsView(
+            target: self,
+            openFolderAction: #selector(openTranscriptsFolder),
+            quitAction: #selector(quit)
+        )
+        menu.addItem(footerItem)
     }
 
     @objc private func noop() {}
+    @objc private func quit() { NSApp.terminate(nil) }
+
+    @objc private func openTranscriptsFolder() {
+        do {
+            let url = try AppState.shared.transcriptsDirectory()
+            NSWorkspace.shared.open(url)
+        } catch {
+            NSSound.beep()
+        }
+    }
 
     @objc private func copyHistoryAt0() { copyHistory(index: 0) }
     @objc private func copyHistoryAt1() { copyHistory(index: 1) }
