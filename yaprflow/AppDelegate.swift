@@ -62,7 +62,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
 
-        // Shortcut row (top, custom view).
+        // Record row (top, custom view).
         let shortcutItem = NSMenuItem()
         shortcutItem.view = HotkeyMenuItemView()
         menu.addItem(shortcutItem)
@@ -78,6 +78,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             isEnabled: { !AppState.shared.lastTranscript.isEmpty }
         )
         menu.addItem(copyItem)
+
+        let vocabularyItem = NSMenuItem()
+        vocabularyItem.view = IconActionMenuItemView(
+            symbolName: "text.book.closed",
+            title: "Vocabulary",
+            target: self,
+            action: #selector(openVocabularyFile),
+            isEnabled: { true }
+        )
+        menu.addItem(vocabularyItem)
+
+        let privacyItem = NSMenuItem()
+        privacyItem.view = IconActionMenuItemView(
+            symbolName: "lock.shield",
+            title: "Privacy",
+            target: self,
+            action: #selector(showPrivacyStatus),
+            isEnabled: { true }
+        )
+        menu.addItem(privacyItem)
 
         menu.addItem(NSMenuItem.separator())
 
@@ -107,6 +127,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         } catch {
             NSSound.beep()
         }
+    }
+
+    @objc private func openVocabularyFile() {
+        do {
+            let url = try AppState.shared.vocabularyFileURL()
+            NSWorkspace.shared.open(url)
+        } catch {
+            NSSound.beep()
+        }
+    }
+
+    @objc private func showPrivacyStatus() {
+        let alert = NSAlert()
+        alert.messageText = "Yaprflow Privacy"
+        alert.informativeText = """
+        Dictation mode: \(AppState.shared.dictationMode.displayName)
+        Speech processing: Local Core ML models
+        Accounts: None
+        Telemetry: None
+        Vocabulary entries: \(AppState.shared.vocabularyEntryCount())
+
+        Transcripts are saved locally in Application Support/Yaprflow/Transcripts.
+        """
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
     }
 
     private func registerHotkey() {

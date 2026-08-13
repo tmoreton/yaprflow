@@ -7,9 +7,11 @@ final class HotkeyMenuItemView: NSView {
     private let titleField = NSTextField(labelWithString: "")
     private let shortcutField = NSTextField(labelWithString: "")
     private var isRecording = false
+    private var isShortcutHovered = false
+    private var trackingArea: NSTrackingArea?
 
     init() {
-        super.init(frame: NSRect(x: 0, y: 0, width: 180, height: 22))
+        super.init(frame: NSRect(x: 0, y: 0, width: 190, height: 22))
         autoresizingMask = [.width]
         setupLayout()
         refresh()
@@ -34,7 +36,7 @@ final class HotkeyMenuItemView: NSView {
 
     private func setupLayout() {
         iconView.translatesAutoresizingMaskIntoConstraints = false
-        iconView.image = NSImage(systemSymbolName: "keyboard", accessibilityDescription: nil)
+        iconView.image = NSImage(systemSymbolName: "record.circle", accessibilityDescription: nil)
         iconView.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 12, weight: .regular)
         addSubview(iconView)
 
@@ -71,23 +73,58 @@ final class HotkeyMenuItemView: NSView {
 
     private func refresh() {
         if isRecording {
-            titleField.stringValue = "Press a shortcut…"
-            titleField.textColor = .systemBlue
-            shortcutField.stringValue = "esc"
+            titleField.stringValue = "Record"
+            titleField.textColor = .labelColor
+            shortcutField.stringValue = "Press keys..."
+            shortcutField.textColor = .systemBlue
         } else {
-            titleField.stringValue = "Shortcut"
+            titleField.stringValue = "Record"
             titleField.textColor = .labelColor
             shortcutField.stringValue = AppState.shared.hotkey.displayString
+            shortcutField.textColor = isShortcutHovered ? .systemBlue : .secondaryLabelColor
         }
     }
 
     override func mouseDown(with event: NSEvent) {
-        isRecording.toggle()
+        guard shortcutHitRect.contains(convert(event.locationInWindow, from: nil)) else {
+            TranscriptionController.shared.toggle()
+            enclosingMenuItem?.menu?.cancelTracking()
+            return
+        }
+        isRecording = true
         refresh()
         window?.makeFirstResponder(self)
     }
 
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let area = trackingArea { removeTrackingArea(area) }
+        let area = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseEnteredAndExited, .mouseMoved, .activeAlways, .inVisibleRect],
+            owner: self
+        )
+        addTrackingArea(area)
+        trackingArea = area
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        let hovering = shortcutHitRect.contains(convert(event.locationInWindow, from: nil))
+        guard hovering != isShortcutHovered else { return }
+        isShortcutHovered = hovering
+        refresh()
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        isShortcutHovered = false
+        refresh()
+    }
+
     override var acceptsFirstResponder: Bool { true }
+
+    private var shortcutHitRect: NSRect {
+        shortcutField.frame.insetBy(dx: -8, dy: -4)
+    }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         guard isRecording else { return false }

@@ -37,6 +37,8 @@ final class TranscriptionController {
     private var currentSpeechStart: Int?
     private var confirmedText = ""
     private var volatileText = ""
+    private var vocabularyReplacementCount = 0
+    private var sessionSourceApplication: String?
     private var lastSpeculativeSampleCount = 0
     private var transcribeChain: Task<Void, Never>?
 
@@ -101,6 +103,8 @@ final class TranscriptionController {
         autoHideTask?.cancel()
         confirmedText = ""
         volatileText = ""
+        vocabularyReplacementCount = 0
+        sessionSourceApplication = Self.frontmostApplicationName()
         lastSpeculativeSampleCount = 0
         state.liveTranscript = ""
         NotchOverlayWindowController.shared.show()
@@ -146,7 +150,11 @@ final class TranscriptionController {
             let pb = NSPasteboard.general
             pb.clearContents()
             pb.setString(finalText, forType: .string)
-            state.recordTranscript(finalText)
+            state.recordTranscript(
+                finalText,
+                sourceApplication: sessionSourceApplication,
+                vocabularyReplacementCount: vocabularyReplacementCount
+            )
             state.status = .copied
             scheduleAutoHide(after: 1.2)
         } else {
@@ -236,14 +244,15 @@ final class TranscriptionController {
         guard let asr = asrManager else { return }
         do {
             let result = try await asr.transcribe(samples, source: .microphone)
-            let cleaned = Self.cleanTranscript(result.text)
+            let processed = state.processTranscript(result.text)
             await MainActor.run {
-                if !cleaned.isEmpty {
+                if !processed.text.isEmpty {
                     if self.confirmedText.isEmpty {
-                        self.confirmedText = cleaned
+                        self.confirmedText = processed.text
                     } else {
-                        self.confirmedText += " " + cleaned
+                        self.confirmedText += " " + processed.text
                     }
+                    self.vocabularyReplacementCount += processed.vocabularyReplacementCount
                 }
                 self.volatileText = ""
                 self.state.liveTranscript = self.displayText()
@@ -266,42 +275,15 @@ final class TranscriptionController {
         guard let asr = asrManager else { return }
         do {
             let result = try await asr.transcribe(samples, source: .microphone)
-            let cleaned = Self.cleanTranscript(result.text)
+            let processed = state.processTranscript(result.text)
             await MainActor.run {
                 guard self.isActive, self.currentSpeechStart == segmentStart else { return }
-                self.volatileText = cleaned
+                self.volatileText = processed.text
                 self.state.liveTranscript = self.displayText()
             }
         } catch {
             log.error("Speculative transcribe failed: \(error.localizedDescription)")
         }
-    }
-
-    /// Regex matching filler words ("uh", "um", "er", "ah", "hmm", "mm"
-    /// and obvious repetitions like "uhhh") as standalone words — not
-    /// substrings — so we don't eat real tokens like "umbrella" or "ermine".
-    /// Optional trailing comma or period gets swallowed with the filler.
-    private static let fillerWordRegex: NSRegularExpression = {
-        let pattern = #"(?i)\b(?:u+h+m*|u+m+h*|e+r+h*|a+h+m*|hmm+|mm+|mhm+)\b[,\.]?\s*"#
-        return try! NSRegularExpression(pattern: pattern)
-    }()
-
-    private static func cleanTranscript(_ raw: String) -> String {
-        let range = NSRange(raw.startIndex..., in: raw)
-        var text = fillerWordRegex.stringByReplacingMatches(
-            in: raw,
-            options: [],
-            range: range,
-            withTemplate: ""
-        )
-        while text.contains("  ") {
-            text = text.replacingOccurrences(of: "  ", with: " ")
-        }
-        text = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let first = text.first, ",.;:!?".contains(first) {
-            text = String(text.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-        return text
     }
 
     private func displayText() -> String {
@@ -311,6 +293,10 @@ final class TranscriptionController {
         case (true, false):  return volatileText
         case (false, false): return confirmedText + " " + volatileText
         }
+    }
+
+    private static func frontmostApplicationName() -> String? {
+        NSWorkspace.shared.frontmostApplication?.localizedName
     }
 
     private func ensureMicPermission() async throws {

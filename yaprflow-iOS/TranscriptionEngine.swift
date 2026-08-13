@@ -36,11 +36,6 @@ final class TranscriptionEngine: ObservableObject {
     @Published var status: TranscriptionStatus = .idle
     @Published var liveTranscript: String = ""
 
-    /// Set by `YaprflowApp.onOpenURL` when the user pressed the keyboard's
-    /// mic. The next successful stop() will write a KeyboardResult to the
-    /// App Group so the keyboard can pick it up and insert it.
-    var pendingKeyboardRequestID: String?
-
     /// Rolling history of recent normalized audio levels (0...1). Updated at
     /// roughly the audio buffer rate while recording, decays toward zero when
     /// idle. Size is fixed; SwiftUI renders this directly as a bar waveform.
@@ -109,21 +104,6 @@ final class TranscriptionEngine: ObservableObject {
 
     var isRecording: Bool { isActive }
 
-    /// One-shot transcription of a pre-recorded float buffer at 16 kHz mono.
-    /// Used by the keyboard-extension IPC bridge — bypasses VAD/streaming
-    /// because the keyboard sends a complete utterance at once.
-    func transcribeChunk(_ samples: [Float]) async -> String {
-        do {
-            _ = try await ensureLoaded()
-            guard let asr = asrManager else { return "" }
-            let result = try await asr.transcribe(samples, source: .microphone)
-            return Self.cleanTranscript(result.text)
-        } catch {
-            log.error("Chunk transcribe failed: \(error.localizedDescription)")
-            return ""
-        }
-    }
-
     func preload() {
         Task { @MainActor in
             do {
@@ -186,45 +166,11 @@ final class TranscriptionEngine: ObservableObject {
         if !finalText.isEmpty {
             UIPasteboard.general.string = finalText
             history.add(finalText)
-
-            // If this dictation was triggered by the keyboard's URL handoff,
-            // drop a result file the keyboard will read on viewWillAppear.
-            if let reqID = pendingKeyboardRequestID {
-                let result = KeyboardResult(
-                    requestID: reqID,
-                    text: finalText,
-                    finishedAt: Date()
-                )
-                try? result.write()
-                pendingKeyboardRequestID = nil
-                // Don't auto-hide as fast — give the user a moment to see
-                // the result and remember to swipe back to their app.
-                status = .copied
-                scheduleAutoHide(after: 2.5)
-            } else {
-                status = .copied
-                scheduleAutoHide(after: 1.5)
-            }
+            status = .copied
+            scheduleAutoHide(after: 1.5)
         } else {
             status = .idle
             scheduleAutoHide(after: 1.0)
-            // If we were expecting to satisfy a keyboard request and got
-            // empty audio, clear it so a stale request doesn't get matched
-            // by some later session.
-            pendingKeyboardRequestID = nil
-        }
-    }
-
-    /// Triggered by `yaprflow://record?id=...` from the keyboard extension.
-    /// Begins dictation immediately if we're not already recording.
-    func autoRecordForKeyboard(requestID: String) {
-        Task { @MainActor in
-            // If we're mid-dictation, don't interrupt — but capture the
-            // request so the user's current session still satisfies it.
-            pendingKeyboardRequestID = requestID
-            if !isActive, !isStarting {
-                await start()
-            }
         }
     }
 

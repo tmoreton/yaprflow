@@ -86,7 +86,7 @@ fi
 read_marketing_version() {
     xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration "$CONFIGURATION" \
         -showBuildSettings 2>/dev/null \
-        | awk -F' = ' '/^\s*MARKETING_VERSION = /{print $2; exit}'
+        | awk -F' = ' '/^[[:space:]]*MARKETING_VERSION = /{print $2; exit}'
 }
 
 if [[ -z "$VERSION" ]]; then
@@ -117,6 +117,8 @@ else
 
     if [[ -n "${NOTARY_PROFILE}" ]] && xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null 2>&1; then
         NOTARY_AUTH=(--keychain-profile "$NOTARY_PROFILE")
+    elif [[ -n "${APPLE_ID:-}" && -n "${APPLE_PASSWORD:-}" && -n "${APPLE_TEAM_ID:-}" ]]; then
+        NOTARY_AUTH=(--apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_PASSWORD")
     elif [[ -n "${APPLE_ID:-}" && -n "${APPLE_APP_PASSWORD:-}" && -n "${APPLE_TEAM_ID:-}" ]]; then
         NOTARY_AUTH=(--apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD")
     else

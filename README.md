@@ -9,6 +9,9 @@
 
 - 🔒 **100% local** — audio never leaves your Mac
 - ⚡ **Accurate** — NVIDIA Parakeet TDT 0.6B v3 on the Neural Engine, with live partials
+- ✍️ **Polished dictation** — removes common filler words for cleaner text
+- 📖 **Local vocabulary** — add deterministic phrase replacements in a plain Markdown file
+- 🗂️ **Markdown archive** — every completed transcript is saved locally with useful metadata
 - 🌍 **Multilingual** — 25 European languages, auto-detected
 - 🎛️ **Menu bar** — out of your way, one hotkey away
 - 🆓 **Open source** — Apache 2.0, no accounts, no telemetry

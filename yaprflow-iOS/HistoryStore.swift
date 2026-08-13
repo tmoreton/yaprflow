@@ -1,15 +1,10 @@
 import Foundation
 import Combine
 
-/// FIFO of the most recent transcripts. Backed by the App Group container so
-/// the keyboard extension (phase 2) can read the same list without IPC.
+/// FIFO of the most recent transcripts for quick re-copy inside the iOS app.
 @MainActor
 final class HistoryStore: ObservableObject {
     static let shared = HistoryStore()
-
-    /// Update this if you create the App Group with a different identifier.
-    /// Falls back to standard UserDefaults if the App Group isn't configured yet.
-    static let appGroupID = "group.com.tmoreton.yaprflow"
 
     private static let key = "yaprflow.history"
     private static let maxItems = 3
@@ -19,7 +14,7 @@ final class HistoryStore: ObservableObject {
     private let defaults: UserDefaults
 
     private init() {
-        self.defaults = UserDefaults(suiteName: Self.appGroupID) ?? .standard
+        self.defaults = .standard
         self.items = defaults.stringArray(forKey: Self.key) ?? []
     }
 

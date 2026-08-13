@@ -20,20 +20,6 @@
                ReferencedContainer = "container:yaprflow.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
-         <BuildActionEntry
-            buildForTesting = "YES"
-            buildForRunning = "NO"
-            buildForProfiling = "NO"
-            buildForArchiving = "NO"
-            buildForAnalyzing = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "C2822FA0CBAF6C4BC2B95065"
-               BuildableName = "yaprflow-iOS-Keyboard.appex"
-               BlueprintName = "yaprflow-iOS-Keyboard"
-               ReferencedContainer = "container:yaprflow.xcodeproj">
-            </BuildableReference>
-         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction

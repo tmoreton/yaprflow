@@ -1,8 +1,8 @@
 import AppKit
 
 /// Custom menu item view for action items (Copy Transcript / Copy Summary)
-/// that mirrors the icon + title geometry used by the toggle views above
-/// (Streaming / Grammar / Shortcut). Standard `NSMenuItem.image` reserves a
+/// that mirrors the icon + title geometry used by the custom views above.
+/// Standard `NSMenuItem.image` reserves a
 /// checkmark column to the left of the image, so icons rendered that way sit
 /// further right than the custom views' icons — converting these to a custom
 /// view makes the whole menu align on a single icon column.
@@ -26,7 +26,7 @@ final class IconActionMenuItemView: NSView {
         self.actionTarget = target
         self.action = action
         self.isEnabledProvider = isEnabled
-        super.init(frame: NSRect(x: 0, y: 0, width: 220, height: 22))
+        super.init(frame: NSRect(x: 0, y: 0, width: 190, height: 22))
         autoresizingMask = [.width]
         setup(symbolName: symbolName, title: title)
         updateAppearance()
@@ -123,6 +123,8 @@ final class IconActionMenuItemView: NSView {
 
 @MainActor
 final class BottomMenuActionsView: NSView {
+    private var folderButton: NSButton!
+    private var quitButton: NSButton!
     private weak var actionTarget: AnyObject?
     private let openFolderAction: Selector
     private let quitAction: Selector
@@ -131,7 +133,7 @@ final class BottomMenuActionsView: NSView {
         self.actionTarget = target
         self.openFolderAction = openFolderAction
         self.quitAction = quitAction
-        super.init(frame: NSRect(x: 0, y: 0, width: 220, height: 30))
+        super.init(frame: NSRect(x: 0, y: 0, width: 190, height: 34))
         autoresizingMask = [.width]
         setupLayout()
     }
@@ -139,17 +141,19 @@ final class BottomMenuActionsView: NSView {
     required init?(coder: NSCoder) { fatalError() }
 
     override var intrinsicContentSize: NSSize {
-        NSSize(width: NSView.noIntrinsicMetric, height: 30)
+        NSSize(width: NSView.noIntrinsicMetric, height: 34)
     }
 
     private func setupLayout() {
-        let folderButton = makeButton(
+        folderButton = makeButton(
             symbolName: "folder",
+            title: "Recordings",
             accessibilityDescription: "Open transcripts folder",
             action: #selector(openFolder)
         )
-        let quitButton = makeButton(
-            symbolName: "power",
+        quitButton = makeButton(
+            symbolName: nil,
+            title: "\u{2318}Q",
             accessibilityDescription: "Quit Yaprflow",
             action: #selector(quit)
         )
@@ -161,32 +165,59 @@ final class BottomMenuActionsView: NSView {
             folderButton.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14),
             folderButton.centerYAnchor.constraint(equalTo: centerYAnchor),
 
-            quitButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
+            quitButton.leadingAnchor.constraint(greaterThanOrEqualTo: folderButton.trailingAnchor, constant: 14),
+            quitButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -14),
             quitButton.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
     }
 
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        bounds.contains(point) ? self : nil
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        if quitButton.frame.insetBy(dx: -8, dy: -5).contains(point) {
+            send(action: quitAction)
+        } else if folderButton.frame.insetBy(dx: -8, dy: -5).contains(point) {
+            send(action: openFolderAction)
+        }
+    }
+
     private func makeButton(
-        symbolName: String,
+        symbolName: String?,
+        title: String,
         accessibilityDescription: String,
         action: Selector
     ) -> NSButton {
         let button = NSButton()
         button.translatesAutoresizingMaskIntoConstraints = false
-        button.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: accessibilityDescription)
-        button.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
-        button.imagePosition = .imageOnly
+        if let symbolName {
+            button.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: accessibilityDescription)
+            button.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
+            button.imagePosition = .imageLeft
+        } else {
+            button.imagePosition = .noImage
+        }
+        button.title = title
+        button.attributedTitle = NSAttributedString(
+            string: title,
+            attributes: [
+                .font: NSFont.menuFont(ofSize: 0),
+                .foregroundColor: NSColor.secondaryLabelColor,
+            ]
+        )
+        button.font = NSFont.menuFont(ofSize: 0)
         button.isBordered = false
         button.bezelStyle = .regularSquare
         button.target = self
         button.action = action
         button.toolTip = accessibilityDescription
         button.setAccessibilityLabel(accessibilityDescription)
-        button.contentTintColor = .labelColor
-        NSLayoutConstraint.activate([
-            button.widthAnchor.constraint(equalToConstant: 28),
-            button.heightAnchor.constraint(equalToConstant: 24),
-        ])
+        button.contentTintColor = .secondaryLabelColor
+        button.setContentHuggingPriority(.required, for: .horizontal)
+        button.setContentCompressionResistancePriority(.required, for: .horizontal)
+        button.heightAnchor.constraint(equalToConstant: 24).isActive = true
         return button
     }
 
