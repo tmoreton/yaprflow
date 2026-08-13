@@ -73,12 +73,12 @@ final class HotkeyMenuItemView: NSView {
 
     private func refresh() {
         if isRecording {
-            titleField.stringValue = "Record"
+            titleField.stringValue = "Transcribe"
             titleField.textColor = .labelColor
             shortcutField.stringValue = "Press keys..."
             shortcutField.textColor = .systemBlue
         } else {
-            titleField.stringValue = "Record"
+            titleField.stringValue = "Transcribe"
             titleField.textColor = .labelColor
             shortcutField.stringValue = AppState.shared.hotkey.displayString
             shortcutField.textColor = isShortcutHovered ? .systemBlue : .secondaryLabelColor
