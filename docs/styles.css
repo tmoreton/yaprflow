@@ -148,10 +148,10 @@ svg {
 
 .hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.78fr);
-  gap: 56px;
-  align-items: center;
-  padding: 54px 0 70px;
+  justify-items: center;
+  gap: 34px;
+  padding: 28px 0 72px;
+  text-align: center;
 }
 
 .hero-copy {
@@ -207,6 +207,7 @@ h3 {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
   gap: 12px;
 }
 
@@ -257,39 +258,17 @@ h3 {
 }
 
 .mac-demo {
-  position: relative;
-  overflow: hidden;
-  min-height: 420px;
-  border: 1px solid rgba(17, 17, 17, 0.1);
-  border-radius: 8px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(255, 255, 255, 0.4)),
-    linear-gradient(145deg, #e7efe9, #d7e6ed 54%, #efe7dc);
-  color: var(--ink);
-  box-shadow: var(--shadow);
-  animation: float-in 700ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-}
-
-.menu-bar {
-  height: 30px;
+  width: 100%;
+  min-height: 76px;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 14px;
-  border-bottom: 1px solid rgba(17, 17, 17, 0.06);
-  background: rgba(255, 255, 255, 0.62);
-  color: rgba(17, 17, 17, 0.54);
-  font-size: 12px;
-  font-weight: 750;
-  backdrop-filter: blur(14px);
+  align-items: flex-start;
+  justify-content: center;
+  color: white;
 }
 
 .notch-overlay {
-  position: absolute;
-  top: 30px;
-  left: 50%;
-  min-width: 210px;
-  max-width: min(78%, 430px);
+  width: min(100%, 520px);
+  min-height: 48px;
   display: flex;
   align-items: flex-start;
   gap: 12px;
@@ -299,8 +278,8 @@ h3 {
   border-radius: 0 0 22px 22px;
   background: rgba(0, 0, 0, 0.92);
   color: white;
-  transform: translateX(-50%);
   box-shadow: 0 14px 34px rgba(17, 17, 17, 0.16);
+  animation: float-in 700ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
 .live-dot {
@@ -319,54 +298,7 @@ h3 {
   font-size: 15px;
   font-weight: 650;
   line-height: 1.28;
-}
-
-.desktop-card {
-  position: absolute;
-  right: 34px;
-  bottom: 34px;
-  width: 50%;
-  max-width: 300px;
-  display: grid;
-  gap: 10px;
-  padding: 18px;
-  border: 1px solid rgba(17, 17, 17, 0.08);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.58);
-  box-shadow: 0 18px 44px rgba(17, 17, 17, 0.08);
-  backdrop-filter: blur(16px);
-}
-
-.desktop-card span {
-  height: 9px;
-  border-radius: 999px;
-  background: rgba(17, 17, 17, 0.12);
-}
-
-.desktop-card span:nth-child(1) {
-  width: 58%;
-}
-
-.desktop-card span:nth-child(2) {
-  width: 92%;
-}
-
-.desktop-card span:nth-child(3) {
-  width: 76%;
-}
-
-.hotkey-chip {
-  position: absolute;
-  left: 24px;
-  bottom: 24px;
-  padding: 8px 10px;
-  border: 1px solid rgba(17, 17, 17, 0.08);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.68);
-  color: rgba(17, 17, 17, 0.62);
-  font-size: 12px;
-  font-weight: 800;
-  backdrop-filter: blur(16px);
+  text-align: left;
 }
 
 .caret {
@@ -474,12 +406,8 @@ h3 {
 .cta-section {
   display: grid;
   justify-items: center;
-  padding: 78px 24px 84px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.4)),
-    var(--teal-soft);
+  padding: 84px 0 88px;
+  border-top: 1px solid var(--line);
   text-align: center;
 }
 
@@ -547,9 +475,7 @@ h3 {
 
 @media (max-width: 980px) {
   .hero {
-    grid-template-columns: 1fr;
-    gap: 34px;
-    padding-top: 34px;
+    padding-top: 26px;
   }
 
   h1 {
@@ -562,8 +488,7 @@ h3 {
   }
 
   .mac-demo {
-    min-height: 350px;
-    max-width: 620px;
+    min-height: 74px;
   }
 
   .feature-grid {
@@ -594,7 +519,7 @@ h3 {
   }
 
   .hero {
-    padding: 24px 0 42px;
+    padding: 22px 0 50px;
   }
 
   h1 {
@@ -615,24 +540,17 @@ h3 {
   }
 
   .mac-demo {
-    min-height: 260px;
+    min-height: 68px;
   }
 
   .notch-overlay {
-    min-width: 190px;
-    max-width: calc(100% - 36px);
+    width: min(100%, 380px);
+    min-height: 46px;
     padding: 9px 14px;
   }
 
   .overlay-copy {
     font-size: 14px;
-  }
-
-  .desktop-card {
-    right: 18px;
-    bottom: 54px;
-    width: calc(100% - 36px);
-    max-width: none;
   }
 
   .proof-strip {
@@ -667,7 +585,7 @@ h3 {
   }
 
   .cta-section {
-    padding: 56px 18px 62px;
+    padding: 58px 0 62px;
   }
 
   .site-footer {
