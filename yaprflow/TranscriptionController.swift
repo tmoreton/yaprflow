@@ -79,22 +79,6 @@ final class TranscriptionController {
         }
     }
 
-    /// Eagerly load ASR + VAD models so the first hotkey press doesn't block
-    /// on the ~30s Encoder compile. Safe to call multiple times — subsequent
-    /// calls are no-ops once the models are loaded.
-    func preload() {
-        Task { @MainActor in
-            do {
-                _ = try await ensureLoaded()
-                if !isActive, !isStarting {
-                    state.status = .idle
-                }
-            } catch {
-                log.error("Preload failed: \(error.localizedDescription)")
-            }
-        }
-    }
-
     private func start() async {
         guard !isActive, !isStarting else { return }
         isStarting = true
@@ -217,7 +201,7 @@ final class TranscriptionController {
     }
 
     /// While the user is still speaking, re-transcribe the in-progress speech
-    /// segment every ~1.2s and show it as volatile text. The confirmed segment
+    /// segment every ~2s and show it as volatile text. The confirmed segment
     /// replaces this on speechEnd.
     private func maybeRunSpeculative() {
         guard let start = currentSpeechStart else { return }
@@ -527,10 +511,10 @@ final class TranscriptionController {
         }
     }
 
-    /// Run a silent chunk through both models so CoreML's per-device
-    /// compile + first-inference warmup happens during preload, not on the
-    /// user's first real dictation. Any error here is swallowed — the worst
-    /// case is the original slow-first-call behaviour.
+    /// Run a silent chunk through both models so CoreML's per-device compile
+    /// and first-inference warmup happen during model loading, not on the
+    /// user's first real dictation. Any error here is swallowed; the worst case
+    /// is the original slow-first-call behavior.
     private static func warmUp(asr: AsrManager, vad: VadManager) async {
         do {
             let oneSecondOfSilence = [Float](repeating: 0.0, count: 16_000)
@@ -571,8 +555,8 @@ final class TranscriptionController {
         state.status = .preparing("Extracting speech model...")
 
         // Extract into a staging sibling directory first; only move into the
-        // real cache if tar succeeds AND the expected files are there. Way to
-        // ensure a crashed/killed extract can never leave a half-written
+        // real cache if tar succeeds AND the expected files are there. This
+        // ensures a crashed/killed extract can never leave a half-written
         // Encoder.mlmodelc that fools cacheLooksHealthy on the next launch.
         let fm = FileManager.default
         let stagingDir = cacheDir
