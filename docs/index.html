@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Yaprflow - Private macOS dictation that stays on your Mac</title>
-  <meta name="description" content="Yaprflow is free, open-source voice-to-text for macOS. Press Command-T, speak naturally, and paste polished text anywhere. 100% local, multilingual, no accounts, no cloud audio, no telemetry.">
-  <meta name="keywords" content="voice to text mac, dictation macOS, offline transcription, open source dictation, speech to text, Wispr Flow alternative, WhisperFlow alternative, Superwhisper alternative, Apple Neural Engine dictation, private voice recognition">
+  <title>Yaprflow - Private voice dictation for macOS</title>
+  <meta name="description" content="Yaprflow is free, open-source voice dictation for macOS. Speak naturally, paste clean text anywhere, and keep every transcription local on your Mac.">
+  <meta name="keywords" content="voice dictation macOS, voice to text Mac, offline transcription, open source dictation, private speech to text, Wispr Flow alternative, WhisperFlow alternative, Apple Neural Engine dictation">
   <meta name="author" content="Tim Moreton">
   <meta name="robots" content="index, follow">
-  <meta name="theme-color" content="#f7f5f0">
+  <meta name="theme-color" content="#f5f3ee">
   <link rel="canonical" href="https://yaprflow.com/">
 
   <link rel="icon" type="image/png" href="icon.png">
@@ -18,8 +18,8 @@
 
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Yaprflow">
-  <meta property="og:title" content="Yaprflow - Private macOS dictation that stays on your Mac">
-  <meta property="og:description" content="Free, open-source voice-to-text for macOS. Press Command-T, speak naturally, and paste polished text anywhere without cloud audio or accounts.">
+  <meta property="og:title" content="Yaprflow - Private voice dictation for macOS">
+  <meta property="og:description" content="Speak naturally, paste clean text anywhere, and keep every transcription local on your Mac. Free and open source.">
   <meta property="og:url" content="https://yaprflow.com/">
   <meta property="og:image" content="https://yaprflow.com/icon.png">
   <meta property="og:image:alt" content="Yaprflow app icon">
@@ -28,8 +28,8 @@
   <meta property="og:locale" content="en_US">
 
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="Yaprflow - Private macOS dictation">
-  <meta name="twitter:description" content="Free, open-source voice-to-text for macOS. Fast local transcription, cleaner dictation, no accounts, no telemetry.">
+  <meta name="twitter:title" content="Yaprflow - Private voice dictation for macOS">
+  <meta name="twitter:description" content="Free, open-source voice dictation that runs locally on your Mac.">
   <meta name="twitter:image" content="https://yaprflow.com/icon.png">
   <meta name="twitter:image:alt" content="Yaprflow app icon">
 
@@ -38,7 +38,7 @@
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     "name": "Yaprflow",
-    "description": "Private, offline voice-to-text dictation for macOS. Press Command-T, speak naturally, and paste polished text anywhere. Runs locally with Core ML on the Apple Neural Engine.",
+    "description": "Private, offline voice dictation for macOS. Speak naturally, paste clean text anywhere, and keep transcription local with Core ML on the Apple Neural Engine.",
     "applicationCategory": "UtilitiesApplication",
     "operatingSystem": "macOS 14+",
     "url": "https://yaprflow.com/",
@@ -72,25 +72,23 @@
 
   <header class="site-header">
     <a class="brand" href="/" aria-label="Yaprflow home">
-      <img src="icon.png" alt="" width="34" height="34">
+      <img src="icon.png" alt="" width="36" height="36">
       <span>Yaprflow</span>
     </a>
     <nav class="nav-links" aria-label="Main navigation">
-      <a href="#privacy">Privacy</a>
-      <a href="#workflow">Workflow</a>
-      <a href="#download">Download</a>
       <a href="https://github.com/tmoreton/yaprflow" target="_blank" rel="noopener">GitHub</a>
+      <a class="nav-cta" href="https://github.com/tmoreton/yaprflow/releases/download/v4.0.3/yaprflow-4.0.3.dmg" onclick="gtag('event', 'download', {'event_category': 'engagement', 'event_label': 'nav-yaprflow-4.0.3.dmg'});">Download</a>
     </nav>
   </header>
 
   <main id="content">
-    <section class="hero section-shell">
+    <section class="hero">
       <div class="hero-copy">
-        <p class="eyebrow">Free, open-source macOS dictation</p>
-        <h1>Private dictation for macOS.</h1>
-        <p class="hero-lede">Yaprflow turns speech into polished text in any app while keeping audio on-device. Press <kbd>Command</kbd> <kbd>T</kbd>, talk naturally, then paste the result wherever you work.</p>
+        <p class="eyebrow">Private voice-to-text for Mac</p>
+        <h1>Speak freely. Paste instantly.</h1>
+        <p class="hero-lede">Yaprflow turns natural speech into clean text in any macOS app. It runs locally, so your audio stays on your Mac.</p>
         <div class="hero-actions">
-          <a class="button button-primary" href="https://github.com/tmoreton/yaprflow/releases/download/v4.0.3/yaprflow-4.0.3.dmg" onclick="gtag('event', 'download', {'event_category': 'engagement', 'event_label': 'yaprflow-4.0.3.dmg'});">
+          <a class="button button-primary" href="https://github.com/tmoreton/yaprflow/releases/download/v4.0.3/yaprflow-4.0.3.dmg" onclick="gtag('event', 'download', {'event_category': 'engagement', 'event_label': 'hero-yaprflow-4.0.3.dmg'});">
             <svg aria-hidden="true" viewBox="0 0 24 24">
               <path d="M12 3v11"></path>
               <path d="m7 10 5 5 5-5"></path>
@@ -98,55 +96,31 @@
             </svg>
             Download for macOS
           </a>
-          <a class="button button-secondary" href="https://github.com/tmoreton/yaprflow" target="_blank" rel="noopener">
-            <svg aria-hidden="true" viewBox="0 0 24 24">
-              <path d="M7 7h10v10"></path>
-              <path d="M7 17 17 7"></path>
-            </svg>
-            View source
-          </a>
         </div>
-        <p class="download-note">macOS 14+ &middot; v4.0.3 &middot; no signup required</p>
+        <p class="availability">macOS 14+ / Free / Open source / No account</p>
       </div>
 
-      <div class="hero-demo" role="group" aria-labelledby="demo-title">
-        <div class="demo-topbar">
-          <span class="window-dot"></span>
-          <span class="window-dot"></span>
-          <span class="window-dot"></span>
-          <span class="demo-title" id="demo-title">Yaprflow is listening</span>
+      <div class="mac-demo" role="group" aria-labelledby="demo-title">
+        <div class="menu-bar" aria-hidden="true">
+          <span>Finder</span>
+          <span>Yaprflow</span>
         </div>
-        <div class="demo-body">
-          <div class="notch-preview">
-            <span class="recording-dot" aria-hidden="true"></span>
-            <div class="waveform" aria-hidden="true">
-              <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
-            </div>
-            <span class="notch-text">Transcribing locally</span>
-          </div>
-          <div class="transcript-panel">
-            <span class="panel-label">Polished output</span>
-            <p><span id="typed"></span><span class="caret" aria-hidden="true"></span></p>
-          </div>
-          <dl class="signal-grid">
-            <div>
-              <dt>Audio</dt>
-              <dd>Never uploaded</dd>
-            </div>
-            <div>
-              <dt>Model</dt>
-              <dd>Core ML</dd>
-            </div>
-            <div>
-              <dt>Archive</dt>
-              <dd>Markdown</dd>
-            </div>
-          </dl>
+        <div class="notch-overlay">
+          <span class="live-dot" aria-hidden="true"></span>
+          <span class="overlay-copy" id="demo-title">
+            <span id="typed"></span><span class="caret" aria-hidden="true"></span>
+          </span>
         </div>
+        <div class="desktop-card" aria-hidden="true">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+        <div class="hotkey-chip" aria-hidden="true">Command T</div>
       </div>
     </section>
 
-    <section class="metrics section-shell" aria-label="Yaprflow highlights">
+    <section class="proof-strip" aria-label="Yaprflow highlights">
       <div>
         <strong>100% local</strong>
         <span>No cloud audio</span>
@@ -156,160 +130,65 @@
         <span>Auto-detected</span>
       </div>
       <div>
-        <strong>Apache 2.0</strong>
-        <span>Open source</span>
-      </div>
-      <div>
-        <strong>Neural Engine</strong>
-        <span>Real-time partials</span>
+        <strong>Plain text</strong>
+        <span>Markdown archive</span>
       </div>
     </section>
 
-    <section id="privacy" class="section-shell split-section">
-      <div>
-        <p class="section-kicker">Private by default</p>
-        <h2>Built for dictation you would not send to a server.</h2>
-      </div>
-      <div class="section-copy">
-        <p>Yaprflow keeps speech recognition on-device. There are no accounts, no telemetry, and no remote transcription queue, so meeting notes, names, client details, and rough first drafts stay under your control.</p>
-        <ul class="check-list">
-          <li>Audio stays on your Mac</li>
-          <li>Transcripts are saved locally as Markdown</li>
-          <li>Custom vocabulary lives in a plain local file</li>
-        </ul>
-      </div>
-    </section>
-
-    <section id="workflow" class="section-shell workflow-section">
+    <section class="simple-section">
       <div class="section-heading">
-        <p class="section-kicker">Simple workflow</p>
-        <h2>Speak once. Use it anywhere.</h2>
-      </div>
-      <div class="workflow-grid">
-        <article>
-          <span>01</span>
-          <h3>Press the hotkey</h3>
-          <p>Start and stop dictation from the menu bar with <kbd>Command</kbd> <kbd>T</kbd>.</p>
-        </article>
-        <article>
-          <span>02</span>
-          <h3>Talk naturally</h3>
-          <p>Live partials show what Yaprflow hears while filler words and common dictation noise are cleaned up.</p>
-        </article>
-        <article>
-          <span>03</span>
-          <h3>Paste clean text</h3>
-          <p>Your final transcript lands on the clipboard, ready for email, chat, notes, issues, and docs.</p>
-        </article>
-      </div>
-    </section>
-
-    <section class="section-shell feature-section">
-      <div class="section-heading">
-        <p class="section-kicker">Why it feels different</p>
-        <h2>Fast dictation without the cloud tradeoff.</h2>
+        <p class="eyebrow">Why Yaprflow</p>
+        <h2>Dictation without the tradeoff.</h2>
       </div>
       <div class="feature-grid">
         <article>
-          <h3>On-device speech model</h3>
-          <p>NVIDIA Parakeet TDT 0.6B v3 runs locally through Core ML for quick, accurate transcription.</p>
+          <span class="feature-mark">01</span>
+          <h3>Private by design</h3>
+          <p>Speech recognition happens on-device with Core ML. No accounts, no telemetry, no remote transcription queue.</p>
         </article>
         <article>
-          <h3>Cleaner defaults</h3>
-          <p>Common filler words and rough speech patterns are removed so your pasted text needs less cleanup.</p>
+          <span class="feature-mark">02</span>
+          <h3>Made for real writing</h3>
+          <p>Yaprflow cleans common dictation noise and supports local vocabulary replacements for names and jargon.</p>
         </article>
         <article>
-          <h3>Local vocabulary</h3>
-          <p>Add deterministic phrase replacements for names, technical terms, acronyms, and preferred spellings.</p>
-        </article>
-        <article>
-          <h3>Transcript archive</h3>
-          <p>Every completed dictation can be saved as a Markdown record with useful local metadata.</p>
-        </article>
-        <article>
-          <h3>Multilingual support</h3>
-          <p>Dictate across 25 European languages with automatic language detection.</p>
-        </article>
-        <article>
-          <h3>Quiet menu bar app</h3>
-          <p>Yaprflow stays out of the way until you need to turn speech into text.</p>
+          <span class="feature-mark">03</span>
+          <h3>Open source</h3>
+          <p>Apache 2.0, inspectable, free to use, and built for people who want useful voice input without a black box.</p>
         </article>
       </div>
     </section>
 
-    <section class="section-shell comparison-section">
-      <div class="section-heading">
-        <p class="section-kicker">Clear difference</p>
-        <h2>A focused alternative to cloud dictation.</h2>
-      </div>
-      <table class="comparison-table" aria-label="Yaprflow compared with cloud dictation">
-        <thead>
-          <tr>
-            <th scope="col">What matters</th>
-            <th scope="col">Yaprflow</th>
-            <th scope="col">Typical cloud dictation</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <th scope="row">Where audio goes</th>
-            <td data-label="Yaprflow">Stays on-device</td>
-            <td data-label="Typical cloud dictation">Sent to a service</td>
-          </tr>
-          <tr>
-            <th scope="row">Account required</th>
-            <td data-label="Yaprflow">No</td>
-            <td data-label="Typical cloud dictation">Often</td>
-          </tr>
-          <tr>
-            <th scope="row">Source model</th>
-            <td data-label="Yaprflow">Open-source app</td>
-            <td data-label="Typical cloud dictation">Closed service</td>
-          </tr>
-        </tbody>
-      </table>
-    </section>
-
-    <section id="download" class="section-shell download-section">
-      <div>
-        <p class="section-kicker">Get started</p>
-        <h2>Download, grant microphone access, press <kbd>Command</kbd> <kbd>T</kbd>.</h2>
-        <p>Yaprflow is free and open source. The speech model downloads automatically on first launch.</p>
-      </div>
-      <div class="download-actions">
-        <a class="button button-primary" href="https://github.com/tmoreton/yaprflow/releases/download/v4.0.3/yaprflow-4.0.3.dmg" onclick="gtag('event', 'download', {'event_category': 'engagement', 'event_label': 'yaprflow-4.0.3.dmg'});">
-          <svg aria-hidden="true" viewBox="0 0 24 24">
-            <path d="M12 3v11"></path>
-            <path d="m7 10 5 5 5-5"></path>
-            <path d="M5 20h14"></path>
-          </svg>
-          Download v4.0.3
-        </a>
-        <a class="text-link" href="https://github.com/tmoreton/yaprflow#build-from-source" target="_blank" rel="noopener">Build from source</a>
-      </div>
+    <section class="cta-section">
+      <img src="icon.png" alt="" width="56" height="56">
+      <h2>Stop retyping your thoughts.</h2>
+      <p>Press Command T, speak, press Command T again, then paste.</p>
+      <a class="button button-primary" href="https://github.com/tmoreton/yaprflow/releases/download/v4.0.3/yaprflow-4.0.3.dmg" onclick="gtag('event', 'download', {'event_category': 'engagement', 'event_label': 'footer-yaprflow-4.0.3.dmg'});">
+        <svg aria-hidden="true" viewBox="0 0 24 24">
+          <path d="M12 3v11"></path>
+          <path d="m7 10 5 5 5-5"></path>
+          <path d="M5 20h14"></path>
+        </svg>
+        Download v4.0.3
+      </a>
     </section>
   </main>
 
   <footer class="site-footer">
-    <div class="footer-inner">
-      <a class="brand" href="/" aria-label="Yaprflow home">
-        <img src="icon.png" alt="" width="30" height="30">
-        <span>Yaprflow</span>
-      </a>
-      <div class="footer-links">
-        <a href="mailto:tim@yaprflow.com">Contact</a>
-        <a href="https://github.com/tmoreton/yaprflow" target="_blank" rel="noopener">GitHub</a>
-        <a href="https://www.apache.org/licenses/LICENSE-2.0" target="_blank" rel="noopener">Apache 2.0</a>
-      </div>
+    <span>Yaprflow</span>
+    <div>
+      <a href="mailto:tim@yaprflow.com">Contact</a>
+      <a href="https://github.com/tmoreton/yaprflow" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://www.apache.org/licenses/LICENSE-2.0" target="_blank" rel="noopener">Apache 2.0</a>
     </div>
   </footer>
 
   <script>
     (function () {
       const phrases = [
-        "Please turn those meeting notes into a clear follow-up.",
-        "Draft a short reply confirming the release is ready.",
-        "Add the customer name to my local vocabulary."
+        "Send a quick note that the release is ready.",
+        "Turn this idea into a clean first draft.",
+        "Add this customer name to my vocabulary."
       ];
       const el = document.getElementById('typed');
       if (!el) return;
@@ -329,10 +208,10 @@
           el.textContent = phrase.slice(0, charIndex);
           if (charIndex >= phrase.length) {
             deleting = true;
-            setTimeout(tick, 1700);
+            setTimeout(tick, 1600);
             return;
           }
-          setTimeout(tick, 30 + Math.random() * 45);
+          setTimeout(tick, 26 + Math.random() * 42);
           return;
         }
 
@@ -341,10 +220,10 @@
         if (charIndex <= 0) {
           deleting = false;
           phraseIndex = (phraseIndex + 1) % phrases.length;
-          setTimeout(tick, 320);
+          setTimeout(tick, 300);
           return;
         }
-        setTimeout(tick, 12);
+        setTimeout(tick, 10);
       }
 
       tick();
