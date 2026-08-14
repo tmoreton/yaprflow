@@ -196,8 +196,6 @@ h3 {
 }
 
 .hero-lede {
-  max-width: 610px;
-  margin-bottom: 30px;
   color: var(--ink-soft);
   font-size: 22px;
   line-height: 1.42;
@@ -268,14 +266,13 @@ h3 {
 
 .notch-overlay {
   width: min(100%, 520px);
-  min-height: 48px;
   display: flex;
   align-items: flex-start;
   gap: 12px;
   padding: 10px 18px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-top: 0;
-  border-radius: 0 0 22px 22px;
+  border-radius: 22px;
   background: rgba(0, 0, 0, 0.92);
   color: white;
   box-shadow: 0 14px 34px rgba(17, 17, 17, 0.16);
