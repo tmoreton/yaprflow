@@ -3,24 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Yaprflow — Private, offline voice-to-text dictation for macOS</title>
-  <meta name="description" content="Free, open-source voice-to-text for macOS. Press a hotkey, speak, and paste — 100% local, real-time, multilingual (25 European languages). No accounts, no cloud, no telemetry.">
-  <meta name="keywords" content="voice to text mac, dictation macOS, offline transcription, open source whisper, speech to text, Superwhisper alternative, WisprFlow alternative, free dictation app, Apple Silicon, private voice recognition, multilingual dictation, European languages">
+  <title>Yaprflow - Private macOS dictation that stays on your Mac</title>
+  <meta name="description" content="Yaprflow is free, open-source voice-to-text for macOS. Press Command-T, speak naturally, and paste polished text anywhere. 100% local, multilingual, no accounts, no cloud audio, no telemetry.">
+  <meta name="keywords" content="voice to text mac, dictation macOS, offline transcription, open source dictation, speech to text, Wispr Flow alternative, WhisperFlow alternative, Superwhisper alternative, Apple Neural Engine dictation, private voice recognition">
   <meta name="author" content="Tim Moreton">
   <meta name="robots" content="index, follow">
-  <meta name="theme-color" content="#1c1917">
+  <meta name="theme-color" content="#f7f5f0">
   <link rel="canonical" href="https://yaprflow.com/">
 
-  <!-- Icons -->
   <link rel="icon" type="image/png" href="icon.png">
-  <link rel="apple-touch-icon" href="icon.png">
-  <link rel="shortcut icon" href="icon.png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="shortcut icon" href="favicon.ico">
+  <link rel="stylesheet" href="styles.css">
 
-  <!-- Open Graph (iMessage, Slack, Facebook, LinkedIn) -->
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Yaprflow">
-  <meta property="og:title" content="Yaprflow — Private, offline voice-to-text for macOS">
-  <meta property="og:description" content="Free, open-source dictation for macOS. Press a hotkey, speak, and paste — multilingual, 100% local, real-time, no accounts.">
+  <meta property="og:title" content="Yaprflow - Private macOS dictation that stays on your Mac">
+  <meta property="og:description" content="Free, open-source voice-to-text for macOS. Press Command-T, speak naturally, and paste polished text anywhere without cloud audio or accounts.">
   <meta property="og:url" content="https://yaprflow.com/">
   <meta property="og:image" content="https://yaprflow.com/icon.png">
   <meta property="og:image:alt" content="Yaprflow app icon">
@@ -28,20 +27,18 @@
   <meta property="og:image:height" content="512">
   <meta property="og:locale" content="en_US">
 
-  <!-- Twitter / X -->
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="Yaprflow — Private, offline voice-to-text for macOS">
-  <meta name="twitter:description" content="Free, open-source dictation for macOS. Press a hotkey, speak, and paste — multilingual, 100% local, real-time, no accounts.">
+  <meta name="twitter:title" content="Yaprflow - Private macOS dictation">
+  <meta name="twitter:description" content="Free, open-source voice-to-text for macOS. Fast local transcription, cleaner dictation, no accounts, no telemetry.">
   <meta name="twitter:image" content="https://yaprflow.com/icon.png">
   <meta name="twitter:image:alt" content="Yaprflow app icon">
 
-  <!-- Structured data for search engines -->
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     "name": "Yaprflow",
-    "description": "Private, offline voice-to-text dictation for macOS. Press a hotkey, speak, and paste your words anywhere — multilingual (25 European languages), 100% local via Core ML on the Apple Neural Engine.",
+    "description": "Private, offline voice-to-text dictation for macOS. Press Command-T, speak naturally, and paste polished text anywhere. Runs locally with Core ML on the Apple Neural Engine.",
     "applicationCategory": "UtilitiesApplication",
     "operatingSystem": "macOS 14+",
     "url": "https://yaprflow.com/",
@@ -62,335 +59,6 @@
   }
   </script>
 
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg: #fafaf9;
-      --fg: #1c1917;
-      --muted: #78716c;
-      --accent: #0f766e;
-      --accent-hover: #115e59;
-      --surface: #ffffff;
-      --border: #e7e5e4;
-    }
-
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: var(--bg);
-      color: var(--fg);
-      line-height: 1.6;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    .container {
-      max-width: 720px;
-      margin: 0 auto;
-      padding: 0 24px;
-    }
-
-    /* Header */
-    header {
-      padding: 24px 0;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      font-weight: 700;
-      font-size: 18px;
-      color: var(--fg);
-      text-decoration: none;
-    }
-
-    .logo img {
-      width: 32px;
-      height: 32px;
-      border-radius: 8px;
-    }
-
-    .gh-link {
-      font-size: 14px;
-      color: var(--muted);
-      text-decoration: none;
-      font-weight: 500;
-      transition: color 0.2s;
-    }
-
-    .gh-link:hover { color: var(--fg); }
-
-    /* Hero */
-    .hero {
-      text-align: center;
-      padding: 16px 0 72px;
-    }
-
-    /* Animated notch-style demo */
-    .notch {
-      display: flex;
-      width: fit-content;
-      max-width: 100%;
-      margin: 0 auto 28px;
-      align-items: center;
-      gap: 14px;
-      padding: 10px 18px 10px 14px;
-      background: #1c1917;
-      color: #fafaf9;
-      border-radius: 999px;
-      box-shadow: 0 12px 32px rgba(28, 25, 23, 0.18), 0 2px 4px rgba(28, 25, 23, 0.06);
-      animation: notch-in 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-    }
-
-    @keyframes notch-in {
-      from { opacity: 0; transform: translateY(-8px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    .rec-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #ef4444;
-      flex-shrink: 0;
-      animation: pulse 1.6s ease-out infinite;
-    }
-
-    @keyframes pulse {
-      0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); }
-      70% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-    }
-
-    .waveform {
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
-      height: 22px;
-      flex-shrink: 0;
-    }
-
-    .waveform span {
-      display: inline-block;
-      width: 3px;
-      border-radius: 2px;
-      background: linear-gradient(180deg, #2dd4bf, #0f766e);
-      animation: wave 1s ease-in-out infinite;
-      transform-origin: center;
-    }
-
-    .waveform span:nth-child(1) { animation-delay: -0.1s; height: 35%; }
-    .waveform span:nth-child(2) { animation-delay: -0.3s; height: 65%; }
-    .waveform span:nth-child(3) { animation-delay: -0.5s; height: 90%; }
-    .waveform span:nth-child(4) { animation-delay: -0.2s; height: 100%; }
-    .waveform span:nth-child(5) { animation-delay: -0.4s; height: 75%; }
-    .waveform span:nth-child(6) { animation-delay: -0.6s; height: 45%; }
-    .waveform span:nth-child(7) { animation-delay: -0.15s; height: 25%; }
-
-    @keyframes wave {
-      0%, 100% { transform: scaleY(0.3); }
-      50%      { transform: scaleY(1); }
-    }
-
-    .transcript {
-      font-family: 'Inter', sans-serif;
-      font-size: 14px;
-      font-weight: 500;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 360px;
-      min-width: 220px;
-      text-align: left;
-      line-height: 1.2;
-    }
-
-    .transcript .caret {
-      display: inline-block;
-      width: 2px;
-      height: 14px;
-      background: #fafaf9;
-      vertical-align: text-bottom;
-      margin-left: 2px;
-      animation: blink 1s step-end infinite;
-    }
-
-    @keyframes blink {
-      0%, 49%   { opacity: 1; }
-      50%, 100% { opacity: 0; }
-    }
-
-    .badge {
-      display: flex;
-      width: fit-content;
-      margin: 0 auto 24px;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 14px;
-      border-radius: 999px;
-      background: #f0fdf4;
-      color: #15803d;
-      font-size: 13px;
-      font-weight: 600;
-    }
-
-    .badge::before {
-      content: '';
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: #22c55e;
-    }
-
-    h1 {
-      font-size: clamp(40px, 6vw, 64px);
-      font-weight: 700;
-      line-height: 1.05;
-      letter-spacing: -0.02em;
-      margin-bottom: 20px;
-    }
-
-    .subtitle {
-      font-size: 18px;
-      color: var(--muted);
-      max-width: 480px;
-      margin: 0 auto 36px;
-      line-height: 1.5;
-    }
-
-    .cta-group {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .btn-primary {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      padding: 14px 28px;
-      border-radius: 12px;
-      background: var(--fg);
-      color: var(--bg);
-      font-size: 15px;
-      font-weight: 600;
-      text-decoration: none;
-      transition: transform 0.15s, background 0.2s;
-    }
-
-    .btn-primary:hover {
-      background: #292524;
-      transform: translateY(-1px);
-    }
-
-    .btn-note {
-      font-size: 13px;
-      color: var(--muted);
-    }
-
-    /* Features */
-    .features {
-      padding: 20px 0 48px;
-    }
-
-    .feature-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 12px;
-      max-width: 560px;
-      margin: 0 auto;
-    }
-
-    @media (max-width: 560px) {
-      .feature-grid { grid-template-columns: 1fr; }
-    }
-
-    .feature {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 20px;
-      transition: transform 0.15s ease, box-shadow 0.15s ease;
-    }
-
-    .feature:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 24px rgba(28, 25, 23, 0.08);
-    }
-
-    .feature-icon {
-      width: 32px;
-      height: 32px;
-      border-radius: 8px;
-      background: #f5f5f4;
-      color: var(--fg);
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 12px;
-    }
-
-    .feature-icon svg {
-      width: 16px;
-      height: 16px;
-      stroke-width: 1.75;
-    }
-
-    .feature h3 {
-      font-size: 14px;
-      font-weight: 600;
-      margin-bottom: 4px;
-      letter-spacing: -0.01em;
-    }
-
-    .feature p {
-      font-size: 13px;
-      color: var(--muted);
-      line-height: 1.5;
-      margin: 0;
-    }
-
-    /* Footer */
-    footer {
-      padding: 32px 0 40px;
-      text-align: center;
-      border-top: 1px solid var(--border);
-      margin-top: 24px;
-    }
-
-    footer p {
-      font-size: 13px;
-      color: var(--muted);
-    }
-
-    footer a {
-      color: var(--muted);
-      text-decoration: underline;
-      text-underline-offset: 2px;
-    }
-
-    footer a:hover { color: var(--fg); }
-
-    @media (max-width: 600px) {
-      .notch { flex-wrap: wrap; border-radius: 20px; padding: 12px 16px; }
-      .transcript { min-width: 0; max-width: 100%; font-size: 13px; white-space: normal; }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      .notch, .rec-dot, .waveform span, .transcript .caret {
-        animation: none !important;
-      }
-    }
-  </style>
-
-  <!-- Google tag (gtag.js) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-0FTBJXMCSM"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -400,97 +68,248 @@
   </script>
 </head>
 <body>
-  <div class="container">
-    <header>
-      <a href="/" class="logo">
-        <img src="icon.png" alt="Yaprflow">
-        Yaprflow
-      </a>
-      <a href="https://github.com/tmoreton/yaprflow" class="gh-link" target="_blank" rel="noopener">GitHub →</a>
-    </header>
+  <a class="skip-link" href="#content">Skip to content</a>
 
-    <section class="hero">
-      <div class="notch" role="img" aria-label="Live transcription preview">
-        <span class="rec-dot" aria-hidden="true"></span>
-        <div class="waveform" aria-hidden="true">
-          <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="Yaprflow home">
+      <img src="icon.png" alt="" width="34" height="34">
+      <span>Yaprflow</span>
+    </a>
+    <nav class="nav-links" aria-label="Main navigation">
+      <a href="#privacy">Privacy</a>
+      <a href="#workflow">Workflow</a>
+      <a href="#download">Download</a>
+      <a href="https://github.com/tmoreton/yaprflow" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </header>
+
+  <main id="content">
+    <section class="hero section-shell">
+      <div class="hero-copy">
+        <p class="eyebrow">Free, open-source macOS dictation</p>
+        <h1>Private dictation for macOS.</h1>
+        <p class="hero-lede">Yaprflow turns speech into polished text in any app while keeping audio on-device. Press <kbd>Command</kbd> <kbd>T</kbd>, talk naturally, then paste the result wherever you work.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="https://github.com/tmoreton/yaprflow/releases/download/v4.0.3/yaprflow-4.0.3.dmg" onclick="gtag('event', 'download', {'event_category': 'engagement', 'event_label': 'yaprflow-4.0.3.dmg'});">
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <path d="M12 3v11"></path>
+              <path d="m7 10 5 5 5-5"></path>
+              <path d="M5 20h14"></path>
+            </svg>
+            Download for macOS
+          </a>
+          <a class="button button-secondary" href="https://github.com/tmoreton/yaprflow" target="_blank" rel="noopener">
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <path d="M7 7h10v10"></path>
+              <path d="M7 17 17 7"></path>
+            </svg>
+            View source
+          </a>
         </div>
-        <div class="transcript"><span id="typed"></span><span class="caret" aria-hidden="true"></span></div>
+        <p class="download-note">macOS 14+ &middot; v4.0.3 &middot; no signup required</p>
       </div>
 
-      <div class="badge">Free &amp; open source</div>
-      <h1>Say it.<br>Paste it.</h1>
-      <p class="subtitle">Private, offline voice-to-text for macOS. Press a hotkey, talk, and your words appear — multilingual, real-time, on-device.</p>
-      <div class="cta-group">
-        <a href="https://github.com/tmoreton/yaprflow/releases/download/v4.0.3/yaprflow-4.0.3.dmg" class="btn-primary" onclick="gtag('event', 'download', {'event_category': 'engagement', 'event_label': 'yaprflow-4.0.3.dmg'});">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 2v8"/>
-            <path d="m16 6-4 4-4-4"/>
-            <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>
-            <path d="M4 17h16"/>
-          </svg>
-          Download for macOS
-        </a>
-        <span class="btn-note">macOS 14+ · No signup required</span>
+      <div class="hero-demo" role="group" aria-labelledby="demo-title">
+        <div class="demo-topbar">
+          <span class="window-dot"></span>
+          <span class="window-dot"></span>
+          <span class="window-dot"></span>
+          <span class="demo-title" id="demo-title">Yaprflow is listening</span>
+        </div>
+        <div class="demo-body">
+          <div class="notch-preview">
+            <span class="recording-dot" aria-hidden="true"></span>
+            <div class="waveform" aria-hidden="true">
+              <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+            </div>
+            <span class="notch-text">Transcribing locally</span>
+          </div>
+          <div class="transcript-panel">
+            <span class="panel-label">Polished output</span>
+            <p><span id="typed"></span><span class="caret" aria-hidden="true"></span></p>
+          </div>
+          <dl class="signal-grid">
+            <div>
+              <dt>Audio</dt>
+              <dd>Never uploaded</dd>
+            </div>
+            <div>
+              <dt>Model</dt>
+              <dd>Core ML</dd>
+            </div>
+            <div>
+              <dt>Archive</dt>
+              <dd>Markdown</dd>
+            </div>
+          </dl>
+        </div>
       </div>
     </section>
 
-    <section class="features">
+    <section class="metrics section-shell" aria-label="Yaprflow highlights">
+      <div>
+        <strong>100% local</strong>
+        <span>No cloud audio</span>
+      </div>
+      <div>
+        <strong>25 languages</strong>
+        <span>Auto-detected</span>
+      </div>
+      <div>
+        <strong>Apache 2.0</strong>
+        <span>Open source</span>
+      </div>
+      <div>
+        <strong>Neural Engine</strong>
+        <span>Real-time partials</span>
+      </div>
+    </section>
+
+    <section id="privacy" class="section-shell split-section">
+      <div>
+        <p class="section-kicker">Private by default</p>
+        <h2>Built for dictation you would not send to a server.</h2>
+      </div>
+      <div class="section-copy">
+        <p>Yaprflow keeps speech recognition on-device. There are no accounts, no telemetry, and no remote transcription queue, so meeting notes, names, client details, and rough first drafts stay under your control.</p>
+        <ul class="check-list">
+          <li>Audio stays on your Mac</li>
+          <li>Transcripts are saved locally as Markdown</li>
+          <li>Custom vocabulary lives in a plain local file</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="workflow" class="section-shell workflow-section">
+      <div class="section-heading">
+        <p class="section-kicker">Simple workflow</p>
+        <h2>Speak once. Use it anywhere.</h2>
+      </div>
+      <div class="workflow-grid">
+        <article>
+          <span>01</span>
+          <h3>Press the hotkey</h3>
+          <p>Start and stop dictation from the menu bar with <kbd>Command</kbd> <kbd>T</kbd>.</p>
+        </article>
+        <article>
+          <span>02</span>
+          <h3>Talk naturally</h3>
+          <p>Live partials show what Yaprflow hears while filler words and common dictation noise are cleaned up.</p>
+        </article>
+        <article>
+          <span>03</span>
+          <h3>Paste clean text</h3>
+          <p>Your final transcript lands on the clipboard, ready for email, chat, notes, issues, and docs.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section-shell feature-section">
+      <div class="section-heading">
+        <p class="section-kicker">Why it feels different</p>
+        <h2>Fast dictation without the cloud tradeoff.</h2>
+      </div>
       <div class="feature-grid">
-        <div class="feature">
-          <div class="feature-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="11" width="18" height="11" rx="2"/>
-              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-            </svg>
-          </div>
-          <h3>100% Private</h3>
-          <p>Everything stays on your Mac. No cloud, no accounts, no telemetry.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-            </svg>
-          </div>
-          <h3>Lightning Fast</h3>
-          <p>Real-time transcription on the Apple Neural Engine. No waiting, no servers.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10"/>
-              <path d="M2 12h20"/>
-              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-            </svg>
-          </div>
-          <h3>Polished Vocabulary</h3>
-          <p>Cleaner default dictation with a local Markdown vocabulary for names, product terms, and preferred spellings.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="16 18 22 12 16 6"/>
-              <polyline points="8 6 2 12 8 18"/>
-            </svg>
-          </div>
-          <h3>Local Recordings</h3>
-          <p>Every completed transcript is saved as a Markdown file with useful metadata and a one-click recordings folder.</p>
-        </div>
+        <article>
+          <h3>On-device speech model</h3>
+          <p>NVIDIA Parakeet TDT 0.6B v3 runs locally through Core ML for quick, accurate transcription.</p>
+        </article>
+        <article>
+          <h3>Cleaner defaults</h3>
+          <p>Common filler words and rough speech patterns are removed so your pasted text needs less cleanup.</p>
+        </article>
+        <article>
+          <h3>Local vocabulary</h3>
+          <p>Add deterministic phrase replacements for names, technical terms, acronyms, and preferred spellings.</p>
+        </article>
+        <article>
+          <h3>Transcript archive</h3>
+          <p>Every completed dictation can be saved as a Markdown record with useful local metadata.</p>
+        </article>
+        <article>
+          <h3>Multilingual support</h3>
+          <p>Dictate across 25 European languages with automatic language detection.</p>
+        </article>
+        <article>
+          <h3>Quiet menu bar app</h3>
+          <p>Yaprflow stays out of the way until you need to turn speech into text.</p>
+        </article>
       </div>
     </section>
 
-    <footer>
-      <p>Apache 2.0 · Built by <a href="https://github.com/tmoreton" target="_blank" rel="noopener">tmoreton</a> · <a href="mailto:tim@yaprflow.com">tim@yaprflow.com</a> · <a href="https://github.com/tmoreton/yaprflow" target="_blank" rel="noopener">View on GitHub</a></p>
-    </footer>
-  </div>
+    <section class="section-shell comparison-section">
+      <div class="section-heading">
+        <p class="section-kicker">Clear difference</p>
+        <h2>A focused alternative to cloud dictation.</h2>
+      </div>
+      <table class="comparison-table" aria-label="Yaprflow compared with cloud dictation">
+        <thead>
+          <tr>
+            <th scope="col">What matters</th>
+            <th scope="col">Yaprflow</th>
+            <th scope="col">Typical cloud dictation</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">Where audio goes</th>
+            <td data-label="Yaprflow">Stays on-device</td>
+            <td data-label="Typical cloud dictation">Sent to a service</td>
+          </tr>
+          <tr>
+            <th scope="row">Account required</th>
+            <td data-label="Yaprflow">No</td>
+            <td data-label="Typical cloud dictation">Often</td>
+          </tr>
+          <tr>
+            <th scope="row">Source model</th>
+            <td data-label="Yaprflow">Open-source app</td>
+            <td data-label="Typical cloud dictation">Closed service</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="download" class="section-shell download-section">
+      <div>
+        <p class="section-kicker">Get started</p>
+        <h2>Download, grant microphone access, press <kbd>Command</kbd> <kbd>T</kbd>.</h2>
+        <p>Yaprflow is free and open source. The speech model downloads automatically on first launch.</p>
+      </div>
+      <div class="download-actions">
+        <a class="button button-primary" href="https://github.com/tmoreton/yaprflow/releases/download/v4.0.3/yaprflow-4.0.3.dmg" onclick="gtag('event', 'download', {'event_category': 'engagement', 'event_label': 'yaprflow-4.0.3.dmg'});">
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M12 3v11"></path>
+            <path d="m7 10 5 5 5-5"></path>
+            <path d="M5 20h14"></path>
+          </svg>
+          Download v4.0.3
+        </a>
+        <a class="text-link" href="https://github.com/tmoreton/yaprflow#build-from-source" target="_blank" rel="noopener">Build from source</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <a class="brand" href="/" aria-label="Yaprflow home">
+        <img src="icon.png" alt="" width="30" height="30">
+        <span>Yaprflow</span>
+      </a>
+      <div class="footer-links">
+        <a href="mailto:tim@yaprflow.com">Contact</a>
+        <a href="https://github.com/tmoreton/yaprflow" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://www.apache.org/licenses/LICENSE-2.0" target="_blank" rel="noopener">Apache 2.0</a>
+      </div>
+    </div>
+  </footer>
 
   <script>
     (function () {
       const phrases = [
-        "Hey, can you review the proposal by end of day?",
-        "Reminder: ship the release notes before Friday.",
-        "Let's sync tomorrow morning to go over the designs."
+        "Please turn those meeting notes into a clear follow-up.",
+        "Draft a short reply confirming the release is ready.",
+        "Add the customer name to my local vocabulary."
       ];
       const el = document.getElementById('typed');
       if (!el) return;
@@ -499,27 +318,33 @@
         return;
       }
 
-      let p = 0, i = 0, deleting = false;
+      let phraseIndex = 0;
+      let charIndex = 0;
+      let deleting = false;
 
       function tick() {
-        const phrase = phrases[p];
+        const phrase = phrases[phraseIndex];
         if (!deleting) {
-          i++;
-          el.textContent = phrase.slice(0, i);
-          if (i >= phrase.length) {
+          charIndex += 1;
+          el.textContent = phrase.slice(0, charIndex);
+          if (charIndex >= phrase.length) {
             deleting = true;
-            return setTimeout(tick, 1800);
+            setTimeout(tick, 1700);
+            return;
           }
-          return setTimeout(tick, 38 + Math.random() * 50);
+          setTimeout(tick, 30 + Math.random() * 45);
+          return;
         }
-        i--;
-        el.textContent = phrase.slice(0, i);
-        if (i <= 0) {
+
+        charIndex -= 1;
+        el.textContent = phrase.slice(0, charIndex);
+        if (charIndex <= 0) {
           deleting = false;
-          p = (p + 1) % phrases.length;
-          return setTimeout(tick, 400);
+          phraseIndex = (phraseIndex + 1) % phrases.length;
+          setTimeout(tick, 320);
+          return;
         }
-        setTimeout(tick, 14);
+        setTimeout(tick, 12);
       }
 
       tick();
