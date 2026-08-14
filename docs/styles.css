@@ -314,20 +314,19 @@ h3 {
 .proof-strip {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  overflow: hidden;
   margin-bottom: 84px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(16px);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
 }
 
 .proof-strip div {
-  min-height: 112px;
+  min-height: 104px;
   display: grid;
   align-content: center;
+  justify-items: center;
   gap: 6px;
   padding: 24px;
+  text-align: center;
   border-left: 1px solid var(--line);
 }
 
@@ -336,7 +335,8 @@ h3 {
 }
 
 .proof-strip strong {
-  font-size: 22px;
+  font-size: 24px;
+  font-weight: 850;
   line-height: 1.1;
 }
 
@@ -363,10 +363,10 @@ h3 {
 }
 
 .feature-grid article {
-  min-height: 250px;
+  min-height: 210px;
   display: flex;
   flex-direction: column;
-  padding: 24px;
+  padding: 24px 24px 26px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.68);
@@ -380,21 +380,21 @@ h3 {
 }
 
 .feature-mark {
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   display: grid;
   place-items: center;
-  margin-bottom: auto;
+  margin-bottom: 20px;
   border: 1px solid var(--line-dark);
   border-radius: 50%;
   color: var(--teal);
   font-family: "SF Mono", ui-monospace, Menlo, monospace;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 850;
 }
 
 .feature-grid h3 {
-  margin-top: 34px;
+  margin-top: 0;
 }
 
 .feature-grid p {
@@ -559,7 +559,7 @@ h3 {
   }
 
   .proof-strip div {
-    min-height: 92px;
+    min-height: 88px;
     border-top: 1px solid var(--line);
     border-left: none;
   }
@@ -574,14 +574,6 @@ h3 {
 
   .feature-grid article {
     min-height: auto;
-  }
-
-  .feature-mark {
-    margin-bottom: 32px;
-  }
-
-  .feature-grid h3 {
-    margin-top: 0;
   }
 
   .cta-section {
