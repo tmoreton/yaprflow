@@ -4,13 +4,26 @@ import SwiftUI
 
 struct TranscriptHistoryItem: Identifiable, Hashable {
     let url: URL
-    let modifiedAt: Date
+    let recordedAt: Date
     let transcript: String
+    let generatedTitle: String?
+    let topic: String?
+    let generatedDescription: String?
 
     var id: URL { url }
-    var title: String { modifiedAt.formatted(date: .abbreviated, time: .shortened) }
+    var title: String {
+        generatedTitle ?? url.deletingPathExtension().lastPathComponent
+    }
+
+    var dateDescription: String {
+        recordedAt.formatted(date: .abbreviated, time: .shortened)
+    }
 
     var preview: String {
+        if let generatedDescription {
+            return generatedDescription
+        }
+
         let compact = transcript
             .split(whereSeparator: \.isWhitespace)
             .joined(separator: " ")
@@ -31,7 +44,7 @@ final class TranscriptHistoryModel: ObservableObject {
     func refresh(selectLatest: Bool = false) {
         do {
             let directory = try AppState.shared.transcriptsDirectory()
-            let keys: Set<URLResourceKey> = [.contentModificationDateKey, .isRegularFileKey]
+            let keys: Set<URLResourceKey> = [.isRegularFileKey]
             let urls = try FileManager.default.contentsOfDirectory(
                 at: directory,
                 includingPropertiesForKeys: Array(keys),
@@ -42,14 +55,17 @@ final class TranscriptHistoryModel: ObservableObject {
                 guard url.pathExtension.lowercased() == "md" else { return nil }
                 let values = try? url.resourceValues(forKeys: keys)
                 guard values?.isRegularFile != false else { return nil }
-                let contents = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+                guard let document = try? TranscriptArchiveDocument.load(from: url) else { return nil }
                 return TranscriptHistoryItem(
                     url: url,
-                    modifiedAt: values?.contentModificationDate ?? .distantPast,
-                    transcript: Self.transcriptBody(from: contents)
+                    recordedAt: document.recordedAt,
+                    transcript: document.transcript,
+                    generatedTitle: document.generatedTitle,
+                    topic: document.topic,
+                    generatedDescription: document.generatedDescription
                 )
             }
-            .sorted { $0.modifiedAt > $1.modifiedAt }
+            .sorted { $0.recordedAt > $1.recordedAt }
 
             if selectLatest || !items.contains(where: { $0.id == selection }) {
                 selection = items.first?.id
@@ -82,27 +98,12 @@ final class TranscriptHistoryModel: ObservableObject {
         }
     }
 
-    private static func transcriptBody(from markdown: String) -> String {
-        guard let heading = markdown.range(of: "# Transcript") else {
-            return markdown.trimmingCharacters(in: .whitespacesAndNewlines)
+    func handleArchiveChange(_ notification: Notification) {
+        if let change = notification.object as? TranscriptArchiveChange,
+           selection == change.oldURL {
+            selection = change.newURL
         }
-
-        var lines = markdown[heading.upperBound...]
-            .components(separatedBy: .newlines)
-
-        while let first = lines.first {
-            let line = first.trimmingCharacters(in: .whitespacesAndNewlines)
-            if line.isEmpty
-                || line.hasPrefix("Recorded:")
-                || line.hasPrefix("Mode:")
-                || line.hasPrefix("Source:") {
-                lines.removeFirst()
-            } else {
-                break
-            }
-        }
-
-        return lines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+        refresh()
     }
 }
 
@@ -158,9 +159,15 @@ struct HistoryView: View {
             }
         }
         .padding(18)
-        .frame(minWidth: 440, minHeight: 330)
+        .frame(minWidth: 480, minHeight: 350)
         .background(Color(nsColor: .windowBackgroundColor))
-        .onAppear { model.refresh() }
+        .onAppear {
+            model.refresh()
+            TranscriptMetadataEnricher.shared.enqueueMissingTranscripts()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .yaprflowTranscriptArchiveChanged)) {
+            model.handleArchiveChange($0)
+        }
     }
 
     private var transcriptList: some View {
@@ -175,13 +182,30 @@ struct HistoryView: View {
                                 .foregroundStyle(.secondary)
 
                             VStack(alignment: .leading, spacing: 3) {
-                                Text(item.title)
-                                    .font(.callout.weight(.medium))
-                                    .lineLimit(1)
+                                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                    Text(item.title)
+                                        .font(.callout.weight(.medium))
+                                        .lineLimit(1)
+
+                                    Spacer(minLength: 8)
+
+                                    Text(item.dateDescription)
+                                        .font(.caption2)
+                                        .foregroundStyle(.tertiary)
+                                        .lineLimit(1)
+                                }
+
+                                if let topic = item.topic {
+                                    Text(topic)
+                                        .font(.caption.weight(.medium))
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                }
+
                                 Text(item.preview)
                                     .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
+                                    .foregroundStyle(item.topic == nil ? .secondary : .tertiary)
+                                    .lineLimit(2)
                             }
 
                             Spacer(minLength: 8)
@@ -235,8 +259,8 @@ struct HistoryView: View {
 enum HistoryWindowController {
     static let shared = FeatureWindowController(
         title: "History",
-        contentSize: NSSize(width: 480, height: 390),
-        minimumSize: NSSize(width: 440, height: 330)
+        contentSize: NSSize(width: 540, height: 430),
+        minimumSize: NSSize(width: 480, height: 350)
     ) {
         HistoryView()
     }

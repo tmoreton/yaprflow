@@ -23,9 +23,11 @@ transcripts.
 - **Local vocabulary**: deterministic phrase replacements for names, acronyms,
   product terms, and preferred spellings.
 - **On-device AI Actions**: summarize, rewrite, or transform the latest or any
-  saved transcript with a custom prompt using Apple Intelligence on supported Macs.
-- **Markdown archive**: each completed transcript is saved locally with
-  timestamp, mode, source app, and vocabulary replacement count.
+  saved transcript with a custom prompt using Apple Intelligence on supported
+  Macs. Long transcripts are divided and recombined automatically.
+- **Smart Markdown archive**: each completed transcript is saved locally; on
+  supported Macs, Apple Intelligence adds a title, topic, and description and
+  renames the file with its date and title.
 - **Multilingual**: the Parakeet model supports 25 European languages with
   automatic detection.
 - **Open source**: Apache 2.0.
@@ -52,8 +54,10 @@ Yaprflow runs as a menu-bar app. Click the waveform icon to open the menu.
 - **Change shortcut**: click the shortcut text in the menu, then press the new
   key combination. Escape cancels shortcut capture.
 - **Copy Transcript**: copies the most recent completed transcript again.
-- **AI Actions**: runs a preset or custom prompt against the latest transcript.
-- **History**: browses, opens, and copies locally saved transcripts.
+- **AI Actions**: runs a preset or custom prompt against any saved transcript,
+  automatically processing long transcripts in manageable parts.
+- **History**: browses titled transcripts by date, topic, and description, and
+  opens or copies the original locally saved files.
 - **Settings**: controls the desktop transcript preview and shows how speech, AI, accounts, telemetry, and storage are handled.
 - **Command-Q**: quits the app.
 
@@ -87,8 +91,8 @@ directory.
 - Vocabulary: `Yaprflow/Vocabulary.md`
 - Speech model cache: `FluidAudio/Models/parakeet-tdt-0.6b-v3`
 
-Use the menu-bar `Recordings` and `Vocabulary` actions instead of memorizing
-paths; sandboxed macOS apps place Application Support under their container.
+Use the `Folder` action in History to reveal saved transcripts; sandboxed macOS
+apps place Application Support under their container.
 
 ## How It Works
 
@@ -154,7 +158,7 @@ xcodebuild \
 
 The project has two shared schemes:
 
-- `yaprflow`: macOS app, bundle id `com.tmoreton.yaprflow`, version 4.0.5.
+- `yaprflow`: macOS app, bundle id `com.tmoreton.yaprflow`, version 4.0.6.
 - `yaprflow-iOS`: iOS target, bundle id `com.tmoreton.yaprflow.ios`.
 
 ## Release
@@ -169,7 +173,7 @@ For a signed and notarized release, configure the notarization credentials
 described in `scripts/release.sh`, then run:
 
 ```bash
-scripts/release.sh 4.0.5 --publish
+scripts/release.sh 4.0.6 --publish
 ```
 
 The release script can build the app, export a Developer ID signed app, notarize

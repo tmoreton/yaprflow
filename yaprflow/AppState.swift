@@ -80,13 +80,23 @@ final class AppState: ObservableObject {
     ) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        try? Self.writeTranscriptMarkdown(
+        let recordedAt = Date()
+        let fileURL = try? Self.writeTranscriptMarkdown(
             trimmed,
             mode: dictationMode,
             sourceApplication: sourceApplication,
-            vocabularyReplacementCount: vocabularyReplacementCount
+            vocabularyReplacementCount: vocabularyReplacementCount,
+            recordedAt: recordedAt
         )
         lastTranscript = trimmed
+
+        if let fileURL {
+            TranscriptMetadataEnricher.shared.enqueue(
+                url: fileURL,
+                transcript: trimmed,
+                recordedAt: recordedAt
+            )
+        }
     }
 
     func processTranscript(_ raw: String) -> TranscriptProcessingResult {
@@ -117,10 +127,10 @@ final class AppState: ObservableObject {
         _ text: String,
         mode: DictationMode,
         sourceApplication: String?,
-        vocabularyReplacementCount: Int
-    ) throws {
+        vocabularyReplacementCount: Int,
+        recordedAt date: Date
+    ) throws -> URL {
         let directory = try ensureTranscriptsDirectory()
-        let date = Date()
         let fileURL = uniqueTranscriptURL(in: directory, date: date)
         let recordedAt = displayTimestampFormatter.string(from: date)
         let isoRecordedAt = isoTimestampFormatter.string(from: date)
@@ -142,6 +152,7 @@ final class AppState: ObservableObject {
         \(text)
         """
         try markdown.write(to: fileURL, atomically: true, encoding: .utf8)
+        return fileURL
     }
 
     private static func ensureTranscriptsDirectory() throws -> URL {
