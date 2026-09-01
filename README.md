@@ -22,6 +22,8 @@ transcripts.
   clipboard.
 - **Local vocabulary**: deterministic phrase replacements for names, acronyms,
   product terms, and preferred spellings.
+- **On-device AI Actions**: summarize, rewrite, or transform the latest
+  transcript with a custom prompt using Apple Intelligence on supported Macs.
 - **Markdown archive**: each completed transcript is saved locally with
   timestamp, mode, source app, and vocabulary replacement count.
 - **Multilingual**: the Parakeet model supports 25 European languages with
@@ -50,9 +52,9 @@ Yaprflow runs as a menu-bar app. Click the waveform icon to open the menu.
 - **Change shortcut**: click the shortcut text in the menu, then press the new
   key combination. Escape cancels shortcut capture.
 - **Copy Transcript**: copies the most recent completed transcript again.
-- **Vocabulary**: opens the local vocabulary file.
-- **Privacy**: shows local processing status and vocabulary entry count.
-- **Recordings**: opens the local transcript archive folder.
+- **AI Actions**: runs a preset or custom prompt against the latest transcript.
+- **History**: browses, opens, and copies locally saved transcripts.
+- **Privacy**: shows how speech, AI, accounts, telemetry, and storage are handled.
 - **Command-Q**: quits the app.
 
 While dictating, Yaprflow shows a compact black overlay near the Mac notch or
@@ -152,7 +154,7 @@ xcodebuild \
 
 The project has two shared schemes:
 
-- `yaprflow`: macOS app, bundle id `com.tmoreton.yaprflow`, version 4.0.3.
+- `yaprflow`: macOS app, bundle id `com.tmoreton.yaprflow`, version 4.0.4.
 - `yaprflow-iOS`: iOS target, bundle id `com.tmoreton.yaprflow.ios`.
 
 ## Release
@@ -167,7 +169,7 @@ For a signed and notarized release, configure the notarization credentials
 described in `scripts/release.sh`, then run:
 
 ```bash
-scripts/release.sh 4.0.3 --publish
+scripts/release.sh 4.0.4 --publish
 ```
 
 The release script can build the app, export a Developer ID signed app, notarize

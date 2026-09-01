@@ -6,6 +6,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // SwiftUI finishes Transparent App Lifecycle restoration a few seconds
+        // after this callback and then makes windowless apps automatically
+        // terminable. Opt out after that bookkeeping so this menu-bar app keeps
+        // listening for its global hotkey while idle.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 6) {
+            ProcessInfo.processInfo.disableAutomaticTermination(
+                "Yaprflow must remain available for its global hotkey"
+            )
+        }
+
         NSApp.setActivationPolicy(.accessory)
         installStatusItem()
         _ = NotchOverlayWindowController.shared
@@ -79,32 +89,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         )
         menu.addItem(copyItem)
 
-        let vocabularyItem = NSMenuItem()
-        vocabularyItem.view = IconActionMenuItemView(
-            symbolName: "text.book.closed",
-            title: "Vocabulary",
+        let aiItem = NSMenuItem()
+        aiItem.view = IconActionMenuItemView(
+            symbolName: "sparkles",
+            title: "AI Actions…",
             target: self,
-            action: #selector(openVocabularyFile),
+            action: #selector(showAIActions),
             isEnabled: { true }
         )
-        menu.addItem(vocabularyItem)
+        menu.addItem(aiItem)
 
-        let privacyItem = NSMenuItem()
-        privacyItem.view = IconActionMenuItemView(
-            symbolName: "lock.shield",
-            title: "Privacy",
+        let historyItem = NSMenuItem()
+        historyItem.view = IconActionMenuItemView(
+            symbolName: "clock.arrow.circlepath",
+            title: "History",
             target: self,
-            action: #selector(showPrivacyStatus),
+            action: #selector(showHistory),
             isEnabled: { true }
         )
-        menu.addItem(privacyItem)
+        menu.addItem(historyItem)
 
         menu.addItem(NSMenuItem.separator())
 
         let footerItem = NSMenuItem()
         footerItem.view = BottomMenuActionsView(
             target: self,
-            openFolderAction: #selector(openTranscriptsFolder),
+            privacyAction: #selector(showPrivacy),
             quitAction: #selector(quit)
         )
         menu.addItem(footerItem)
@@ -120,38 +130,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         pb.setString(text, forType: .string)
     }
 
-    @objc private func openTranscriptsFolder() {
-        do {
-            let url = try AppState.shared.transcriptsDirectory()
-            NSWorkspace.shared.open(url)
-        } catch {
-            NSSound.beep()
-        }
+    @objc private func showAIActions() {
+        TranscriptAIWindowController.shared.show()
     }
 
-    @objc private func openVocabularyFile() {
-        do {
-            let url = try AppState.shared.vocabularyFileURL()
-            NSWorkspace.shared.open(url)
-        } catch {
-            NSSound.beep()
-        }
+    @objc private func showHistory() {
+        HistoryWindowController.shared.show()
     }
 
-    @objc private func showPrivacyStatus() {
-        let alert = NSAlert()
-        alert.messageText = "Yaprflow Privacy"
-        alert.informativeText = """
-        Dictation mode: \(AppState.shared.dictationMode.displayName)
-        Speech processing: Local Core ML models
-        Accounts: None
-        Telemetry: None
-        Vocabulary entries: \(AppState.shared.vocabularyEntryCount())
-
-        Transcripts are saved locally in Application Support/Yaprflow/Transcripts.
-        """
-        alert.addButton(withTitle: "OK")
-        alert.runModal()
+    @objc private func showPrivacy() {
+        PrivacyWindowController.shared.show()
     }
 
     private func registerHotkey() {

@@ -123,15 +123,15 @@ final class IconActionMenuItemView: NSView {
 
 @MainActor
 final class BottomMenuActionsView: NSView {
-    private var folderButton: NSButton!
+    private var privacyButton: NSButton!
     private var quitButton: NSButton!
     private weak var actionTarget: AnyObject?
-    private let openFolderAction: Selector
+    private let privacyAction: Selector
     private let quitAction: Selector
 
-    init(target: AnyObject, openFolderAction: Selector, quitAction: Selector) {
+    init(target: AnyObject, privacyAction: Selector, quitAction: Selector) {
         self.actionTarget = target
-        self.openFolderAction = openFolderAction
+        self.privacyAction = privacyAction
         self.quitAction = quitAction
         super.init(frame: NSRect(x: 0, y: 0, width: 190, height: 34))
         autoresizingMask = [.width]
@@ -145,11 +145,11 @@ final class BottomMenuActionsView: NSView {
     }
 
     private func setupLayout() {
-        folderButton = makeButton(
-            symbolName: "folder",
-            title: "Recordings",
-            accessibilityDescription: "Open transcripts folder",
-            action: #selector(openFolder)
+        privacyButton = makeButton(
+            symbolName: "lock.shield",
+            title: "Privacy",
+            accessibilityDescription: "Show privacy details",
+            action: #selector(showPrivacy)
         )
         quitButton = makeButton(
             symbolName: nil,
@@ -158,14 +158,14 @@ final class BottomMenuActionsView: NSView {
             action: #selector(quit)
         )
 
-        addSubview(folderButton)
+        addSubview(privacyButton)
         addSubview(quitButton)
 
         NSLayoutConstraint.activate([
-            folderButton.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14),
-            folderButton.centerYAnchor.constraint(equalTo: centerYAnchor),
+            privacyButton.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14),
+            privacyButton.centerYAnchor.constraint(equalTo: centerYAnchor),
 
-            quitButton.leadingAnchor.constraint(greaterThanOrEqualTo: folderButton.trailingAnchor, constant: 14),
+            quitButton.leadingAnchor.constraint(greaterThanOrEqualTo: privacyButton.trailingAnchor, constant: 14),
             quitButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -14),
             quitButton.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
@@ -179,8 +179,8 @@ final class BottomMenuActionsView: NSView {
         let point = convert(event.locationInWindow, from: nil)
         if quitButton.frame.insetBy(dx: -8, dy: -5).contains(point) {
             send(action: quitAction)
-        } else if folderButton.frame.insetBy(dx: -8, dy: -5).contains(point) {
-            send(action: openFolderAction)
+        } else if privacyButton.frame.insetBy(dx: -8, dy: -5).contains(point) {
+            send(action: privacyAction)
         }
     }
 
@@ -221,8 +221,8 @@ final class BottomMenuActionsView: NSView {
         return button
     }
 
-    @objc private func openFolder() {
-        send(action: openFolderAction)
+    @objc private func showPrivacy() {
+        send(action: privacyAction)
     }
 
     @objc private func quit() {
