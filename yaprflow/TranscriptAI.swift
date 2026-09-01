@@ -57,6 +57,11 @@ final class TranscriptAIModel: ObservableObject {
         prompt = Self.defaultPrompt
     }
 
+    func clearOutput() {
+        result = ""
+        errorMessage = nil
+    }
+
     func run(transcript: String) {
         let trimmedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedTranscript = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -127,6 +132,7 @@ final class TranscriptAIModel: ObservableObject {
 struct TranscriptAIView: View {
     @ObservedObject private var appState = AppState.shared
     @StateObject private var ai = TranscriptAIModel()
+    @StateObject private var history = TranscriptHistoryModel()
 
     private let presets: [(title: String, prompt: String)] = [
         (
@@ -176,17 +182,57 @@ struct TranscriptAIView: View {
         .padding(18)
         .frame(minWidth: 480, minHeight: 440)
         .background(Color(nsColor: .windowBackgroundColor))
-        .onAppear { ai.refreshAvailability() }
+        .onAppear {
+            ai.refreshAvailability()
+            history.refresh(selectLatest: true)
+        }
+        .onChange(of: appState.lastTranscript) { _, _ in
+            history.refresh(selectLatest: true)
+        }
+        .onChange(of: history.selection) { oldSelection, newSelection in
+            if oldSelection != newSelection {
+                ai.clearOutput()
+            }
+        }
     }
 
     private var sourceRow: some View {
-        Label(
-            sourceDescription,
-            systemImage: appState.lastTranscript.isEmpty ? "waveform.slash" : "waveform"
-        )
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .lineLimit(1)
+        HStack(spacing: 8) {
+            Image(systemName: selectedTranscript.isEmpty ? "waveform.slash" : "waveform")
+                .foregroundStyle(.secondary)
+
+            if history.items.isEmpty {
+                Text(selectedTranscript.isEmpty ? "No transcripts yet" : "Latest transcript")
+                    .font(.callout)
+                    .foregroundStyle(selectedTranscript.isEmpty ? .secondary : .primary)
+            } else {
+                Picker("Transcript", selection: $history.selection) {
+                    ForEach(history.items) { item in
+                        Text(sourceTitle(for: item))
+                            .tag(Optional(item.id))
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .fixedSize(horizontal: true, vertical: false)
+            }
+
+            Spacer(minLength: 8)
+
+            Text(sourceDescription)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+
+            Button {
+                history.refresh()
+            } label: {
+                Image(systemName: "arrow.clockwise")
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .help("Refresh transcript history")
+        }
     }
 
     private var promptSection: some View {
@@ -241,7 +287,7 @@ struct TranscriptAIView: View {
                 }
 
                 Button(ai.isRunning ? "Working…" : "Run") {
-                    ai.run(transcript: appState.lastTranscript)
+                    ai.run(transcript: selectedTranscript)
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(runIsDisabled)
@@ -280,18 +326,29 @@ struct TranscriptAIView: View {
     }
 
     private var sourceDescription: String {
-        let transcript = appState.lastTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
+        let transcript = selectedTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !transcript.isEmpty else {
-            return "Record something first, then return here."
+            return "Record something first"
         }
         let wordCount = transcript.split(whereSeparator: \.isWhitespace).count
-        return "\(wordCount) \(wordCount == 1 ? "word" : "words") ready to process"
+        return "\(wordCount) \(wordCount == 1 ? "word" : "words")"
+    }
+
+    private var selectedTranscript: String {
+        history.selectedItem?.transcript ?? appState.lastTranscript
+    }
+
+    private func sourceTitle(for item: TranscriptHistoryItem) -> String {
+        if item.id == history.items.first?.id {
+            return "Latest · \(item.title)"
+        }
+        return item.title
     }
 
     private var runIsDisabled: Bool {
         ai.isRunning
             || !ai.isModelAvailable
-            || appState.lastTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || selectedTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             || ai.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }

@@ -36,12 +36,18 @@ final class AppState: ObservableObject {
 
     private static let lastTranscriptKey = "yaprflow.lastTranscript"
     private static let dictationModeKey = "yaprflow.dictationMode"
+    private static let desktopPreviewEnabledKey = "yaprflow.desktopPreviewEnabled"
     private static let transcriptsFolderName = "Transcripts"
     private static let vocabularyFileName = "Vocabulary.md"
 
     @Published var status: TranscriptionStatus = .idle
     @Published var liveTranscript: String = ""
     @Published var hotkey: HotkeyConfig = HotkeyConfig.load() ?? .defaultHotkey
+    @Published var isDesktopPreviewEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(isDesktopPreviewEnabled, forKey: Self.desktopPreviewEnabledKey)
+        }
+    }
     @Published var dictationMode: DictationMode {
         didSet {
             UserDefaults.standard.set(dictationMode.rawValue, forKey: Self.dictationModeKey)
@@ -58,6 +64,9 @@ final class AppState: ObservableObject {
 
     private init() {
         self.lastTranscript = UserDefaults.standard.string(forKey: Self.lastTranscriptKey) ?? ""
+        self.isDesktopPreviewEnabled = UserDefaults.standard.object(
+            forKey: Self.desktopPreviewEnabledKey
+        ) as? Bool ?? true
         self.dictationMode = .polished
         UserDefaults.standard.set(DictationMode.polished.rawValue, forKey: Self.dictationModeKey)
     }

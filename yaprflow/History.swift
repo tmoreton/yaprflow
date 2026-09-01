@@ -2,7 +2,7 @@ import AppKit
 import Combine
 import SwiftUI
 
-private struct TranscriptHistoryItem: Identifiable, Hashable {
+struct TranscriptHistoryItem: Identifiable, Hashable {
     let url: URL
     let modifiedAt: Date
     let transcript: String
@@ -19,7 +19,7 @@ private struct TranscriptHistoryItem: Identifiable, Hashable {
 }
 
 @MainActor
-private final class HistoryModel: ObservableObject {
+final class TranscriptHistoryModel: ObservableObject {
     @Published private(set) var items: [TranscriptHistoryItem] = []
     @Published var selection: URL?
     @Published private(set) var errorMessage: String?
@@ -28,7 +28,7 @@ private final class HistoryModel: ObservableObject {
         items.first { $0.id == selection }
     }
 
-    func refresh() {
+    func refresh(selectLatest: Bool = false) {
         do {
             let directory = try AppState.shared.transcriptsDirectory()
             let keys: Set<URLResourceKey> = [.contentModificationDateKey, .isRegularFileKey]
@@ -51,7 +51,7 @@ private final class HistoryModel: ObservableObject {
             }
             .sorted { $0.modifiedAt > $1.modifiedAt }
 
-            if !items.contains(where: { $0.id == selection }) {
+            if selectLatest || !items.contains(where: { $0.id == selection }) {
                 selection = items.first?.id
             }
             errorMessage = nil
@@ -107,7 +107,7 @@ private final class HistoryModel: ObservableObject {
 }
 
 struct HistoryView: View {
-    @StateObject private var model = HistoryModel()
+    @StateObject private var model = TranscriptHistoryModel()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {

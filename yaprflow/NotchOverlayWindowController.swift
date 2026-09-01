@@ -43,6 +43,7 @@ final class NotchOverlayWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func show() {
+        guard AppState.shared.isDesktopPreviewEnabled else { return }
         recenter()
         window?.orderFrontRegardless()
         NSAnimationContext.runAnimationGroup { ctx in
@@ -57,7 +58,9 @@ final class NotchOverlayWindowController: NSWindowController, NSWindowDelegate {
             ctx.duration = 0.18
             window.animator().alphaValue = 0
         }, completionHandler: {
-            window.orderOut(nil)
+            Task { @MainActor in
+                window.orderOut(nil)
+            }
         })
     }
 

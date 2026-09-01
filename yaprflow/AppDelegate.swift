@@ -92,7 +92,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let aiItem = NSMenuItem()
         aiItem.view = IconActionMenuItemView(
             symbolName: "sparkles",
-            title: "AI Actions…",
+            title: "AI Actions",
             target: self,
             action: #selector(showAIActions),
             isEnabled: { true }
@@ -114,7 +114,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let footerItem = NSMenuItem()
         footerItem.view = BottomMenuActionsView(
             target: self,
-            privacyAction: #selector(showPrivacy),
+            settingsAction: #selector(showSettings),
             quitAction: #selector(quit)
         )
         menu.addItem(footerItem)
@@ -138,8 +138,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         HistoryWindowController.shared.show()
     }
 
-    @objc private func showPrivacy() {
-        PrivacyWindowController.shared.show()
+    @objc private func showSettings() {
+        SettingsWindowController.shared.show()
     }
 
     private func registerHotkey() {

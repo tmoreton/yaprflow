@@ -123,15 +123,15 @@ final class IconActionMenuItemView: NSView {
 
 @MainActor
 final class BottomMenuActionsView: NSView {
-    private var privacyButton: NSButton!
+    private var settingsButton: NSButton!
     private var quitButton: NSButton!
     private weak var actionTarget: AnyObject?
-    private let privacyAction: Selector
+    private let settingsAction: Selector
     private let quitAction: Selector
 
-    init(target: AnyObject, privacyAction: Selector, quitAction: Selector) {
+    init(target: AnyObject, settingsAction: Selector, quitAction: Selector) {
         self.actionTarget = target
-        self.privacyAction = privacyAction
+        self.settingsAction = settingsAction
         self.quitAction = quitAction
         super.init(frame: NSRect(x: 0, y: 0, width: 190, height: 34))
         autoresizingMask = [.width]
@@ -145,11 +145,11 @@ final class BottomMenuActionsView: NSView {
     }
 
     private func setupLayout() {
-        privacyButton = makeButton(
-            symbolName: "lock.shield",
-            title: "Privacy",
-            accessibilityDescription: "Show privacy details",
-            action: #selector(showPrivacy)
+        settingsButton = makeButton(
+            symbolName: "gearshape",
+            title: "Settings",
+            accessibilityDescription: "Show Yaprflow settings",
+            action: #selector(showSettings)
         )
         quitButton = makeButton(
             symbolName: nil,
@@ -158,14 +158,14 @@ final class BottomMenuActionsView: NSView {
             action: #selector(quit)
         )
 
-        addSubview(privacyButton)
+        addSubview(settingsButton)
         addSubview(quitButton)
 
         NSLayoutConstraint.activate([
-            privacyButton.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14),
-            privacyButton.centerYAnchor.constraint(equalTo: centerYAnchor),
+            settingsButton.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14),
+            settingsButton.centerYAnchor.constraint(equalTo: centerYAnchor),
 
-            quitButton.leadingAnchor.constraint(greaterThanOrEqualTo: privacyButton.trailingAnchor, constant: 14),
+            quitButton.leadingAnchor.constraint(greaterThanOrEqualTo: settingsButton.trailingAnchor, constant: 14),
             quitButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -14),
             quitButton.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
@@ -179,8 +179,8 @@ final class BottomMenuActionsView: NSView {
         let point = convert(event.locationInWindow, from: nil)
         if quitButton.frame.insetBy(dx: -8, dy: -5).contains(point) {
             send(action: quitAction)
-        } else if privacyButton.frame.insetBy(dx: -8, dy: -5).contains(point) {
-            send(action: privacyAction)
+        } else if settingsButton.frame.insetBy(dx: -8, dy: -5).contains(point) {
+            send(action: settingsAction)
         }
     }
 
@@ -221,8 +221,8 @@ final class BottomMenuActionsView: NSView {
         return button
     }
 
-    @objc private func showPrivacy() {
-        send(action: privacyAction)
+    @objc private func showSettings() {
+        send(action: settingsAction)
     }
 
     @objc private func quit() {

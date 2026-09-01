@@ -1,17 +1,41 @@
 import AppKit
 import SwiftUI
 
-struct PrivacyView: View {
+struct SettingsView: View {
+    @ObservedObject private var appState = AppState.shared
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             FeatureWindowHeader(
-                symbolName: "lock.shield.fill",
-                title: "Privacy",
-                subtitle: "Your voice and transcripts stay on this Mac.",
-                accent: .green,
-                badge: "Local only",
+                symbolName: "gearshape.fill",
+                title: "Settings",
+                subtitle: "Control Yaprflow and review how your data is handled.",
+                accent: .blue,
+                badge: "On-device",
                 badgeSymbol: "lock.fill"
             )
+
+            FeatureCard {
+                HStack(spacing: 12) {
+                    Image(systemName: appState.isDesktopPreviewEnabled ? "eye" : "eye.slash")
+                        .foregroundStyle(.secondary)
+                        .frame(width: 26)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Desktop preview")
+                            .font(.callout.weight(.medium))
+                        Text("Show the floating transcript while recording.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    Toggle("Desktop preview", isOn: desktopPreviewBinding)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                }
+            }
 
             FeatureCard {
                 VStack(spacing: 0) {
@@ -70,8 +94,25 @@ struct PrivacyView: View {
             Spacer(minLength: 0)
         }
         .padding(22)
-        .frame(minWidth: 540, minHeight: 400)
+        .frame(minWidth: 540, minHeight: 470)
         .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    private var desktopPreviewBinding: Binding<Bool> {
+        Binding(
+            get: { appState.isDesktopPreviewEnabled },
+            set: { isEnabled in
+                appState.isDesktopPreviewEnabled = isEnabled
+
+                if isEnabled {
+                    if appState.status != .idle {
+                        NotchOverlayWindowController.shared.show()
+                    }
+                } else {
+                    NotchOverlayWindowController.shared.hide()
+                }
+            }
+        )
     }
 }
 
@@ -106,12 +147,12 @@ private struct PrivacyRow: View {
 }
 
 @MainActor
-enum PrivacyWindowController {
+enum SettingsWindowController {
     static let shared = FeatureWindowController(
-        title: "Privacy",
-        contentSize: NSSize(width: 580, height: 430),
-        minimumSize: NSSize(width: 540, height: 400)
+        title: "Settings",
+        contentSize: NSSize(width: 580, height: 500),
+        minimumSize: NSSize(width: 540, height: 470)
     ) {
-        PrivacyView()
+        SettingsView()
     }
 }
