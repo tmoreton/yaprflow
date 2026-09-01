@@ -1,9 +1,11 @@
 import AppKit
+import Combine
 import SwiftUI
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem?
+    private var statusCancellable: AnyCancellable?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // SwiftUI finishes Transparent App Lifecycle restoration a few seconds
@@ -63,6 +65,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         item.menu = menu
         self.statusItem = item
+
+        statusCancellable = AppState.shared.$status
+            .removeDuplicates()
+            .sink { [weak self] status in
+                self?.updateStatusItem(for: status)
+            }
+        updateStatusItem(for: AppState.shared.status)
+    }
+
+    private func updateStatusItem(for status: TranscriptionStatus) {
+        guard let button = statusItem?.button else { return }
+
+        if case .listening = status {
+            button.contentTintColor = .systemRed
+            button.toolTip = "Yaprflow is recording"
+            button.setAccessibilityLabel("Yaprflow is recording")
+        } else {
+            button.contentTintColor = nil
+            button.toolTip = "Yaprflow"
+            button.setAccessibilityLabel("Yaprflow")
+        }
     }
 
     // MARK: - NSMenuDelegate
