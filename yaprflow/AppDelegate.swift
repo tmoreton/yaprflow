@@ -98,8 +98,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func installStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = item.button {
-            button.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "Yaprflow")
-            button.image?.isTemplate = true
+            button.image = Self.statusItemImage()
+            button.contentTintColor = nil
         }
 
         let menu = NSMenu()
@@ -122,22 +122,48 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         switch status {
         case let .preparing(message):
-            button.contentTintColor = .systemOrange
+            button.image = Self.statusItemImage(tint: .systemOrange)
             button.toolTip = "Yaprflow: \(message)"
             button.setAccessibilityLabel("Yaprflow is preparing to record: \(message)")
         case .listening:
-            button.contentTintColor = .systemRed
+            button.image = Self.statusItemImage(tint: .systemRed)
             button.toolTip = "Yaprflow is recording"
             button.setAccessibilityLabel("Yaprflow is recording")
         case let .error(message):
-            button.contentTintColor = .systemOrange
+            button.image = Self.statusItemImage(tint: .systemOrange)
             button.toolTip = "Yaprflow: \(message)"
             button.setAccessibilityLabel("Yaprflow error: \(message)")
         default:
-            button.contentTintColor = nil
+            button.image = Self.statusItemImage()
             button.toolTip = "Yaprflow"
             button.setAccessibilityLabel("Yaprflow")
         }
+
+        // A template image can be recolored by the menu bar after
+        // `contentTintColor` is applied, which made the recording state turn
+        // black on some appearances. Colored states above use palette-rendered
+        // non-template images, so keep AppKit's secondary tint disabled.
+        button.contentTintColor = nil
+    }
+
+    private static func statusItemImage(tint: NSColor? = nil) -> NSImage? {
+        guard let symbol = NSImage(
+            systemSymbolName: "waveform",
+            accessibilityDescription: "Yaprflow"
+        ) else {
+            return nil
+        }
+
+        guard let tint else {
+            symbol.isTemplate = true
+            return symbol
+        }
+
+        let palette = NSImage.SymbolConfiguration(paletteColors: [tint])
+        let colored = symbol.withSymbolConfiguration(palette) ?? symbol
+        colored.isTemplate = false
+        colored.accessibilityDescription = "Yaprflow"
+        return colored
     }
 
     // MARK: - NSMenuDelegate

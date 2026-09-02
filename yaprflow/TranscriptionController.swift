@@ -208,10 +208,10 @@ final class TranscriptionController {
         sessionSourceApplication = Self.frontmostApplicationName()
         lastSpeculativeSampleCount = 0
         state.liveTranscript = ""
+        state.status = .preparing("Checking microphone access…")
         NotchOverlayWindowController.shared.show()
 
         do {
-            state.status = .preparing("Checking microphone access…")
             try await ensureMicPermission()
             try capture.validateInputAvailable()
             let (_, vad) = try await ensureLoaded()

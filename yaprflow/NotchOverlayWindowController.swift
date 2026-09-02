@@ -1,5 +1,8 @@
 import AppKit
+import OSLog
 import SwiftUI
+
+private let overlayLog = Logger(subsystem: "com.tmoreton.yaprflow", category: "DesktopPreview")
 
 @MainActor
 final class NotchOverlayWindowController: NSWindowController, NSWindowDelegate {
@@ -8,6 +11,7 @@ final class NotchOverlayWindowController: NSWindowController, NSWindowDelegate {
     private static let initialWidth: CGFloat = 160
     private static let initialHeight: CGFloat = 44
     private static let topMargin: CGFloat = 0
+    private var visibilitySequence = 0
 
     convenience init() {
         let content = NotchOverlayView(state: AppState.shared)
@@ -44,32 +48,42 @@ final class NotchOverlayWindowController: NSWindowController, NSWindowDelegate {
 
     func show(force: Bool = false) {
         guard force || AppState.shared.isDesktopPreviewEnabled else { return }
-        recenter()
-        window?.orderFrontRegardless()
+        guard let window else { return }
+
+        visibilitySequence += 1
+        let screen = Self.preferredScreen()
+        recenter(on: screen)
+        window.orderFrontRegardless()
+        overlayLog.info(
+            "Showing desktop preview on \(screen?.localizedName ?? "unknown display", privacy: .public)"
+        )
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.18
-            window?.animator().alphaValue = 1
+            window.animator().alphaValue = 1
         }
     }
 
     func hide() {
         guard let window else { return }
+        visibilitySequence += 1
+        let sequence = visibilitySequence
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = 0.18
             window.animator().alphaValue = 0
-        }, completionHandler: {
+        }, completionHandler: { [weak self] in
             Task { @MainActor in
+                guard self?.visibilitySequence == sequence else { return }
                 window.orderOut(nil)
             }
         })
     }
 
     func windowDidResize(_ notification: Notification) {
-        recenter()
+        recenter(on: window?.screen ?? Self.preferredScreen())
     }
 
-    private func recenter() {
-        guard let window, let screen = Self.preferredScreen() else { return }
+    private func recenter(on screen: NSScreen?) {
+        guard let window, let screen else { return }
         let w = window.frame.width
         let h = window.frame.height
         let x = screen.frame.midX - w / 2
@@ -81,10 +95,18 @@ final class NotchOverlayWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private static func preferredScreen() -> NSScreen? {
-        if let notched = NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 }) {
-            return notched
+        // `main` follows the display receiving keyboard events, which is the
+        // right target for a global shortcut. The pointer is the fallback for
+        // a menu-bar click. Always preferring a notched display could put the
+        // preview on a different MacBook screen.
+        if let activeScreen = NSScreen.main {
+            return activeScreen
         }
-        return NSScreen.screens.first ?? NSScreen.main
+        let pointerLocation = NSEvent.mouseLocation
+        if let pointedScreen = NSScreen.screens.first(where: { $0.frame.contains(pointerLocation) }) {
+            return pointedScreen
+        }
+        return NSScreen.screens.first
     }
 }
 
