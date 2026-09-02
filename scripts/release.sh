@@ -219,7 +219,8 @@ else
     # The Xcode build phase rsyncs ./Models into the bundle. If a fresh clone
     # hasn't run scripts/fetch-models.sh, the resulting .app would ship without
     # the Parakeet small files / Silero VAD and silently fail at first launch.
-    if [[ ! -f "Models/parakeet-tdt-0.6b-v3/parakeet_vocab.json" ]]; then
+    if [[ ! -f "Models/parakeet-tdt-0.6b-v3/parakeet_vocab.json" \
+       || ! -d "Models/silero-vad/silero-vad-unified-256ms-v6.0.0.mlmodelc" ]]; then
         echo "==> Models missing — running scripts/fetch-models.sh"
         scripts/fetch-models.sh
     fi

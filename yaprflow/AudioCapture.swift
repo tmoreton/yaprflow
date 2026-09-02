@@ -1,5 +1,19 @@
 @preconcurrency import AVFoundation
 
+enum AudioCaptureError: LocalizedError {
+    case noInputDevice
+    case invalidInputFormat
+
+    var errorDescription: String? {
+        switch self {
+        case .noInputDevice:
+            return "No microphone is connected. Connect or select one in System Settings → Sound → Input."
+        case .invalidInputFormat:
+            return "The selected microphone is unavailable. Choose another input in System Settings → Sound → Input."
+        }
+    }
+}
+
 nonisolated final class AudioCapture: @unchecked Sendable {
     private let engine = AVAudioEngine()
     private var running = false
@@ -9,11 +23,21 @@ nonisolated final class AudioCapture: @unchecked Sendable {
         self.bufferHandler = bufferHandler
     }
 
+    func validateInputAvailable() throws {
+        guard AVCaptureDevice.default(for: .audio) != nil else {
+            throw AudioCaptureError.noInputDevice
+        }
+    }
+
     func start() throws {
         guard !running else { return }
+        try validateInputAvailable()
 
         let input = engine.inputNode
         let format = input.inputFormat(forBus: 0)
+        guard format.sampleRate > 0, format.channelCount > 0 else {
+            throw AudioCaptureError.invalidInputFormat
+        }
 
         input.installTap(onBus: 0, bufferSize: 4096, format: format) { [handler = bufferHandler] buffer, _ in
             guard let copy = AudioCapture.copy(buffer: buffer) else { return }

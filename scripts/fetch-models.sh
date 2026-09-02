@@ -11,6 +11,21 @@ TARBALL="parakeet-tdt-0.6b-v3.tar.gz"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DEST="$ROOT/Models/parakeet-tdt-0.6b-v3"
+VAD_DEST="$ROOT/Models/silero-vad"
+VAD_MODEL="silero-vad-unified-256ms-v6.0.0.mlmodelc"
+
+if [ ! -d "$VAD_DEST/$VAD_MODEL" ]; then
+    if ! command -v hf >/dev/null 2>&1; then
+        echo "error: 'hf' is required to fetch the Silero VAD model. brew install huggingface-cli" >&2
+        exit 1
+    fi
+
+    echo "Downloading Silero VAD…"
+    HF_HUB_DISABLE_XET=1 hf download "FluidInference/silero-vad-coreml" \
+        --include "$VAD_MODEL/*" \
+        --local-dir "$VAD_DEST"
+    rm -rf "$VAD_DEST/.cache"
+fi
 
 if [ -f "$DEST/parakeet_vocab.json" ] && [ -d "$DEST/Encoder.mlmodelc" ]; then
     echo "Models already present at $DEST"

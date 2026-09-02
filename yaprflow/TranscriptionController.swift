@@ -141,7 +141,7 @@ final class TranscriptionController {
         guard isActive, state.status == .listening else {
             return RecordingSmokeTestResult(
                 succeeded: false,
-                message: "Could not enter the listening state: \(smokeTestStatusDescription)."
+                message: "Could not enter the listening state: \(smokeTestStatusDescription)"
             )
         }
 
@@ -213,6 +213,7 @@ final class TranscriptionController {
         do {
             state.status = .preparing("Checking microphone access…")
             try await ensureMicPermission()
+            try capture.validateInputAvailable()
             let (_, vad) = try await ensureLoaded()
 
             sessionSamples.removeAll(keepingCapacity: true)
@@ -227,6 +228,7 @@ final class TranscriptionController {
         } catch {
             log.error("Start failed: \(error.localizedDescription)")
             state.status = .error(error.localizedDescription)
+            NotchOverlayWindowController.shared.show(force: true)
             scheduleAutoHide(after: 2.5)
             scheduleModelUnload()
         }
@@ -499,7 +501,10 @@ final class TranscriptionController {
             try await asr.loadModels(asrModels)
 
             state.status = .preparing("Loading voice detector…")
-            let vadConfig = VadConfig(computeUnits: .cpuAndGPU)
+            // Silero VAD is tiny and runs comfortably on CPU. Asking Core ML
+            // to prepare a GPU plan for it can stall first recording startup
+            // for more than a minute on some Macs.
+            let vadConfig = VadConfig(computeUnits: .cpuOnly)
             let vad: VadManager
             if let vadBase = Self.bundledVADBaseURL() {
                 log.info("Loading bundled VAD from \(vadBase.path, privacy: .public)")
@@ -508,13 +513,6 @@ final class TranscriptionController {
                 log.info("Bundled VAD missing, downloading Silero VAD from HuggingFace")
                 vad = try await VadManager(config: vadConfig)
             }
-
-            // Warm up first-inference compile paths. Without this, the user's
-            // first real transcribe on a fresh install pays a 5–10s CoreML
-            // warmup cost and feels broken. One silent chunk each is enough.
-            state.status = .preparing("Warming up…")
-            log.info("Warming up ASR + VAD with silent chunks")
-            await Self.warmUp(asr: asr, vad: vad)
 
             return (asr, vad)
         }
@@ -664,27 +662,6 @@ final class TranscriptionController {
 
         if !fm.fileExists(atPath: cacheDir.appendingPathComponent("Encoder.mlmodelc").path) {
             try await downloadAndExtractEncoder(into: cacheDir)
-        }
-    }
-
-    /// Run a silent chunk through both models so CoreML's per-device compile
-    /// and first-inference warmup happen during model loading, not on the
-    /// user's first real dictation. Any error here is swallowed; the worst case
-    /// is the original slow-first-call behavior.
-    private static func warmUp(asr: AsrManager, vad: VadManager) async {
-        do {
-            let oneSecondOfSilence = [Float](repeating: 0.0, count: 16_000)
-            _ = try await asr.transcribe(oneSecondOfSilence, source: .microphone)
-        } catch {
-            log.info("ASR warmup skipped: \(error.localizedDescription, privacy: .public)")
-        }
-
-        do {
-            let chunk = [Float](repeating: 0.0, count: VadManager.chunkSize)
-            let state = await vad.makeStreamState()
-            _ = try await vad.processStreamingChunk(chunk, state: state)
-        } catch {
-            log.info("VAD warmup skipped: \(error.localizedDescription, privacy: .public)")
         }
     }
 
