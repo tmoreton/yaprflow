@@ -9,11 +9,31 @@ private let log = Logger(subsystem: "com.tmoreton.yaprflow", category: "Transcri
 
 enum TranscriptionError: LocalizedError {
     case microphoneDenied
+    case microphonePermissionTimedOut
 
     var errorDescription: String? {
         switch self {
         case .microphoneDenied: return "Microphone access denied"
+        case .microphonePermissionTimedOut:
+            return "Microphone access did not respond. Reopen Yaprflow after enabling it in System Settings → Privacy & Security → Microphone."
         }
+    }
+}
+
+nonisolated final class MicrophonePermissionContinuation: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Bool?, Never>?
+
+    init(_ continuation: CheckedContinuation<Bool?, Never>) {
+        self.continuation = continuation
+    }
+
+    func resume(returning value: Bool?) {
+        lock.lock()
+        let continuation = continuation
+        self.continuation = nil
+        lock.unlock()
+        continuation?.resume(returning: value)
     }
 }
 
@@ -101,7 +121,10 @@ final class TranscriptionController {
         }
     }
 
-    func runRecordingSmokeTest() async -> RecordingSmokeTestResult {
+    func runRecordingSmokeTest(
+        startAction: (@MainActor () -> Void)? = nil,
+        stopAction: (@MainActor () -> Void)? = nil
+    ) async -> RecordingSmokeTestResult {
         guard !isActive, !isStarting else {
             return RecordingSmokeTestResult(
                 succeeded: false,
@@ -109,7 +132,12 @@ final class TranscriptionController {
             )
         }
 
-        await start()
+        if let startAction {
+            startAction()
+            await waitForRecordingToStart()
+        } else {
+            await start()
+        }
         guard isActive, state.status == .listening else {
             return RecordingSmokeTestResult(
                 succeeded: false,
@@ -123,11 +151,35 @@ final class TranscriptionController {
             return RecordingSmokeTestResult(succeeded: false, message: "The recording test was interrupted.")
         }
 
-        await stop()
+        if let stopAction {
+            stopAction()
+            await waitForRecordingToStop()
+        } else {
+            await stop()
+        }
         return RecordingSmokeTestResult(
             succeeded: !isActive,
-            message: "The microphone capture engine started and stopped successfully."
+            message: "The Transcribe menu action and microphone capture engine started and stopped successfully."
         )
+    }
+
+    private func waitForRecordingToStart() async {
+        for _ in 0..<1_200 {
+            if isActive || isErrorStatus { return }
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+    }
+
+    private func waitForRecordingToStop() async {
+        for _ in 0..<1_200 {
+            if !isActive, !isStarting, state.status != .finishing { return }
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+    }
+
+    private var isErrorStatus: Bool {
+        if case .error = state.status { return true }
+        return false
     }
 
     private var smokeTestStatusDescription: String {
@@ -159,6 +211,7 @@ final class TranscriptionController {
         NotchOverlayWindowController.shared.show()
 
         do {
+            state.status = .preparing("Checking microphone access…")
             try await ensureMicPermission()
             let (_, vad) = try await ensureLoaded()
 
@@ -353,16 +406,49 @@ final class TranscriptionController {
     }
 
     private func ensureMicPermission() async throws {
-        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        let authorizationStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+        log.info("Microphone authorization status: \(Self.authorizationStatusDescription(authorizationStatus), privacy: .public)")
+
+        switch authorizationStatus {
         case .authorized:
             return
         case .notDetermined:
-            if await AVCaptureDevice.requestAccess(for: .audio) { return }
+            log.info("Requesting microphone access")
+            guard let granted = await requestMicrophoneAccess(timeout: 15) else {
+                log.error("Microphone access request timed out")
+                throw TranscriptionError.microphonePermissionTimedOut
+            }
+            log.info("Microphone access request completed (granted: \(granted, privacy: .public))")
+            if granted { return }
             throw TranscriptionError.microphoneDenied
         case .denied, .restricted:
             throw TranscriptionError.microphoneDenied
         @unknown default:
             throw TranscriptionError.microphoneDenied
+        }
+    }
+
+    private func requestMicrophoneAccess(timeout: TimeInterval) async -> Bool? {
+        await withCheckedContinuation { continuation in
+            let oneShot = MicrophonePermissionContinuation(continuation)
+
+            AVCaptureDevice.requestAccess(for: .audio) { granted in
+                oneShot.resume(returning: granted)
+            }
+
+            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + timeout) {
+                oneShot.resume(returning: nil)
+            }
+        }
+    }
+
+    private static func authorizationStatusDescription(_ status: AVAuthorizationStatus) -> String {
+        switch status {
+        case .notDetermined: return "not determined"
+        case .restricted: return "restricted"
+        case .denied: return "denied"
+        case .authorized: return "authorized"
+        @unknown default: return "unknown"
         }
     }
 

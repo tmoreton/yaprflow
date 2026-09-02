@@ -47,7 +47,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         if ProcessInfo.processInfo.arguments.contains("--smoke-test-recording") {
             Task { @MainActor in
-                let result = await TranscriptionController.shared.runRecordingSmokeTest()
+                let result: RecordingSmokeTestResult
+                if let menu = statusItem?.menu {
+                    menuNeedsUpdate(menu)
+                    result = await TranscriptionController.shared.runRecordingSmokeTest(
+                        startAction: { menu.performActionForItem(at: 0) },
+                        stopAction: {
+                            self.menuNeedsUpdate(menu)
+                            menu.performActionForItem(at: 0)
+                        }
+                    )
+                } else {
+                    result = RecordingSmokeTestResult(
+                        succeeded: false,
+                        message: "The status menu was unavailable."
+                    )
+                }
                 let succeeded = hotkeyRegistered && result.succeeded
                 let hotkeyMessage = hotkeyRegistered
                     ? "The global hotkey registered successfully."
