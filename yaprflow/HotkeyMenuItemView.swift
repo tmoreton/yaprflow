@@ -6,9 +6,7 @@ final class HotkeyMenuItemView: NSView {
     private let iconView = NSImageView()
     private let titleField = NSTextField(labelWithString: "")
     private let shortcutField = NSTextField(labelWithString: "")
-    private var isRecording = false
-    private var isShortcutHovered = false
-    private var trackingArea: NSTrackingArea?
+    private var isCapturingShortcut = false
 
     init() {
         super.init(frame: NSRect(x: 0, y: 0, width: 190, height: 22))
@@ -34,9 +32,16 @@ final class HotkeyMenuItemView: NSView {
         NSSize(width: NSView.noIntrinsicMetric, height: 22)
     }
 
+    /// Menu-item subviews such as label text fields otherwise become the hit
+    /// target and swallow the mouse event. Keep the complete row interactive
+    /// so clicking the icon or "Shortcut" reliably reaches `mouseDown`.
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        bounds.contains(point) ? self : nil
+    }
+
     private func setupLayout() {
         iconView.translatesAutoresizingMaskIntoConstraints = false
-        iconView.image = NSImage(systemSymbolName: "record.circle", accessibilityDescription: nil)
+        iconView.image = NSImage(systemSymbolName: "keyboard", accessibilityDescription: nil)
         iconView.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 12, weight: .regular)
         addSubview(iconView)
 
@@ -72,67 +77,34 @@ final class HotkeyMenuItemView: NSView {
     }
 
     private func refresh() {
-        if isRecording {
-            titleField.stringValue = "Transcribe"
-            titleField.textColor = .labelColor
+        if isCapturingShortcut {
+            titleField.stringValue = "Shortcut"
+            titleField.textColor = .systemBlue
             shortcutField.stringValue = "Press keys..."
             shortcutField.textColor = .systemBlue
         } else {
-            titleField.stringValue = "Transcribe"
+            titleField.stringValue = "Shortcut"
             titleField.textColor = .labelColor
             shortcutField.stringValue = AppState.shared.hotkey.displayString
-            shortcutField.textColor = isShortcutHovered ? .systemBlue : .secondaryLabelColor
+            shortcutField.textColor = .secondaryLabelColor
         }
     }
 
     override func mouseDown(with event: NSEvent) {
-        guard shortcutHitRect.contains(convert(event.locationInWindow, from: nil)) else {
-            TranscriptionController.shared.toggle()
-            enclosingMenuItem?.menu?.cancelTracking()
-            return
-        }
-        isRecording = true
+        isCapturingShortcut = true
         refresh()
         window?.makeFirstResponder(self)
     }
 
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        if let area = trackingArea { removeTrackingArea(area) }
-        let area = NSTrackingArea(
-            rect: bounds,
-            options: [.mouseEnteredAndExited, .mouseMoved, .activeAlways, .inVisibleRect],
-            owner: self
-        )
-        addTrackingArea(area)
-        trackingArea = area
-    }
-
-    override func mouseMoved(with event: NSEvent) {
-        let hovering = shortcutHitRect.contains(convert(event.locationInWindow, from: nil))
-        guard hovering != isShortcutHovered else { return }
-        isShortcutHovered = hovering
-        refresh()
-    }
-
-    override func mouseExited(with event: NSEvent) {
-        isShortcutHovered = false
-        refresh()
-    }
-
     override var acceptsFirstResponder: Bool { true }
 
-    private var shortcutHitRect: NSRect {
-        shortcutField.frame.insetBy(dx: -8, dy: -4)
-    }
-
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        guard isRecording else { return false }
+        guard isCapturingShortcut else { return false }
         return handle(event: event)
     }
 
     override func keyDown(with event: NSEvent) {
-        guard isRecording, handle(event: event) else {
+        guard isCapturingShortcut, handle(event: event) else {
             super.keyDown(with: event)
             return
         }
@@ -143,7 +115,7 @@ final class HotkeyMenuItemView: NSView {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
 
         if event.keyCode == UInt16(kVK_Escape) && flags.subtracting(.capsLock).isEmpty {
-            isRecording = false
+            isCapturingShortcut = false
             refresh()
             enclosingMenuItem?.menu?.cancelTracking()
             return true
@@ -164,7 +136,7 @@ final class HotkeyMenuItemView: NSView {
         newConfig.save()
         NotificationCenter.default.post(name: .yaprflowHotkeyChanged, object: nil)
 
-        isRecording = false
+        isCapturingShortcut = false
         refresh()
         enclosingMenuItem?.menu?.cancelTracking()
         return true

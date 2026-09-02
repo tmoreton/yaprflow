@@ -65,6 +65,7 @@ final class GlobalHotkey {
             GetApplicationEventTarget(),
             { _, _, _ in
                 let handler = GlobalHotkey.onFire
+                log.info("Received global hotkey event")
                 DispatchQueue.main.async { handler?() }
                 return noErr
             },

@@ -1,6 +1,9 @@
 import AppKit
 import Combine
+import OSLog
 import SwiftUI
+
+private let log = Logger(subsystem: "com.tmoreton.yaprflow", category: "App")
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
@@ -20,11 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         NSApp.setActivationPolicy(.accessory)
         installStatusItem()
         _ = NotchOverlayWindowController.shared
-#if DEBUG
         let hotkeyRegistered = registerHotkey()
-#else
-        _ = registerHotkey()
-#endif
 
         // Models load lazily on the first hotkey press (see ensureLoaded).
         // Preloading on launch was causing CoreML to AOT-compile the encoder
@@ -46,7 +45,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
         }
 
-#if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--smoke-test-recording") {
             Task { @MainActor in
                 let result = await TranscriptionController.shared.runRecordingSmokeTest()
@@ -59,7 +57,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 NSApp.terminate(nil)
             }
         }
-#endif
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -100,6 +97,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard let button = statusItem?.button else { return }
 
         switch status {
+        case let .preparing(message):
+            button.contentTintColor = .systemOrange
+            button.toolTip = "Yaprflow: \(message)"
+            button.setAccessibilityLabel("Yaprflow is preparing to record: \(message)")
         case .listening:
             button.contentTintColor = .systemRed
             button.toolTip = "Yaprflow is recording"
@@ -122,7 +123,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
 
-        // Record row (top, custom view).
+        // Keep the primary action native so AppKit owns the entire hit target.
+        // The previous split custom row let its text fields swallow clicks.
+        let transcribeItem = NSMenuItem(
+            title: AppState.shared.status == .listening ? "Stop Recording" : "Transcribe",
+            action: #selector(toggleTranscription),
+            keyEquivalent: ""
+        )
+        transcribeItem.target = self
+        transcribeItem.image = NSImage(
+            systemSymbolName: "record.circle",
+            accessibilityDescription: "Transcribe"
+        )
+        menu.addItem(transcribeItem)
+
+        // Shortcut editing stays separate from the recording action.
         let shortcutItem = NSMenuItem()
         shortcutItem.view = HotkeyMenuItemView()
         menu.addItem(shortcutItem)
@@ -180,6 +195,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         pb.setString(text, forType: .string)
     }
 
+    @objc private func toggleTranscription() {
+        log.info("Transcribe menu action activated")
+        TranscriptionController.shared.toggle()
+    }
+
     @objc private func showAIActions() {
         TranscriptAIWindowController.shared.show()
     }
@@ -195,6 +215,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func registerHotkey() -> Bool {
         GlobalHotkey.onFire = {
             Task { @MainActor in
+                log.info("Global hotkey activated")
                 TranscriptionController.shared.toggle()
             }
         }

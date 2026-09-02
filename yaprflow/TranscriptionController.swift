@@ -91,6 +91,7 @@ final class TranscriptionController {
     }
 
     func toggle() {
+        log.info("Recording toggle requested (active: \(self.isActive, privacy: .public), starting: \(self.isStarting, privacy: .public))")
         Task { @MainActor in
             if isActive {
                 await stop()
@@ -100,7 +101,6 @@ final class TranscriptionController {
         }
     }
 
-#if DEBUG
     func runRecordingSmokeTest() async -> RecordingSmokeTestResult {
         guard !isActive, !isStarting else {
             return RecordingSmokeTestResult(
@@ -140,10 +140,10 @@ final class TranscriptionController {
         case let .error(message): return message
         }
     }
-#endif
 
     private func start() async {
         guard !isActive, !isStarting else { return }
+        log.info("Starting recording pipeline")
         isStarting = true
         defer { isStarting = false }
 
@@ -170,6 +170,7 @@ final class TranscriptionController {
             state.status = .listening
             try capture.start()
             isActive = true
+            log.info("Microphone capture started")
         } catch {
             log.error("Start failed: \(error.localizedDescription)")
             state.status = .error(error.localizedDescription)
