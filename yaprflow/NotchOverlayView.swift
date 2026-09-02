@@ -20,7 +20,7 @@ struct NotchOverlayView: View {
                     .foregroundStyle(.white)
                     .multilineTextAlignment(.leading)
                     .lineLimit(2)
-                    .fixedSize(horizontal: true, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 if showSubtitle {
                     Text(subtitleText)
@@ -28,15 +28,16 @@ struct NotchOverlayView: View {
                         .foregroundStyle(.white.opacity(0.5))
                         .multilineTextAlignment(.leading)
                         .lineLimit(1)
-                        .fixedSize(horizontal: true, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 10)
+        .frame(width: 520, height: 68, alignment: .leading)
         .background(pillShape.fill(Color.black.opacity(0.92)))
         .overlay(pillShape.strokeBorder(Color.white.opacity(0.08), lineWidth: 1))
-        .fixedSize(horizontal: true, vertical: true)
     }
 
     private var pillShape: UnevenRoundedRectangle {

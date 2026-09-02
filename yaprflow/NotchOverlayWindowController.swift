@@ -8,18 +8,17 @@ private let overlayLog = Logger(subsystem: "com.tmoreton.yaprflow", category: "D
 final class NotchOverlayWindowController: NSWindowController, NSWindowDelegate {
     static let shared = NotchOverlayWindowController()
 
-    private static let initialWidth: CGFloat = 160
-    private static let initialHeight: CGFloat = 44
+    private static let previewWidth: CGFloat = 520
+    private static let previewHeight: CGFloat = 68
     private static let topMargin: CGFloat = 0
     private var visibilitySequence = 0
 
     convenience init() {
         let content = NotchOverlayView(state: AppState.shared)
         let host = NSHostingController(rootView: content)
-        host.sizingOptions = [.intrinsicContentSize]
 
         let window = NotchOverlayWindow(
-            contentRect: NSRect(x: 0, y: 0, width: Self.initialWidth, height: Self.initialHeight),
+            contentRect: NSRect(x: 0, y: 0, width: Self.previewWidth, height: Self.previewHeight),
             styleMask: [.borderless],
             backing: .buffered,
             defer: false
@@ -37,6 +36,10 @@ final class NotchOverlayWindowController: NSWindowController, NSWindowDelegate {
         window.alphaValue = 0
 
         self.init(window: window)
+        // NSHostingController can report a zero intrinsic size while the
+        // preview state is idle. Keep a deterministic content size so the
+        // first loading/listening update cannot leave an invisible 0×0 panel.
+        window.setContentSize(NSSize(width: Self.previewWidth, height: Self.previewHeight))
         window.delegate = self
     }
 
@@ -53,14 +56,11 @@ final class NotchOverlayWindowController: NSWindowController, NSWindowDelegate {
         visibilitySequence += 1
         let screen = Self.preferredScreen()
         recenter(on: screen)
+        window.alphaValue = 1
         window.orderFrontRegardless()
         overlayLog.info(
             "Showing desktop preview on \(screen?.localizedName ?? "unknown display", privacy: .public)"
         )
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.18
-            window.animator().alphaValue = 1
-        }
     }
 
     func hide() {
@@ -80,6 +80,17 @@ final class NotchOverlayWindowController: NSWindowController, NSWindowDelegate {
 
     func windowDidResize(_ notification: Notification) {
         recenter(on: window?.screen ?? Self.preferredScreen())
+    }
+
+    var smokeTestDescription: String {
+        guard let window else { return "FAIL window=missing" }
+        let intersectsDisplay = NSScreen.screens.contains { $0.frame.intersects(window.frame) }
+        let hasUsableSize = window.frame.width >= 500 && window.frame.height >= 60
+        let succeeded = window.isVisible
+            && window.alphaValue > 0.99
+            && intersectsDisplay
+            && hasUsableSize
+        return "\(succeeded ? "PASS" : "FAIL") visible=\(window.isVisible) alpha=\(window.alphaValue) frame=\(NSStringFromRect(window.frame)) onScreen=\(intersectsDisplay)"
     }
 
     private func recenter(on screen: NSScreen?) {

@@ -12,6 +12,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var residencyActivity: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        let isPreviewSmokeTest = ProcessInfo.processInfo.arguments.contains("--smoke-test-preview")
+
         // A menu-bar app is useful even with no windows open. Keep a retained
         // process activity for the entire app lifetime so macOS never treats
         // the idle, windowless process as eligible for automatic termination.
@@ -30,8 +32,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // immediately, pinning ~1.8 GB of RAM and triggering silent Jetsam
         // kills before the user ever pressed the hotkey.
 
-        if !OnboardingWindowController.hasCompleted {
+        if !isPreviewSmokeTest, !OnboardingWindowController.hasCompleted {
             OnboardingWindowController.shared.show()
+        }
+
+        if isPreviewSmokeTest {
+            runPreviewSmokeTest()
         }
 
         NotificationCenter.default.addObserver(
@@ -280,5 +286,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             )
         }
         return registered
+    }
+
+    private func runPreviewSmokeTest() {
+        let state = AppState.shared
+        state.liveTranscript = ""
+        state.status = .preparing("Loading transcription model…")
+        NotchOverlayWindowController.shared.show(force: true)
+
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2))
+            state.liveTranscript = "This is simulated live transcript text."
+            state.status = .listening
+
+            try? await Task.sleep(for: .seconds(8))
+            let result = NotchOverlayWindowController.shared.smokeTestDescription
+            let output = "YAPRFLOW_PREVIEW_SMOKE_TEST=\(result)\n"
+            FileHandle.standardOutput.write(Data(output.utf8))
+            NSApp.terminate(nil)
+        }
     }
 }
