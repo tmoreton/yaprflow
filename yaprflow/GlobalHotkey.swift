@@ -15,9 +15,10 @@ final class GlobalHotkey {
 
     private init() {}
 
-    func register(keyCode: UInt32, modifiers: UInt32) {
+    @discardableResult
+    func register(keyCode: UInt32, modifiers: UInt32) -> Bool {
         unregisterHotKey()
-        installEventHandlerIfNeeded()
+        guard installEventHandlerIfNeeded() else { return false }
 
         let hotKeyID = EventHotKeyID(signature: 0x59_50_72_66 /* 'YPrf' */, id: 1)
         var ref: EventHotKeyRef?
@@ -31,8 +32,11 @@ final class GlobalHotkey {
         )
         if status == noErr {
             hotKeyRef = ref
+            log.info("Registered global hotkey keyCode=\(keyCode, privacy: .public) modifiers=\(modifiers, privacy: .public)")
+            return true
         } else {
             log.error("RegisterEventHotKey failed: \(status, privacy: .public)")
+            return false
         }
     }
 
@@ -51,13 +55,13 @@ final class GlobalHotkey {
         }
     }
 
-    private func installEventHandlerIfNeeded() {
-        guard eventHandlerRef == nil else { return }
+    private func installEventHandlerIfNeeded() -> Bool {
+        guard eventHandlerRef == nil else { return true }
         var eventType = EventTypeSpec(
             eventClass: OSType(kEventClassKeyboard),
             eventKind: UInt32(kEventHotKeyPressed)
         )
-        InstallEventHandler(
+        let status = InstallEventHandler(
             GetApplicationEventTarget(),
             { _, _, _ in
                 let handler = GlobalHotkey.onFire
@@ -69,5 +73,9 @@ final class GlobalHotkey {
             nil,
             &eventHandlerRef
         )
+        if status != noErr {
+            log.error("InstallEventHandler failed: \(status, privacy: .public)")
+        }
+        return status == noErr
     }
 }

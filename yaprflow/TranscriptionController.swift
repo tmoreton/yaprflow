@@ -17,6 +17,11 @@ enum TranscriptionError: LocalizedError {
     }
 }
 
+struct RecordingSmokeTestResult {
+    let succeeded: Bool
+    let message: String
+}
+
 @MainActor
 final class TranscriptionController {
     static let shared = TranscriptionController()
@@ -94,6 +99,48 @@ final class TranscriptionController {
             }
         }
     }
+
+#if DEBUG
+    func runRecordingSmokeTest() async -> RecordingSmokeTestResult {
+        guard !isActive, !isStarting else {
+            return RecordingSmokeTestResult(
+                succeeded: false,
+                message: "A recording was already active."
+            )
+        }
+
+        await start()
+        guard isActive, state.status == .listening else {
+            return RecordingSmokeTestResult(
+                succeeded: false,
+                message: "Could not enter the listening state: \(smokeTestStatusDescription)."
+            )
+        }
+
+        do {
+            try await Task.sleep(for: .seconds(2))
+        } catch {
+            return RecordingSmokeTestResult(succeeded: false, message: "The recording test was interrupted.")
+        }
+
+        await stop()
+        return RecordingSmokeTestResult(
+            succeeded: !isActive,
+            message: "The microphone capture engine started and stopped successfully."
+        )
+    }
+
+    private var smokeTestStatusDescription: String {
+        switch state.status {
+        case .idle: return "idle"
+        case let .preparing(message): return message
+        case .listening: return "listening"
+        case .finishing: return "finishing"
+        case .copied: return "copied"
+        case let .error(message): return message
+        }
+    }
+#endif
 
     private func start() async {
         guard !isActive, !isStarting else { return }

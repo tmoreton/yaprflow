@@ -20,7 +20,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         NSApp.setActivationPolicy(.accessory)
         installStatusItem()
         _ = NotchOverlayWindowController.shared
-        registerHotkey()
+#if DEBUG
+        let hotkeyRegistered = registerHotkey()
+#else
+        _ = registerHotkey()
+#endif
 
         // Models load lazily on the first hotkey press (see ensureLoaded).
         // Preloading on launch was causing CoreML to AOT-compile the encoder
@@ -41,6 +45,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 GlobalHotkey.shared.register(keyCode: config.keyCode, modifiers: config.modifiers)
             }
         }
+
+#if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--smoke-test-recording") {
+            Task { @MainActor in
+                let result = await TranscriptionController.shared.runRecordingSmokeTest()
+                let succeeded = hotkeyRegistered && result.succeeded
+                let hotkeyMessage = hotkeyRegistered
+                    ? "The global hotkey registered successfully."
+                    : "The global hotkey could not be registered."
+                let output = "YAPRFLOW_RECORDING_SMOKE_TEST=\(succeeded ? "PASS" : "FAIL") \(hotkeyMessage) \(result.message)\n"
+                FileHandle.standardOutput.write(Data(output.utf8))
+                NSApp.terminate(nil)
+            }
+        }
+#endif
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -80,11 +99,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func updateStatusItem(for status: TranscriptionStatus) {
         guard let button = statusItem?.button else { return }
 
-        if case .listening = status {
+        switch status {
+        case .listening:
             button.contentTintColor = .systemRed
             button.toolTip = "Yaprflow is recording"
             button.setAccessibilityLabel("Yaprflow is recording")
-        } else {
+        case let .error(message):
+            button.contentTintColor = .systemOrange
+            button.toolTip = "Yaprflow: \(message)"
+            button.setAccessibilityLabel("Yaprflow error: \(message)")
+        default:
             button.contentTintColor = nil
             button.toolTip = "Yaprflow"
             button.setAccessibilityLabel("Yaprflow")
@@ -168,13 +192,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         SettingsWindowController.shared.show()
     }
 
-    private func registerHotkey() {
+    private func registerHotkey() -> Bool {
         GlobalHotkey.onFire = {
             Task { @MainActor in
                 TranscriptionController.shared.toggle()
             }
         }
         let config = AppState.shared.hotkey
-        GlobalHotkey.shared.register(keyCode: config.keyCode, modifiers: config.modifiers)
+        let registered = GlobalHotkey.shared.register(
+            keyCode: config.keyCode,
+            modifiers: config.modifiers
+        )
+        if !registered {
+            AppState.shared.status = .error(
+                "Keyboard shortcut unavailable. Quit any other Yaprflow copy, then reopen the app."
+            )
+        }
+        return registered
     }
 }
