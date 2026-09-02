@@ -6,17 +6,16 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem?
     private var statusCancellable: AnyCancellable?
+    private var residencyActivity: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // SwiftUI finishes Transparent App Lifecycle restoration a few seconds
-        // after this callback and then makes windowless apps automatically
-        // terminable. Opt out after that bookkeeping so this menu-bar app keeps
-        // listening for its global hotkey while idle.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 6) {
-            ProcessInfo.processInfo.disableAutomaticTermination(
-                "Yaprflow must remain available for its global hotkey"
-            )
-        }
+        // A menu-bar app is useful even with no windows open. Keep a retained
+        // process activity for the entire app lifetime so macOS never treats
+        // the idle, windowless process as eligible for automatic termination.
+        residencyActivity = ProcessInfo.processInfo.beginActivity(
+            options: [.automaticTerminationDisabled, .suddenTerminationDisabled],
+            reason: "Yaprflow must remain available for its global hotkey"
+        )
 
         NSApp.setActivationPolicy(.accessory)
         installStatusItem()
@@ -46,6 +45,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         GlobalHotkey.shared.unregister()
+        if let residencyActivity {
+            ProcessInfo.processInfo.endActivity(residencyActivity)
+            self.residencyActivity = nil
+        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

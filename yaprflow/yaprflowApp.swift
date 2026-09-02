@@ -1,10 +1,15 @@
-import SwiftUI
+import AppKit
 
 @main
-struct YaprflowApp: App {
-    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+@MainActor
+struct YaprflowApp {
+    private static var appDelegate: AppDelegate?
 
-    var body: some Scene {
-        Settings { EmptyView() }
+    static func main() {
+        let application = NSApplication.shared
+        let delegate = AppDelegate()
+        appDelegate = delegate
+        application.delegate = delegate
+        application.run()
     }
 }

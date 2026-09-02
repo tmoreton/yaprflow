@@ -24,11 +24,15 @@ final class TranscriptionController {
     private let state = AppState.shared
     private let capture: AudioCapture
     private let audioConverter = AudioConverter()
+    private let memoryPressureSource: DispatchSourceMemoryPressure
 
-    // Models are loaded once and kept for the process lifetime
+    // Models stay warm between nearby recordings, then unload while idle so
+    // the ~1.8 GB Core ML allocation cannot make macOS kill the menu-bar app
+    // later under memory pressure.
     private var asrManager: AsrManager?
     private var vadManager: VadManager?
     private var loadingTask: Task<(AsrManager, VadManager), Error>?
+    private var modelUnloadTask: Task<Void, Never>?
 
     // Per-session state
     private var sessionSamples: [Float] = []
@@ -67,6 +71,18 @@ final class TranscriptionController {
             }
         }
         self.capture = AudioCapture(bufferHandler: bufferHandler)
+
+        let memoryPressureSource = DispatchSource.makeMemoryPressureSource(
+            eventMask: [.warning, .critical],
+            queue: .main
+        )
+        self.memoryPressureSource = memoryPressureSource
+        memoryPressureSource.setEventHandler { [weak self] in
+            Task { @MainActor in
+                self?.releaseModelsIfIdle(reason: "system memory pressure")
+            }
+        }
+        memoryPressureSource.resume()
     }
 
     func toggle() {
@@ -85,6 +101,8 @@ final class TranscriptionController {
         defer { isStarting = false }
 
         autoHideTask?.cancel()
+        modelUnloadTask?.cancel()
+        modelUnloadTask = nil
         confirmedText = ""
         volatileText = ""
         vocabularyReplacementCount = 0
@@ -109,6 +127,7 @@ final class TranscriptionController {
             log.error("Start failed: \(error.localizedDescription)")
             state.status = .error(error.localizedDescription)
             scheduleAutoHide(after: 2.5)
+            scheduleModelUnload()
         }
     }
 
@@ -126,6 +145,7 @@ final class TranscriptionController {
             enqueueTranscribe(samples: tail)
         }
         await transcribeChain?.value
+        transcribeChain = nil
 
         let finalText = confirmedText.trimmingCharacters(in: .whitespacesAndNewlines)
         state.liveTranscript = finalText
@@ -145,6 +165,7 @@ final class TranscriptionController {
             state.status = .idle
             scheduleAutoHide(after: 1.2)
         }
+        scheduleModelUnload()
     }
 
     private func feed(_ buffer: AVAudioPCMBuffer) async {
@@ -367,6 +388,7 @@ final class TranscriptionController {
 
         do {
             let (asr, vad) = try await task.value
+            loadingTask = nil
             self.asrManager = asr
             self.vadManager = vad
             return (asr, vad)
@@ -632,6 +654,38 @@ final class TranscriptionController {
             state.liveTranscript = ""
             NotchOverlayWindowController.shared.hide()
         }
+    }
+
+    private func scheduleModelUnload() {
+        modelUnloadTask?.cancel()
+        modelUnloadTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: .seconds(15 * 60))
+            } catch {
+                return
+            }
+            self?.releaseModelsIfIdle(reason: "15 minutes idle")
+        }
+    }
+
+    private func releaseModelsIfIdle(reason: String) {
+        guard !isActive,
+              !isStarting,
+              loadingTask == nil,
+              transcribeChain == nil
+        else {
+            return
+        }
+        guard asrManager != nil || vadManager != nil else { return }
+
+        modelUnloadTask?.cancel()
+        modelUnloadTask = nil
+        asrManager = nil
+        vadManager = nil
+        vadState = nil
+        sessionSamples.removeAll(keepingCapacity: false)
+        vadPending.removeAll(keepingCapacity: false)
+        log.info("Released transcription models after \(reason, privacy: .public)")
     }
 }
 
