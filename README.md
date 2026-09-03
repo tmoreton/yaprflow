@@ -158,7 +158,7 @@ xcodebuild \
 
 The project has two shared schemes:
 
-- `yaprflow`: macOS app, bundle id `com.tmoreton.yaprflow`, version 4.0.11.
+- `yaprflow`: macOS app, bundle id `com.tmoreton.yaprflow`, version 4.0.12.
 - `yaprflow-iOS`: iOS target, bundle id `com.tmoreton.yaprflow.ios`.
 
 ## Release
@@ -173,7 +173,7 @@ For a signed and notarized release, configure the notarization credentials
 described in `scripts/release.sh`, then run:
 
 ```bash
-scripts/release.sh 4.0.11 --publish
+scripts/release.sh 4.0.12 --publish
 ```
 
 The release script can build the app, export a Developer ID signed app, notarize
