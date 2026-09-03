@@ -290,19 +290,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func runPreviewSmokeTest() {
         let state = AppState.shared
+        let originalPreference = state.isDesktopPreviewEnabled
         state.liveTranscript = ""
+        state.setDesktopPreviewEnabledForSmokeTest(false)
         state.status = .preparing("Loading transcription model…")
-        NotchOverlayWindowController.shared.show(force: true)
 
         Task { @MainActor in
-            try? await Task.sleep(for: .seconds(2))
+            try? await Task.sleep(for: .milliseconds(300))
+            let stayedHiddenWhenDisabled = NotchOverlayWindowController.shared.isHiddenForSmokeTest
+
+            state.setDesktopPreviewEnabledForSmokeTest(true)
+            try? await Task.sleep(for: .milliseconds(300))
+            let preparingResult = NotchOverlayWindowController.shared.smokeTestDescription
+
             state.liveTranscript = "This is simulated live transcript text."
             state.status = .listening
+            try? await Task.sleep(for: .milliseconds(300))
+            let listeningResult = NotchOverlayWindowController.shared.smokeTestDescription
 
-            try? await Task.sleep(for: .seconds(8))
-            let result = NotchOverlayWindowController.shared.smokeTestDescription
-            let output = "YAPRFLOW_PREVIEW_SMOKE_TEST=\(result)\n"
+            state.setDesktopPreviewEnabledForSmokeTest(false)
+            try? await Task.sleep(for: .milliseconds(400))
+            let hidWhenDisabled = NotchOverlayWindowController.shared.isHiddenForSmokeTest
+
+            state.setDesktopPreviewEnabledForSmokeTest(true)
+            try? await Task.sleep(for: .milliseconds(300))
+            let reenabledResult = NotchOverlayWindowController.shared.smokeTestDescription
+
+            let succeeded = stayedHiddenWhenDisabled
+                && preparingResult.hasPrefix("PASS")
+                && listeningResult.hasPrefix("PASS")
+                && hidWhenDisabled
+                && reenabledResult.hasPrefix("PASS")
+            let output = "YAPRFLOW_PREVIEW_SMOKE_TEST=\(succeeded ? "PASS" : "FAIL") disabled=\(stayedHiddenWhenDisabled) preparing=[\(preparingResult)] listening=[\(listeningResult)] toggleOff=\(hidWhenDisabled) toggleOn=[\(reenabledResult)]\n"
             FileHandle.standardOutput.write(Data(output.utf8))
+
+            state.status = .idle
+            state.liveTranscript = ""
+            state.setDesktopPreviewEnabledForSmokeTest(originalPreference)
             NSApp.terminate(nil)
         }
     }

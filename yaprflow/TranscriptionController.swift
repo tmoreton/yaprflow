@@ -209,7 +209,6 @@ final class TranscriptionController {
         lastSpeculativeSampleCount = 0
         state.liveTranscript = ""
         state.status = .preparing("Checking microphone access…")
-        NotchOverlayWindowController.shared.show()
 
         do {
             try await ensureMicPermission()
@@ -228,7 +227,6 @@ final class TranscriptionController {
         } catch {
             log.error("Start failed: \(error.localizedDescription)")
             state.status = .error(error.localizedDescription)
-            NotchOverlayWindowController.shared.show(force: true)
             scheduleAutoHide(after: 2.5)
             scheduleModelUnload()
         }
@@ -763,7 +761,6 @@ final class TranscriptionController {
             }
             state.status = .idle
             state.liveTranscript = ""
-            NotchOverlayWindowController.shared.hide()
         }
     }
 

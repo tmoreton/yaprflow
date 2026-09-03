@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import OSLog
 import SwiftUI
 
@@ -10,8 +11,9 @@ final class NotchOverlayWindowController: NSWindowController, NSWindowDelegate {
 
     private static let previewWidth: CGFloat = 520
     private static let previewHeight: CGFloat = 68
-    private static let topMargin: CGFloat = 0
+    private static let topMargin: CGFloat = 8
     private var visibilitySequence = 0
+    private var stateCancellable: AnyCancellable?
 
     convenience init() {
         let content = NotchOverlayView(state: AppState.shared)
@@ -41,6 +43,18 @@ final class NotchOverlayWindowController: NSWindowController, NSWindowDelegate {
         // first loading/listening update cannot leave an invisible 0×0 panel.
         window.setContentSize(NSSize(width: Self.previewWidth, height: Self.previewHeight))
         window.delegate = self
+
+        // Treat visibility as derived state instead of relying on a single
+        // `show()` call at recording startup. This also makes changing the
+        // setting take effect immediately during an active transcription.
+        stateCancellable = AppState.shared.$status
+            .combineLatest(AppState.shared.$isDesktopPreviewEnabled)
+            .removeDuplicates { previous, current in
+                previous.0 == current.0 && previous.1 == current.1
+            }
+            .sink { [weak self] status, isEnabled in
+                self?.synchronizeVisibility(status: status, isEnabled: isEnabled)
+            }
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -54,13 +68,33 @@ final class NotchOverlayWindowController: NSWindowController, NSWindowDelegate {
         guard let window else { return }
 
         visibilitySequence += 1
+        let sequence = visibilitySequence
         let screen = Self.preferredScreen()
+        prepareForDisplay(window)
         recenter(on: screen)
         window.alphaValue = 1
         window.orderFrontRegardless()
+        window.displayIfNeeded()
         overlayLog.info(
-            "Showing desktop preview on \(screen?.localizedName ?? "unknown display", privacy: .public)"
+            "Showing desktop preview on \(screen?.localizedName ?? "unknown display", privacy: .public), frame \(NSStringFromRect(window.frame), privacy: .public)"
         )
+
+        // SwiftUI performs its first layout on the next run-loop pass. Reapply
+        // the fixed size and ordering afterward so AppKit cannot resize or
+        // order out a just-created accessory window during that layout.
+        Task { @MainActor [weak self, weak window] in
+            await Task.yield()
+            guard let self,
+                  let window,
+                  self.visibilitySequence == sequence,
+                  force || AppState.shared.isDesktopPreviewEnabled
+            else { return }
+            self.prepareForDisplay(window)
+            self.recenter(on: screen ?? Self.preferredScreen())
+            window.alphaValue = 1
+            window.orderFrontRegardless()
+            window.displayIfNeeded()
+        }
     }
 
     func hide() {
@@ -86,17 +120,74 @@ final class NotchOverlayWindowController: NSWindowController, NSWindowDelegate {
         guard let window else { return "FAIL window=missing" }
         let intersectsDisplay = NSScreen.screens.contains { $0.frame.intersects(window.frame) }
         let hasUsableSize = window.frame.width >= 500 && window.frame.height >= 60
+        let contentHasUsableSize = (window.contentView?.bounds.width ?? 0) >= 500
+            && (window.contentView?.bounds.height ?? 0) >= 60
+        let contentRendered = renderedContentIsVisible(in: window)
+        let compositorOnScreen = isWindowOnScreen(window)
         let succeeded = window.isVisible
             && window.alphaValue > 0.99
             && intersectsDisplay
             && hasUsableSize
-        return "\(succeeded ? "PASS" : "FAIL") visible=\(window.isVisible) alpha=\(window.alphaValue) frame=\(NSStringFromRect(window.frame)) onScreen=\(intersectsDisplay)"
+            && contentHasUsableSize
+            && contentRendered
+            && compositorOnScreen
+        return "\(succeeded ? "PASS" : "FAIL") visible=\(window.isVisible) alpha=\(window.alphaValue) frame=\(NSStringFromRect(window.frame)) content=\(NSStringFromRect(window.contentView?.bounds ?? .zero)) rendered=\(contentRendered) onScreen=\(compositorOnScreen)"
+    }
+
+    var isHiddenForSmokeTest: Bool {
+        guard let window else { return true }
+        return !window.isVisible || window.alphaValue < 0.01
+    }
+
+    private func synchronizeVisibility(status: TranscriptionStatus, isEnabled: Bool) {
+        if isEnabled, status != .idle {
+            show(force: true)
+        } else {
+            hide()
+        }
+    }
+
+    private func prepareForDisplay(_ window: NSWindow) {
+        window.setContentSize(NSSize(width: Self.previewWidth, height: Self.previewHeight))
+        window.contentView?.needsLayout = true
+        window.contentView?.layoutSubtreeIfNeeded()
+        window.contentView?.needsDisplay = true
+    }
+
+    private func renderedContentIsVisible(in window: NSWindow) -> Bool {
+        guard let view = window.contentView,
+              let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds)
+        else { return false }
+
+        view.cacheDisplay(in: view.bounds, to: bitmap)
+        let xStep = max(1, bitmap.pixelsWide / 20)
+        let yStep = max(1, bitmap.pixelsHigh / 8)
+
+        for x in stride(from: 0, to: bitmap.pixelsWide, by: xStep) {
+            for y in stride(from: 0, to: bitmap.pixelsHigh, by: yStep) {
+                if (bitmap.colorAt(x: x, y: y)?.alphaComponent ?? 0) > 0.5 {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    private func isWindowOnScreen(_ window: NSWindow) -> Bool {
+        guard let windowInfo = CGWindowListCopyWindowInfo(
+            .optionIncludingWindow,
+            CGWindowID(window.windowNumber)
+        ) as? [[String: Any]],
+        let info = windowInfo.first
+        else { return false }
+
+        return info[kCGWindowIsOnscreen as String] as? Bool ?? false
     }
 
     private func recenter(on screen: NSScreen?) {
         guard let window, let screen else { return }
-        let w = window.frame.width
-        let h = window.frame.height
+        let w = Self.previewWidth
+        let h = Self.previewHeight
         let x = screen.frame.midX - w / 2
         let y = screen.visibleFrame.maxY - h - Self.topMargin
         let target = NSRect(x: x, y: y, width: w, height: h)

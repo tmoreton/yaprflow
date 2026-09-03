@@ -101,17 +101,7 @@ struct SettingsView: View {
     private var desktopPreviewBinding: Binding<Bool> {
         Binding(
             get: { appState.isDesktopPreviewEnabled },
-            set: { isEnabled in
-                appState.isDesktopPreviewEnabled = isEnabled
-
-                if isEnabled {
-                    if appState.status != .idle {
-                        NotchOverlayWindowController.shared.show()
-                    }
-                } else {
-                    NotchOverlayWindowController.shared.hide()
-                }
-            }
+            set: { appState.isDesktopPreviewEnabled = $0 }
         )
     }
 }

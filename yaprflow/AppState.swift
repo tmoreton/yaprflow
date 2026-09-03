@@ -39,13 +39,16 @@ final class AppState: ObservableObject {
     private static let desktopPreviewEnabledKey = "yaprflow.desktopPreviewEnabled"
     private static let transcriptsFolderName = "Transcripts"
     private static let vocabularyFileName = "Vocabulary.md"
+    private var shouldPersistDesktopPreviewPreference = true
 
     @Published var status: TranscriptionStatus = .idle
     @Published var liveTranscript: String = ""
     @Published var hotkey: HotkeyConfig = HotkeyConfig.load() ?? .defaultHotkey
     @Published var isDesktopPreviewEnabled: Bool {
         didSet {
-            UserDefaults.standard.set(isDesktopPreviewEnabled, forKey: Self.desktopPreviewEnabledKey)
+            if shouldPersistDesktopPreviewPreference {
+                UserDefaults.standard.set(isDesktopPreviewEnabled, forKey: Self.desktopPreviewEnabledKey)
+            }
         }
     }
     @Published var dictationMode: DictationMode {
@@ -69,6 +72,13 @@ final class AppState: ObservableObject {
         ) as? Bool ?? true
         self.dictationMode = .polished
         UserDefaults.standard.set(DictationMode.polished.rawValue, forKey: Self.dictationModeKey)
+    }
+
+    /// Exercise preference-driven UI without changing the user's saved value.
+    func setDesktopPreviewEnabledForSmokeTest(_ isEnabled: Bool) {
+        shouldPersistDesktopPreviewPreference = false
+        isDesktopPreviewEnabled = isEnabled
+        shouldPersistDesktopPreviewPreference = true
     }
 
     /// Store the newest transcript for quick re-copy and persist each finalized
