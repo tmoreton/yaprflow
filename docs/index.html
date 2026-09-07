@@ -8,7 +8,7 @@
   <meta name="keywords" content="voice dictation macOS, voice to text Mac, offline transcription, open source dictation, private speech to text, Wispr Flow alternative, WhisperFlow alternative, Apple Neural Engine dictation">
   <meta name="author" content="Tim Moreton">
   <meta name="robots" content="index, follow">
-  <meta name="theme-color" content="#f5f3ee">
+  <meta name="theme-color" content="#fafaf8">
   <link rel="canonical" href="https://yaprflow.com/">
 
   <link rel="icon" type="image/png" href="icon.png">
@@ -71,31 +71,29 @@
   <a class="skip-link" href="#content">Skip to content</a>
 
   <header class="site-header">
-    <a class="brand" href="/" aria-label="Yaprflow home">
-      <img src="icon.png" alt="" width="36" height="36">
-      <span>Yaprflow</span>
-    </a>
-    <nav class="nav-links" aria-label="Main navigation">
-      <a href="https://github.com/tmoreton/yaprflow" target="_blank" rel="noopener">GitHub</a>
-      <a class="nav-cta" href="https://github.com/tmoreton/yaprflow/releases/download/v4.0.12/yaprflow-4.0.12.dmg" onclick="gtag('event', 'download', {'event_category': 'engagement', 'event_label': 'nav-yaprflow-4.0.12.dmg'});">Download</a>
-    </nav>
+    <div class="header-inner">
+      <a class="brand" href="/" aria-label="Yaprflow home">
+        <img src="icon.png" alt="" width="34" height="34">
+        <span>Yaprflow</span>
+      </a>
+      <nav class="nav-links" aria-label="Main navigation">
+        <a href="https://github.com/tmoreton/yaprflow" target="_blank" rel="noopener">GitHub</a>
+        <a class="nav-cta" href="https://github.com/tmoreton/yaprflow/releases/download/v4.0.12/yaprflow-4.0.12.dmg" onclick="gtag('event', 'download', {'event_category': 'engagement', 'event_label': 'nav-yaprflow-4.0.12.dmg'});">Download</a>
+      </nav>
+    </div>
   </header>
 
   <main id="content">
     <section class="hero">
-      <div class="mac-demo" role="group" aria-labelledby="demo-title">
-        <div class="notch-overlay">
-          <span class="live-dot" aria-hidden="true"></span>
-          <span class="overlay-copy" id="demo-title" aria-live="polite">
-            <span id="typed"></span><span class="caret" aria-hidden="true"></span>
-          </span>
-        </div>
+      <div class="hero-bg" aria-hidden="true">
+        <div class="orb orb-teal"></div>
+        <div class="orb orb-blue"></div>
       </div>
 
       <div class="hero-copy">
-        <p class="eyebrow">Private voice-to-text for Mac</p>
-        <h1>Speak freely. Paste instantly.</h1>
-        <p class="hero-lede">Yaprflow turns natural speech into clean text in any macOS app. It runs locally, so your audio stays on your Mac.</p>
+        <p class="status-pill"><span class="live-dot" aria-hidden="true"></span> Private voice-to-text for Mac</p>
+        <h1>Speak freely.<br>Paste instantly.</h1>
+        <p class="hero-lede">Yaprflow turns natural speech into clean text in any macOS app. It runs entirely on your Mac, so your audio never leaves it.</p>
         <div class="hero-actions">
           <a class="button button-primary" href="https://github.com/tmoreton/yaprflow/releases/download/v4.0.12/yaprflow-4.0.12.dmg" onclick="gtag('event', 'download', {'event_category': 'engagement', 'event_label': 'hero-yaprflow-4.0.12.dmg'});">
             <svg aria-hidden="true" viewBox="0 0 24 24">
@@ -106,23 +104,33 @@
             Download for macOS
           </a>
         </div>
-        <p class="availability">macOS 14+ / Free / Open source / No account</p>
+        <p class="availability">macOS 14+ &middot; Free &middot; Open source &middot; No account</p>
       </div>
-    </section>
 
-    <section class="proof-strip" aria-label="Yaprflow highlights">
-      <div>
-        <strong>100% local</strong>
-        <span>No cloud audio</span>
+      <div class="mac-demo" role="group" aria-labelledby="demo-title">
+        <div class="notch-overlay">
+          <span class="live-dot" aria-hidden="true"></span>
+          <span class="overlay-copy" id="demo-title" aria-live="polite">
+            <span id="typed"></span><span class="caret" aria-hidden="true"></span>
+          </span>
+        </div>
+ metabolic
       </div>
-      <div>
-        <strong>25 languages</strong>
-        <span>Auto-detected</span>
-      </div>
-      <div>
-        <strong>Smart history</strong>
-        <span>Titles + dates</span>
-      </div>
+
+      <section class="proof-strip" aria-label="Yaprflow highlights">
+        <div>
+          <strong>100% local</strong>
+          <span>No cloud audio</span>
+        </div>
+        <div>
+          <strong>25 languages</strong>
+          <span>Auto-detected</span>
+        </div>
+        <div>
+          <strong>Smart history</strong>
+          <span>Titles + dates</span>
+        </div>
+      </section>
     </section>
 
     <section class="simple-section">
@@ -132,17 +140,23 @@
       </div>
       <div class="feature-grid">
         <article>
-          <span class="feature-mark">01</span>
+          <span class="feature-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M12 3l7 4v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V7l7-4z"></path></svg>
+          </span>
           <h3>Private by design</h3>
           <p>Speech recognition happens on-device with Core ML. No accounts, no telemetry, no remote transcription queue.</p>
         </article>
         <article>
-          <span class="feature-mark">02</span>
+          <span class="feature-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M5 7h14"></path><path d="M5 12h10"></path><path d="M5 17h7"></path></svg>
+          </span>
           <h3>On-device AI actions</h3>
           <p>Summarize, rewrite, or use a custom prompt with Apple Intelligence. Long transcripts are divided and combined automatically.</p>
         </article>
         <article>
-          <span class="feature-mark">03</span>
+          <span class="feature-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
+          </span>
           <h3>History with context</h3>
           <p>Browse local Markdown transcripts by title, topic, description, and date instead of searching through timestamped files.</p>
         </article>
@@ -150,26 +164,30 @@
     </section>
 
     <section class="cta-section">
-      <img src="icon.png" alt="" width="56" height="56">
-      <h2>Stop retyping your thoughts.</h2>
-      <p>Press Command T, speak, press Command T again, then paste.</p>
-      <a class="button button-primary" href="https://github.com/tmoreton/yaprflow/releases/download/v4.0.12/yaprflow-4.0.12.dmg" onclick="gtag('event', 'download', {'event_category': 'engagement', 'event_label': 'footer-yaprflow-4.0.12.dmg'});">
-        <svg aria-hidden="true" viewBox="0 0 24 24">
-          <path d="M12 3v11"></path>
-          <path d="m7 10 5 5 5-5"></path>
-          <path d="M5 20h14"></path>
-        </svg>
-        Download v4.0.12
-      </a>
+      <div class="cta-card">
+        <img src="icon.png" alt="" width="56" height="56">
+        <h2>Stop retyping your thoughts.</h2>
+        <p>Press Command T, speak, press Command T again, then paste.</p>
+        <a class="button button-light" href="https://github.com/tmoreton/yaprflow/releases/download/v4.0.12/yaprflow-4.0.12.dmg" onclick="gtag('event', 'download', {'event_category': 'engagement', 'event_label': 'footer-yaprflow-4.0.12.dmg'});">
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M12 3v11"></path>
+            <path d="m7 10 5 5 5-5"></path>
+            <path d="M5 20h14"></path>
+          </svg>
+          Download v4.0.12
+        </a>
+      </div>
     </section>
   </main>
 
   <footer class="site-footer">
-    <span>Yaprflow</span>
-    <div>
-      <a href="mailto:tim@yaprflow.com">Contact</a>
-      <a href="https://github.com/tmoreton/yaprflow" target="_blank" rel="noopener">GitHub</a>
-      <a href="https://www.apache.org/licenses/LICENSE-2.0" target="_blank" rel="noopener">Apache 2.0</a>
+    <div class="footer-inner">
+      <span>Yaprflow</span>
+      <div>
+        <a href="mailto:tim@yaprflow.com">Contact</a>
+        <a href="https://github.com/tmoreton/yaprflow" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://www.apache.org/licenses/LICENSE-2.0" target="_blank" rel="noopener">Apache 2.0</a>
+      </div>
     </div>
   </footer>
 
