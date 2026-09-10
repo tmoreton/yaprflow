@@ -25,10 +25,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         NSApp.setActivationPolicy(.accessory)
         installStatusItem()
         _ = NotchOverlayWindowController.shared
+        TranscriptionController.shared.prepareVoiceDetector()
         let hotkeyRegistered = registerHotkey()
 
-        // Models load lazily on the first hotkey press (see ensureLoaded).
-        // Preloading on launch was causing CoreML to AOT-compile the encoder
+        // The large speech model loads lazily on the first hotkey press. Only
+        // the tiny voice detector is prepared in the background at launch.
+        // Preloading the speech model was causing CoreML to AOT-compile the encoder
         // immediately, pinning ~1.8 GB of RAM and triggering silent Jetsam
         // kills before the user ever pressed the hotkey.
 
@@ -232,15 +234,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func showAIActions() {
-        TranscriptAIWindowController.shared.show()
+        AppPanelWindowController.show(.aiSummary)
     }
 
     @objc private func showHistory() {
-        HistoryWindowController.shared.show()
+        AppPanelWindowController.show(.history)
     }
 
     @objc private func showSettings() {
-        SettingsWindowController.shared.show()
+        AppPanelWindowController.show(.settings)
     }
 
     private func registerHotkey() -> Bool {
@@ -283,6 +285,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             try? await Task.sleep(for: .milliseconds(300))
             let listeningResult = NotchOverlayWindowController.shared.smokeTestDescription
 
+            state.status = .copied
+            try? await Task.sleep(for: .milliseconds(300))
+            let copiedResult = NotchOverlayWindowController.shared.smokeTestDescription
+
             state.setDesktopPreviewEnabledForSmokeTest(false)
             try? await Task.sleep(for: .milliseconds(400))
             let hidWhenDisabled = NotchOverlayWindowController.shared.isHiddenForSmokeTest
@@ -294,9 +300,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let succeeded = stayedHiddenWhenDisabled
                 && preparingResult.hasPrefix("PASS")
                 && listeningResult.hasPrefix("PASS")
+                && copiedResult.hasPrefix("PASS")
                 && hidWhenDisabled
                 && reenabledResult.hasPrefix("PASS")
-            let output = "YAPRFLOW_PREVIEW_SMOKE_TEST=\(succeeded ? "PASS" : "FAIL") disabled=\(stayedHiddenWhenDisabled) preparing=[\(preparingResult)] listening=[\(listeningResult)] toggleOff=\(hidWhenDisabled) toggleOn=[\(reenabledResult)]\n"
+            let output = "YAPRFLOW_PREVIEW_SMOKE_TEST=\(succeeded ? "PASS" : "FAIL") disabled=\(stayedHiddenWhenDisabled) preparing=[\(preparingResult)] listening=[\(listeningResult)] copied=[\(copiedResult)] toggleOff=\(hidWhenDisabled) toggleOn=[\(reenabledResult)]\n"
             FileHandle.standardOutput.write(Data(output.utf8))
 
             state.status = .idle

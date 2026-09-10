@@ -56,7 +56,8 @@ final class TranscriptionController {
     // later under memory pressure.
     private var asrManager: AsrManager?
     private var vadManager: VadManager?
-    private var loadingTask: Task<(AsrManager, VadManager), Error>?
+    private var asrLoadingTask: Task<AsrManager, Error>?
+    private var voiceDetectorLoadingTask: Task<Void, Never>?
     private var modelUnloadTask: Task<Void, Never>?
 
     // Per-session state
@@ -70,6 +71,7 @@ final class TranscriptionController {
     private var sessionSourceApplication: String?
     private var lastSpeculativeSampleCount = 0
     private var transcribeChain: Task<Void, Never>?
+    private var usesVoiceDetectorForCurrentSession = false
 
     private var isActive = false
     private var isStarting = false
@@ -117,6 +119,27 @@ final class TranscriptionController {
                 await stop()
             } else {
                 await start()
+            }
+        }
+    }
+
+    /// Prepare the small VAD model independently from the speech model. This
+    /// starts at app launch, stays off the recording-critical path, and keeps
+    /// the detector warm because its memory footprint is tiny.
+    func prepareVoiceDetector() {
+        guard vadManager == nil, voiceDetectorLoadingTask == nil else { return }
+
+        voiceDetectorLoadingTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer { self.voiceDetectorLoadingTask = nil }
+
+            do {
+                self.vadManager = try await Self.loadBundledVoiceDetector()
+                log.info("Voice detector prepared in the background")
+            } catch {
+                // Recording remains usable without VAD: the entire session is
+                // transcribed when the user stops recording.
+                log.error("Voice detector preparation failed; using whole-session transcription: \(error.localizedDescription)")
             }
         }
     }
@@ -216,11 +239,18 @@ final class TranscriptionController {
         do {
             try await ensureMicPermission()
             try capture.validateInputAvailable()
-            let (_, vad) = try await ensureLoaded()
+            prepareVoiceDetector()
+            _ = try await ensureLoaded()
 
             sessionSamples.removeAll(keepingCapacity: true)
             vadPending.removeAll(keepingCapacity: true)
-            vadState = await vad.makeStreamState()
+            usesVoiceDetectorForCurrentSession = vadManager != nil
+            if let vad = vadManager, usesVoiceDetectorForCurrentSession {
+                vadState = await vad.makeStreamState()
+            } else {
+                vadState = nil
+                log.info("Voice detector is not ready; recording will use whole-session transcription")
+            }
             currentSpeechStart = nil
 
             state.status = .listening
@@ -243,10 +273,14 @@ final class TranscriptionController {
 
         // Flush any pending speech segment so we don't lose the tail of what
         // the user was saying.
-        if let start = currentSpeechStart, start < sessionSamples.count {
-            let tail = Array(sessionSamples[start..<sessionSamples.count])
-            currentSpeechStart = nil
-            enqueueTranscribe(samples: tail)
+        if usesVoiceDetectorForCurrentSession {
+            if let start = currentSpeechStart, start < sessionSamples.count {
+                let tail = Array(sessionSamples[start..<sessionSamples.count])
+                currentSpeechStart = nil
+                enqueueTranscribe(samples: tail)
+            }
+        } else if !sessionSamples.isEmpty {
+            enqueueTranscribe(samples: sessionSamples)
         }
         await transcribeChain?.value
         transcribeChain = nil
@@ -264,11 +298,12 @@ final class TranscriptionController {
                 vocabularyReplacementCount: vocabularyReplacementCount
             )
             state.status = .copied
-            scheduleAutoHide(after: 1.2)
+            scheduleAutoHide(after: 2.4)
         } else {
             state.status = .idle
             scheduleAutoHide(after: 1.2)
         }
+        usesVoiceDetectorForCurrentSession = false
         scheduleModelUnload()
     }
 
@@ -285,7 +320,10 @@ final class TranscriptionController {
 
         sessionSamples.append(contentsOf: samples)
 
-        guard let vad = vadManager, var currentVadState = vadState else { return }
+        guard usesVoiceDetectorForCurrentSession,
+              let vad = vadManager,
+              var currentVadState = vadState
+        else { return }
         vadPending.append(contentsOf: samples)
 
         while vadPending.count >= VadManager.chunkSize {
@@ -455,15 +493,15 @@ final class TranscriptionController {
         }
     }
 
-    private func ensureLoaded() async throws -> (AsrManager, VadManager) {
-        if let asr = asrManager, let vad = vadManager { return (asr, vad) }
-        if let existing = loadingTask {
+    private func ensureLoaded() async throws -> AsrManager {
+        if let asr = asrManager { return asr }
+        if let existing = asrLoadingTask {
             return try await existing.value
         }
 
         state.status = .preparing("Loading transcription model…")
 
-        let task = Task<(AsrManager, VadManager), Error> { @MainActor in
+        let task = Task<AsrManager, Error> { @MainActor in
             let mlConfig = MLModelConfiguration()
             // .cpuAndGPU instead of .cpuAndNeuralEngine: ANE forces a heavy
             // AOT compile (~30s, ~2GB of disk writes) on every launch when the
@@ -501,32 +539,17 @@ final class TranscriptionController {
             let asr = AsrManager(config: .default)
             try await asr.loadModels(asrModels)
 
-            state.status = .preparing("Loading voice detector…")
-            // Silero VAD is tiny and runs comfortably on CPU. Asking Core ML
-            // to prepare a GPU plan for it can stall first recording startup
-            // for more than a minute on some Macs.
-            let vadConfig = VadConfig(computeUnits: .cpuOnly)
-            let vad: VadManager
-            if let vadBase = Self.bundledVADBaseURL() {
-                log.info("Loading bundled VAD from \(vadBase.path, privacy: .public)")
-                vad = try await VadManager(config: vadConfig, modelDirectory: vadBase)
-            } else {
-                log.info("Bundled VAD missing, downloading Silero VAD from HuggingFace")
-                vad = try await VadManager(config: vadConfig)
-            }
-
-            return (asr, vad)
+            return asr
         }
-        loadingTask = task
+        asrLoadingTask = task
 
         do {
-            let (asr, vad) = try await task.value
-            loadingTask = nil
+            let asr = try await task.value
+            asrLoadingTask = nil
             self.asrManager = asr
-            self.vadManager = vad
-            return (asr, vad)
+            return asr
         } catch {
-            loadingTask = nil
+            asrLoadingTask = nil
             throw error
         }
     }
@@ -742,16 +765,33 @@ final class TranscriptionController {
 
     private static let vadModelFile = "silero-vad-unified-256ms-v6.0.0.mlmodelc"
 
-    /// Returns the base directory that `VadManager(modelDirectory:)` expects —
-    /// it internally appends `Models/silero-vad/<file>`. We bundle the model at
-    /// `<Resources>/Models/silero-vad/...`, so `Resources` is the right base.
-    private static func bundledVADBaseURL() -> URL? {
+    private static func bundledVADModelURL() -> URL? {
         guard let resources = Bundle.main.resourceURL else { return nil }
         let modelPath = resources
             .appendingPathComponent("Models/silero-vad", isDirectory: true)
             .appendingPathComponent(vadModelFile, isDirectory: true)
         guard FileManager.default.fileExists(atPath: modelPath.path) else { return nil }
-        return resources
+        return modelPath
+    }
+
+    /// Load the bundled VAD directly instead of routing through FluidAudio's
+    /// download-and-retry helper. The release always contains this model, and
+    /// direct loading avoids network checks and destructive retry behavior.
+    private static func loadBundledVoiceDetector() async throws -> VadManager {
+        guard let modelURL = bundledVADModelURL() else {
+            throw CocoaError(.fileNoSuchFile, userInfo: [
+                NSFilePathErrorKey: "Models/silero-vad/\(vadModelFile)",
+                NSLocalizedDescriptionKey: "The bundled voice detector is missing.",
+            ])
+        }
+
+        return try await Task.detached(priority: .utility) {
+            let modelConfiguration = MLModelConfiguration()
+            modelConfiguration.computeUnits = .cpuOnly
+            let model = try MLModel(contentsOf: modelURL, configuration: modelConfiguration)
+            let vadConfiguration = VadConfig(computeUnits: .cpuOnly)
+            return VadManager(config: vadConfiguration, vadModel: model)
+        }.value
     }
 
     private func scheduleAutoHide(after seconds: Double) {
@@ -782,17 +822,16 @@ final class TranscriptionController {
     private func releaseModelsIfIdle(reason: String) {
         guard !isActive,
               !isStarting,
-              loadingTask == nil,
+              asrLoadingTask == nil,
               transcribeChain == nil
         else {
             return
         }
-        guard asrManager != nil || vadManager != nil else { return }
+        guard asrManager != nil else { return }
 
         modelUnloadTask?.cancel()
         modelUnloadTask = nil
         asrManager = nil
-        vadManager = nil
         vadState = nil
         sessionSamples.removeAll(keepingCapacity: false)
         vadPending.removeAll(keepingCapacity: false)

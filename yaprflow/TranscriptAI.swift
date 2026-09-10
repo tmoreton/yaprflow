@@ -135,23 +135,23 @@ struct TranscriptAIView: View {
     ]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("AI Summary")
-                    .font(.title3.weight(.semibold))
+        VStack(alignment: .leading, spacing: 14) {
+            FeatureWindowHeader(
+                symbolName: "sparkles",
+                title: "AI Summary",
+                subtitle: "Summarize or transform any saved transcript.",
+                accent: .purple,
+                badge: "On-device",
+                badgeSymbol: "lock.fill"
+            )
 
-                Spacer()
-
-                Label("On-device", systemImage: "lock.fill")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            FeatureCard {
+                sourceRow
             }
 
-            sourceRow
-
-            Divider()
-
-            promptSection
+            FeatureCard {
+                promptSection
+            }
 
             if let errorMessage = ai.errorMessage {
                 Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
@@ -160,12 +160,13 @@ struct TranscriptAIView: View {
                     .textSelection(.enabled)
             }
 
-            Divider()
-
-            resultSection
+            FeatureCard {
+                resultSection
+            }
+            .frame(maxHeight: .infinity)
         }
-        .padding(18)
-        .frame(minWidth: 480, minHeight: 440)
+        .padding(22)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .windowBackgroundColor))
         .onAppear {
             ai.refreshAvailability()
@@ -316,13 +317,14 @@ struct TranscriptAIView: View {
                 .font(.body)
                 .scrollContentBackground(.hidden)
                 .padding(7)
-                .frame(minHeight: 120)
+                .frame(minHeight: 120, maxHeight: .infinity)
                 .background(.background, in: RoundedRectangle(cornerRadius: 7))
                 .overlay {
                     RoundedRectangle(cornerRadius: 7)
                         .stroke(.separator, lineWidth: 1)
                 }
         }
+        .frame(maxHeight: .infinity)
     }
 
     private var sourceDescription: String {
@@ -355,16 +357,5 @@ struct TranscriptAIView: View {
             || !ai.isModelAvailable
             || selectedTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             || ai.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-}
-
-@MainActor
-enum TranscriptAIWindowController {
-    static let shared = FeatureWindowController(
-        title: "AI Summary",
-        contentSize: NSSize(width: 520, height: 500),
-        minimumSize: NSSize(width: 480, height: 440)
-    ) {
-        TranscriptAIView()
     }
 }

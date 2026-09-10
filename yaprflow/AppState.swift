@@ -58,7 +58,7 @@ final class AppState: ObservableObject {
     }
 
     /// Most recent finalized transcript. Persisted so it survives restarts and
-    /// can be re-copied from the menu bar after the clipboard has been replaced.
+    /// remains available in History and AI Summary.
     @Published var lastTranscript: String {
         didSet {
             UserDefaults.standard.set(lastTranscript, forKey: Self.lastTranscriptKey)

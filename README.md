@@ -53,12 +53,8 @@ Yaprflow runs as a menu-bar app. Click the waveform icon to open the menu.
 - **Transcribe**: starts or stops dictation.
 - **Change shortcut**: open Settings, click the keyboard shortcut button, then
   press the new key combination. Escape cancels shortcut capture.
-- **AI Summary**: runs a preset or custom prompt against any saved transcript,
-  automatically processing long transcripts in manageable parts.
-- **History**: browses titled transcripts by date, topic, and description, and
-  opens or copies the original locally saved files.
-- **Settings**: controls the keyboard shortcut and desktop transcript preview,
-  and shows how speech, AI, accounts, and telemetry are handled.
+- **AI Summary, History, and Settings**: opens a single tabbed window for
+  summarizing transcripts, browsing local history, and changing app settings.
 - **Command-Q**: quits the app.
 
 While dictating, Yaprflow shows a compact black overlay near the Mac notch or
@@ -158,7 +154,7 @@ xcodebuild \
 
 The project has two shared schemes:
 
-- `yaprflow`: macOS app, bundle id `com.tmoreton.yaprflow`, version 4.0.13.
+- `yaprflow`: macOS app, bundle id `com.tmoreton.yaprflow`, version 4.0.14.
 - `yaprflow-iOS`: iOS target, bundle id `com.tmoreton.yaprflow.ios`.
 
 ## Release
@@ -173,7 +169,7 @@ For a signed and notarized release, configure the notarization credentials
 described in `scripts/release.sh`, then run:
 
 ```bash
-scripts/release.sh 4.0.13 --publish
+scripts/release.sh 4.0.14 --publish
 ```
 
 The release script can build the app, export a Developer ID signed app, notarize

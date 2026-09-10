@@ -115,7 +115,7 @@ struct SettingsView: View {
             Spacer(minLength: 0)
         }
         .padding(22)
-        .frame(minWidth: 540, minHeight: 540)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
@@ -158,16 +158,5 @@ private struct PrivacyRow: View {
                 .foregroundStyle(.secondary)
         }
         .padding(.vertical, 10)
-    }
-}
-
-@MainActor
-enum SettingsWindowController {
-    static let shared = FeatureWindowController(
-        title: "Settings",
-        contentSize: NSSize(width: 580, height: 570),
-        minimumSize: NSSize(width: 540, height: 540)
-    ) {
-        SettingsView()
     }
 }

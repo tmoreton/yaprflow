@@ -121,55 +121,67 @@ struct HistoryView: View {
     @StateObject private var model = TranscriptHistoryModel()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("History")
-                    .font(.title3.weight(.semibold))
+        VStack(alignment: .leading, spacing: 14) {
+            FeatureWindowHeader(
+                symbolName: "clock.arrow.circlepath",
+                title: "History",
+                subtitle: "Browse and copy transcripts saved on this Mac.",
+                accent: .orange,
+                badge: "Local",
+                badgeSymbol: "internaldrive"
+            )
 
-                Spacer()
+            FeatureCard {
+                VStack(spacing: 12) {
+                    HStack {
+                        statusText
+                        Spacer()
 
-                Button {
-                    model.refresh()
-                } label: {
-                    Image(systemName: "arrow.clockwise")
+                        Button {
+                            model.refresh()
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
+                        .help("Refresh")
+                    }
+
+                    Divider()
+
+                    if model.items.isEmpty {
+                        emptyState
+                    } else {
+                        transcriptList
+                    }
+
+                    Divider()
+
+                    HStack(spacing: 8) {
+                        Spacer()
+
+                        Button("Folder", systemImage: "folder") {
+                            model.revealSelection()
+                        }
+
+                        Button("Open") {
+                            model.openSelected()
+                        }
+                        .disabled(model.selectedItem == nil)
+
+                        Button("Copy", systemImage: "doc.on.clipboard") {
+                            model.copySelected()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(model.selectedItem?.transcript.isEmpty != false)
+                    }
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-                .help("Refresh")
+                .frame(maxHeight: .infinity)
             }
-
-            Divider()
-
-            if model.items.isEmpty {
-                emptyState
-            } else {
-                transcriptList
-            }
-
-            Divider()
-
-            HStack(spacing: 8) {
-                statusText
-                Spacer()
-
-                Button("Folder", systemImage: "folder") {
-                    model.revealSelection()
-                }
-
-                Button("Open") {
-                    model.openSelected()
-                }
-                .disabled(model.selectedItem == nil)
-
-                Button("Copy", systemImage: "doc.on.clipboard") {
-                    model.copySelected()
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(model.selectedItem?.transcript.isEmpty != false)
-            }
+            .frame(maxHeight: .infinity)
         }
-        .padding(18)
-        .frame(minWidth: 480, minHeight: 350)
+        .padding(22)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .windowBackgroundColor))
         .onAppear {
             model.refresh()
@@ -234,6 +246,7 @@ struct HistoryView: View {
             }
             .frame(maxWidth: .infinity)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var emptyState: some View {
@@ -264,16 +277,5 @@ struct HistoryView: View {
             }
         }
         .font(.caption)
-    }
-}
-
-@MainActor
-enum HistoryWindowController {
-    static let shared = FeatureWindowController(
-        title: "History",
-        contentSize: NSSize(width: 540, height: 430),
-        minimumSize: NSSize(width: 480, height: 350)
-    ) {
-        HistoryView()
     }
 }
