@@ -31,7 +31,7 @@ final class TranscriptAIModel: ObservableObject {
     func refreshAvailability() {
         guard #available(macOS 26.0, *) else {
             isModelAvailable = false
-            availabilityMessage = "AI Actions requires macOS 26 or later."
+            availabilityMessage = "AI Summary requires macOS 26 or later."
             return
         }
 
@@ -44,7 +44,7 @@ final class TranscriptAIModel: ObservableObject {
             availabilityMessage = "This Mac does not support Apple Intelligence."
         case .unavailable(.appleIntelligenceNotEnabled):
             isModelAvailable = false
-            availabilityMessage = "Turn on Apple Intelligence in System Settings to use AI Actions."
+            availabilityMessage = "Turn on Apple Intelligence in System Settings to use AI Summary."
         case .unavailable(.modelNotReady):
             isModelAvailable = false
             availabilityMessage = "The on-device model is still downloading or not ready."
@@ -74,7 +74,7 @@ final class TranscriptAIModel: ObservableObject {
             return
         }
         guard !trimmedTranscript.isEmpty else {
-            errorMessage = "Create a transcript before running an AI action."
+            errorMessage = "Create a transcript before generating an AI summary."
             return
         }
 
@@ -137,7 +137,7 @@ struct TranscriptAIView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("AI Actions")
+                Text("AI Summary")
                     .font(.title3.weight(.semibold))
 
                 Spacer()
@@ -194,23 +194,35 @@ struct TranscriptAIView: View {
                     .font(.callout)
                     .foregroundStyle(selectedTranscript.isEmpty ? .secondary : .primary)
             } else {
-                Picker("Transcript", selection: $history.selection) {
+                Menu {
                     ForEach(history.items) { item in
-                        Text(sourceTitle(for: item))
-                            .tag(Optional(item.id))
+                        Button {
+                            history.selection = item.id
+                        } label: {
+                            if history.selection == item.id {
+                                Label(sourceTitle(for: item), systemImage: "checkmark")
+                            } else {
+                                Text(sourceTitle(for: item))
+                            }
+                        }
                     }
+                } label: {
+                    Text(selectedSourceTitle)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
                 }
-                .labelsHidden()
-                .pickerStyle(.menu)
-                .fixedSize(horizontal: true, vertical: false)
+                .menuStyle(.borderlessButton)
+                .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+                .accessibilityLabel("Transcript")
+                .accessibilityValue(selectedSourceTitle)
             }
-
-            Spacer(minLength: 8)
 
             Text(sourceDescription)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
 
             Button {
                 history.refresh()
@@ -326,6 +338,11 @@ struct TranscriptAIView: View {
         history.selectedItem?.transcript ?? appState.lastTranscript
     }
 
+    private var selectedSourceTitle: String {
+        guard let selectedItem = history.selectedItem else { return "Choose a transcript" }
+        return sourceTitle(for: selectedItem)
+    }
+
     private func sourceTitle(for item: TranscriptHistoryItem) -> String {
         if item.id == history.items.first?.id {
             return "Latest · \(item.title) · \(item.dateDescription)"
@@ -344,7 +361,7 @@ struct TranscriptAIView: View {
 @MainActor
 enum TranscriptAIWindowController {
     static let shared = FeatureWindowController(
-        title: "AI Actions",
+        title: "AI Summary",
         contentSize: NSSize(width: 520, height: 500),
         minimumSize: NSSize(width: 480, height: 440)
     ) {

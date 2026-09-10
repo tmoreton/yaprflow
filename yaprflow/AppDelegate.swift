@@ -174,8 +174,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     // MARK: - NSMenuDelegate
 
-    /// Rebuild the menu each time it opens so Copy Transcript reflects the
-    /// latest state without needing manual Combine wiring into AppKit.
+    /// Rebuild the menu each time it opens so the recording action reflects
+    /// the latest state without needing manual Combine wiring into AppKit.
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
 
@@ -193,27 +193,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         )
         menu.addItem(transcribeItem)
 
-        // Shortcut editing stays separate from the recording action.
-        let shortcutItem = NSMenuItem()
-        shortcutItem.view = HotkeyMenuItemView()
-        menu.addItem(shortcutItem)
-
-        menu.addItem(NSMenuItem.separator())
-
-        let copyItem = NSMenuItem()
-        copyItem.view = IconActionMenuItemView(
-            symbolName: "doc.on.clipboard",
-            title: "Copy Transcript",
-            target: self,
-            action: #selector(copyTranscript),
-            isEnabled: { !AppState.shared.lastTranscript.isEmpty }
-        )
-        menu.addItem(copyItem)
-
         let aiItem = NSMenuItem()
         aiItem.view = IconActionMenuItemView(
             symbolName: "sparkles",
-            title: "AI Actions",
+            title: "AI Summary",
             target: self,
             action: #selector(showAIActions),
             isEnabled: { true }
@@ -242,14 +225,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func quit() { NSApp.terminate(nil) }
-
-    @objc private func copyTranscript() {
-        let text = AppState.shared.lastTranscript
-        guard !text.isEmpty else { return }
-        let pb = NSPasteboard.general
-        pb.clearContents()
-        pb.setString(text, forType: .string)
-    }
 
     @objc private func toggleTranscription() {
         log.info("Transcribe menu action activated")

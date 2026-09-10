@@ -1,97 +1,59 @@
 import AppKit
 import Carbon.HIToolbox
+import SwiftUI
+
+struct HotkeyRecorder: NSViewRepresentable {
+    let hotkey: HotkeyConfig
+
+    func makeNSView(context: Context) -> HotkeyRecorderButton {
+        HotkeyRecorderButton()
+    }
+
+    func updateNSView(_ nsView: HotkeyRecorderButton, context: Context) {
+        nsView.updateDisplayedHotkey(hotkey)
+    }
+}
 
 @MainActor
-final class HotkeyMenuItemView: NSView {
-    private let iconView = NSImageView()
-    private let titleField = NSTextField(labelWithString: "")
-    private let shortcutField = NSTextField(labelWithString: "")
+final class HotkeyRecorderButton: NSButton {
     private var isCapturingShortcut = false
 
     init() {
-        super.init(frame: NSRect(x: 0, y: 0, width: 190, height: 22))
-        autoresizingMask = [.width]
-        setupLayout()
+        super.init(frame: NSRect(x: 0, y: 0, width: 118, height: 28))
+        bezelStyle = .rounded
+        controlSize = .regular
+        setButtonType(.momentaryPushIn)
+        target = self
+        action = #selector(beginCapture)
+        toolTip = "Click, then press a shortcut with Command, Option, Control, or Shift."
+        setAccessibilityLabel("Keyboard shortcut")
         refresh()
-
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(onHotkeyChanged),
-            name: .yaprflowHotkeyChanged,
-            object: nil
-        )
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
-    deinit {
-        NotificationCenter.default.removeObserver(self)
-    }
-
-    override var intrinsicContentSize: NSSize {
-        NSSize(width: NSView.noIntrinsicMetric, height: 22)
-    }
-
-    /// Menu-item subviews such as label text fields otherwise become the hit
-    /// target and swallow the mouse event. Keep the complete row interactive
-    /// so clicking the icon or "Shortcut" reliably reaches `mouseDown`.
-    override func hitTest(_ point: NSPoint) -> NSView? {
-        bounds.contains(point) ? self : nil
-    }
-
-    private func setupLayout() {
-        iconView.translatesAutoresizingMaskIntoConstraints = false
-        iconView.image = NSImage(systemSymbolName: "keyboard", accessibilityDescription: nil)
-        iconView.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 12, weight: .regular)
-        addSubview(iconView)
-
-        titleField.translatesAutoresizingMaskIntoConstraints = false
-        titleField.font = NSFont.menuFont(ofSize: 0)
-        titleField.textColor = .labelColor
-        titleField.lineBreakMode = .byTruncatingTail
-        addSubview(titleField)
-
-        shortcutField.translatesAutoresizingMaskIntoConstraints = false
-        shortcutField.font = NSFont.menuFont(ofSize: 0)
-        shortcutField.textColor = .secondaryLabelColor
-        shortcutField.alignment = .right
-        addSubview(shortcutField)
-
-        NSLayoutConstraint.activate([
-            iconView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14),
-            iconView.centerYAnchor.constraint(equalTo: centerYAnchor),
-            iconView.widthAnchor.constraint(equalToConstant: 16),
-            iconView.heightAnchor.constraint(equalToConstant: 16),
-
-            titleField.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 6),
-            titleField.centerYAnchor.constraint(equalTo: centerYAnchor),
-
-            shortcutField.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -14),
-            shortcutField.firstBaselineAnchor.constraint(equalTo: titleField.firstBaselineAnchor),
-            shortcutField.leadingAnchor.constraint(greaterThanOrEqualTo: titleField.trailingAnchor, constant: 16),
-        ])
-    }
-
-    @objc private func onHotkeyChanged() {
-        refresh()
+    func updateDisplayedHotkey(_ hotkey: HotkeyConfig) {
+        guard !isCapturingShortcut else { return }
+        title = hotkey.displayString
+        setAccessibilityValue(hotkey.displayString)
     }
 
     private func refresh() {
         if isCapturingShortcut {
-            titleField.stringValue = "Shortcut"
-            titleField.textColor = .systemBlue
-            shortcutField.stringValue = "Press keys..."
-            shortcutField.textColor = .systemBlue
+            title = "Press keys…"
+            contentTintColor = .systemBlue
+            setAccessibilityValue("Waiting for a new shortcut")
         } else {
-            titleField.stringValue = "Shortcut"
-            titleField.textColor = .labelColor
-            shortcutField.stringValue = AppState.shared.hotkey.displayString
-            shortcutField.textColor = .secondaryLabelColor
+            title = AppState.shared.hotkey.displayString
+            contentTintColor = nil
+            setAccessibilityValue(title)
         }
     }
 
-    override func mouseDown(with event: NSEvent) {
+    @objc private func beginCapture() {
+        guard !isCapturingShortcut else { return }
         isCapturingShortcut = true
+        GlobalHotkey.shared.unregister()
         refresh()
         window?.makeFirstResponder(self)
     }
@@ -110,14 +72,22 @@ final class HotkeyMenuItemView: NSView {
         }
     }
 
+    override func resignFirstResponder() -> Bool {
+        let didResign = super.resignFirstResponder()
+        if didResign, isCapturingShortcut {
+            isCapturingShortcut = false
+            restoreCurrentHotkeyRegistration()
+            refresh()
+        }
+        return didResign
+    }
+
     @discardableResult
     private func handle(event: NSEvent) -> Bool {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
 
         if event.keyCode == UInt16(kVK_Escape) && flags.subtracting(.capsLock).isEmpty {
-            isCapturingShortcut = false
-            refresh()
-            enclosingMenuItem?.menu?.cancelTracking()
+            cancelCapture()
             return true
         }
 
@@ -138,7 +108,19 @@ final class HotkeyMenuItemView: NSView {
 
         isCapturingShortcut = false
         refresh()
-        enclosingMenuItem?.menu?.cancelTracking()
+        window?.makeFirstResponder(nil)
         return true
+    }
+
+    private func cancelCapture() {
+        isCapturingShortcut = false
+        restoreCurrentHotkeyRegistration()
+        refresh()
+        window?.makeFirstResponder(nil)
+    }
+
+    private func restoreCurrentHotkeyRegistration() {
+        let current = AppState.shared.hotkey
+        GlobalHotkey.shared.register(keyCode: current.keyCode, modifiers: current.modifiers)
     }
 }

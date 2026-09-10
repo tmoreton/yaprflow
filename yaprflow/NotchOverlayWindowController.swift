@@ -13,6 +13,7 @@ final class NotchOverlayWindowController: NSWindowController, NSWindowDelegate {
     private static let previewHeight: CGFloat = 68
     private static let topMargin: CGFloat = 8
     private var visibilitySequence = 0
+    private var hasPositionedWindow = false
     private var stateCancellable: AnyCancellable?
 
     convenience init() {
@@ -30,9 +31,9 @@ final class NotchOverlayWindowController: NSWindowController, NSWindowDelegate {
         window.backgroundColor = .clear
         window.hasShadow = false
         window.level = .statusBar
-        window.ignoresMouseEvents = true
+        window.ignoresMouseEvents = false
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
-        window.isMovableByWindowBackground = false
+        window.isMovableByWindowBackground = true
         window.isReleasedWhenClosed = false
         window.hidesOnDeactivate = false
         window.alphaValue = 0
@@ -71,7 +72,7 @@ final class NotchOverlayWindowController: NSWindowController, NSWindowDelegate {
         let sequence = visibilitySequence
         let screen = Self.preferredScreen()
         prepareForDisplay(window)
-        recenter(on: screen)
+        positionOnScreenIfNeeded(window, preferredScreen: screen)
         window.alphaValue = 1
         window.orderFrontRegardless()
         window.displayIfNeeded()
@@ -90,7 +91,10 @@ final class NotchOverlayWindowController: NSWindowController, NSWindowDelegate {
                   force || AppState.shared.isDesktopPreviewEnabled
             else { return }
             self.prepareForDisplay(window)
-            self.recenter(on: screen ?? Self.preferredScreen())
+            self.positionOnScreenIfNeeded(
+                window,
+                preferredScreen: screen ?? Self.preferredScreen()
+            )
             window.alphaValue = 1
             window.orderFrontRegardless()
             window.displayIfNeeded()
@@ -110,10 +114,6 @@ final class NotchOverlayWindowController: NSWindowController, NSWindowDelegate {
                 window.orderOut(nil)
             }
         })
-    }
-
-    func windowDidResize(_ notification: Notification) {
-        recenter(on: window?.screen ?? Self.preferredScreen())
     }
 
     var smokeTestDescription: String {
@@ -184,8 +184,9 @@ final class NotchOverlayWindowController: NSWindowController, NSWindowDelegate {
         return info[kCGWindowIsOnscreen as String] as? Bool ?? false
     }
 
-    private func recenter(on screen: NSScreen?) {
-        guard let window, let screen else { return }
+    private func positionOnScreenIfNeeded(_ window: NSWindow, preferredScreen: NSScreen?) {
+        let isAlreadyOnScreen = NSScreen.screens.contains { $0.visibleFrame.intersects(window.frame) }
+        guard !hasPositionedWindow || !isAlreadyOnScreen, let screen = preferredScreen else { return }
         let w = Self.previewWidth
         let h = Self.previewHeight
         let x = screen.frame.midX - w / 2
@@ -194,6 +195,7 @@ final class NotchOverlayWindowController: NSWindowController, NSWindowDelegate {
         if target != window.frame {
             window.setFrame(target, display: true)
         }
+        hasPositionedWindow = true
     }
 
     private static func preferredScreen() -> NSScreen? {

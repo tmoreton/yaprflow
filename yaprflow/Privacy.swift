@@ -38,6 +38,27 @@ struct SettingsView: View {
             }
 
             FeatureCard {
+                HStack(spacing: 12) {
+                    Image(systemName: "keyboard")
+                        .foregroundStyle(.secondary)
+                        .frame(width: 26)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Keyboard shortcut")
+                            .font(.callout.weight(.medium))
+                        Text("Start or stop dictation from any app.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    HotkeyRecorder(hotkey: appState.hotkey)
+                        .frame(width: 118, height: 28)
+                }
+            }
+
+            FeatureCard {
                 VStack(spacing: 0) {
                     PrivacyRow(
                         symbol: "waveform",
@@ -48,7 +69,7 @@ struct SettingsView: View {
                     Divider().padding(.leading, 38)
                     PrivacyRow(
                         symbol: "sparkles",
-                        title: "AI Actions",
+                        title: "AI Summary",
                         detail: "Uses Apple's on-device model",
                         status: "On-device"
                     )
@@ -71,31 +92,35 @@ struct SettingsView: View {
 
             FeatureCard {
                 HStack(spacing: 12) {
-                    Image(systemName: "internaldrive")
+                    Image(systemName: "info.circle")
                         .foregroundStyle(.secondary)
-                        .frame(width: 24)
+                        .frame(width: 26)
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Transcript storage")
+                        Text("Version")
                             .font(.callout.weight(.medium))
-                        Text("Saved as Markdown files in Application Support.")
+                        Text("Your installed Yaprflow version.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
 
                     Spacer()
 
-                    Button("View History") {
-                        HistoryWindowController.shared.show()
-                    }
+                    Text(appVersion)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
                 }
             }
 
             Spacer(minLength: 0)
         }
         .padding(22)
-        .frame(minWidth: 540, minHeight: 470)
+        .frame(minWidth: 540, minHeight: 540)
         .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    private var appVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Unknown"
     }
 
     private var desktopPreviewBinding: Binding<Bool> {
@@ -140,8 +165,8 @@ private struct PrivacyRow: View {
 enum SettingsWindowController {
     static let shared = FeatureWindowController(
         title: "Settings",
-        contentSize: NSSize(width: 580, height: 500),
-        minimumSize: NSSize(width: 540, height: 470)
+        contentSize: NSSize(width: 580, height: 570),
+        minimumSize: NSSize(width: 540, height: 540)
     ) {
         SettingsView()
     }

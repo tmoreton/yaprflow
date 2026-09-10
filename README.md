@@ -22,7 +22,7 @@ transcripts.
   clipboard.
 - **Local vocabulary**: deterministic phrase replacements for names, acronyms,
   product terms, and preferred spellings.
-- **On-device AI Actions**: summarize, rewrite, or transform the latest or any
+- **On-device AI Summary**: summarize, rewrite, or transform the latest or any
   saved transcript with a custom prompt using Apple Intelligence on supported
   Macs. Long transcripts are divided and recombined automatically.
 - **Smart Markdown archive**: each completed transcript is saved locally; on
@@ -50,15 +50,15 @@ not your audio.
 
 Yaprflow runs as a menu-bar app. Click the waveform icon to open the menu.
 
-- **Transcribe**: starts or stops dictation. The shortcut is shown on the right.
-- **Change shortcut**: click the shortcut text in the menu, then press the new
-  key combination. Escape cancels shortcut capture.
-- **Copy Transcript**: copies the most recent completed transcript again.
-- **AI Actions**: runs a preset or custom prompt against any saved transcript,
+- **Transcribe**: starts or stops dictation.
+- **Change shortcut**: open Settings, click the keyboard shortcut button, then
+  press the new key combination. Escape cancels shortcut capture.
+- **AI Summary**: runs a preset or custom prompt against any saved transcript,
   automatically processing long transcripts in manageable parts.
 - **History**: browses titled transcripts by date, topic, and description, and
   opens or copies the original locally saved files.
-- **Settings**: controls the desktop transcript preview and shows how speech, AI, accounts, telemetry, and storage are handled.
+- **Settings**: controls the keyboard shortcut and desktop transcript preview,
+  and shows how speech, AI, accounts, and telemetry are handled.
 - **Command-Q**: quits the app.
 
 While dictating, Yaprflow shows a compact black overlay near the Mac notch or
@@ -158,7 +158,7 @@ xcodebuild \
 
 The project has two shared schemes:
 
-- `yaprflow`: macOS app, bundle id `com.tmoreton.yaprflow`, version 4.0.12.
+- `yaprflow`: macOS app, bundle id `com.tmoreton.yaprflow`, version 4.0.13.
 - `yaprflow-iOS`: iOS target, bundle id `com.tmoreton.yaprflow.ios`.
 
 ## Release
@@ -173,7 +173,7 @@ For a signed and notarized release, configure the notarization credentials
 described in `scripts/release.sh`, then run:
 
 ```bash
-scripts/release.sh 4.0.12 --publish
+scripts/release.sh 4.0.13 --publish
 ```
 
 The release script can build the app, export a Developer ID signed app, notarize
@@ -184,14 +184,13 @@ GitHub CLI.
 
 - **Nothing records**: grant microphone permission in System Settings >
   Privacy & Security > Microphone.
-- **The hotkey does not fire**: another app may own the shortcut. Open the
-  Yaprflow menu and choose a different shortcut.
+- **The hotkey does not fire**: another app may own the shortcut. Open Settings
+  and choose a different shortcut.
 - **First dictation is slow**: the first run can download and warm up Core ML
   models. Later dictations should start faster.
 - **Model download fails**: check network access to GitHub Releases, then quit
   and reopen Yaprflow to retry.
-- **Need the last transcript again**: use `Copy Transcript` from the menu-bar
-  item.
+- **Need the last transcript again**: open History and copy it from there.
 
 ## License
 

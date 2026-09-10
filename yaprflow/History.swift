@@ -80,9 +80,19 @@ final class TranscriptHistoryModel: ObservableObject {
 
     func copySelected() {
         guard let selectedItem, !selectedItem.transcript.isEmpty else { return }
+        copyToClipboard(selectedItem.transcript)
+    }
+
+    func selectAndCopy(_ item: TranscriptHistoryItem) {
+        selection = item.id
+        guard !item.transcript.isEmpty else { return }
+        copyToClipboard(item.transcript)
+    }
+
+    private func copyToClipboard(_ transcript: String) {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
-        pasteboard.setString(selectedItem.transcript, forType: .string)
+        pasteboard.setString(transcript, forType: .string)
     }
 
     func openSelected() {
@@ -175,7 +185,7 @@ struct HistoryView: View {
             LazyVStack(spacing: 2) {
                 ForEach(model.items) { item in
                     Button {
-                        model.selection = item.id
+                        model.selectAndCopy(item)
                     } label: {
                         HStack(spacing: 10) {
                             Image(systemName: "doc.text")
@@ -217,10 +227,12 @@ struct HistoryView: View {
                             model.selection == item.id ? Color.accentColor.opacity(0.12) : .clear,
                             in: RoundedRectangle(cornerRadius: 8)
                         )
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                 }
             }
+            .frame(maxWidth: .infinity)
         }
     }
 

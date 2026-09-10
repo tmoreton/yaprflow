@@ -36,18 +36,12 @@ struct NotchOverlayView: View {
         .padding(.horizontal, 18)
         .padding(.vertical, 10)
         .frame(width: 520, height: 68, alignment: .leading)
-        .background(pillShape.fill(Color.black.opacity(0.92)))
-        .overlay(pillShape.strokeBorder(Color.white.opacity(0.08), lineWidth: 1))
+        .background(overlayShape.fill(Color.black.opacity(0.92)))
+        .overlay(overlayShape.strokeBorder(Color.white.opacity(0.08), lineWidth: 1))
     }
 
-    private var pillShape: UnevenRoundedRectangle {
-        UnevenRoundedRectangle(
-            topLeadingRadius: 0,
-            bottomLeadingRadius: Self.cornerRadius,
-            bottomTrailingRadius: Self.cornerRadius,
-            topTrailingRadius: 0,
-            style: .continuous
-        )
+    private var overlayShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
     }
 
     private var displayText: String {

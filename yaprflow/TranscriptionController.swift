@@ -208,7 +208,10 @@ final class TranscriptionController {
         sessionSourceApplication = Self.frontmostApplicationName()
         lastSpeculativeSampleCount = 0
         state.liveTranscript = ""
-        state.status = .preparing("Checking microphone access…")
+        // Present the transcript surface immediately. Permission failures are
+        // still reported below, but an already-authorized microphone should
+        // never leave the overlay sitting on a redundant access check.
+        state.status = .listening
 
         do {
             try await ensureMicPermission()

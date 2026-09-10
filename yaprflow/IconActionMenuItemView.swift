@@ -1,7 +1,6 @@
 import AppKit
 
-/// Custom menu item view for action items (Copy Transcript / Copy Summary)
-/// that mirrors the icon + title geometry used by the custom views above.
+/// Custom menu item view that keeps action icons and titles on a shared column.
 /// Standard `NSMenuItem.image` reserves a
 /// checkmark column to the left of the image, so icons rendered that way sit
 /// further right than the custom views' icons — converting these to a custom
