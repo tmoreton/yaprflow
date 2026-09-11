@@ -285,23 +285,45 @@ final class TranscriptionController {
         await transcribeChain?.value
         transcribeChain = nil
 
-        let finalText = confirmedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        var finalText = confirmedText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // VAD is an optimization, not a requirement for producing a result.
+        // Very short recordings or speech that ends near the stop press can
+        // leave it without a completed segment. In that case, transcribe the
+        // entire captured session before deciding that no speech was found.
+        if finalText.isEmpty,
+           usesVoiceDetectorForCurrentSession,
+           !sessionSamples.isEmpty
+        {
+            log.info("Voice detector produced no final segment; transcribing the full recording")
+            await performTranscribe(samples: sessionSamples)
+            finalText = confirmedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
         state.liveTranscript = finalText
 
         if !finalText.isEmpty {
             let pb = NSPasteboard.general
             pb.clearContents()
-            pb.setString(finalText, forType: .string)
-            state.recordTranscript(
-                finalText,
-                sourceApplication: sessionSourceApplication,
-                vocabularyReplacementCount: vocabularyReplacementCount
-            )
-            state.status = .copied
-            scheduleAutoHide(after: 2.4)
+            if pb.setString(finalText, forType: .string) {
+                state.recordTranscript(
+                    finalText,
+                    sourceApplication: sessionSourceApplication,
+                    vocabularyReplacementCount: vocabularyReplacementCount
+                )
+                state.status = .copied
+                scheduleAutoHide(after: 2.4)
+                log.info("Transcript copied to the clipboard; showing confirmation")
+            } else {
+                state.status = .error("Couldn’t copy the transcript")
+                scheduleAutoHide(after: 2.4)
+                log.error("The system pasteboard rejected the transcript")
+            }
         } else {
-            state.status = .idle
-            scheduleAutoHide(after: 1.2)
+            // Do not silently dismiss the overlay. This makes a genuinely
+            // empty recording distinguishable from a missing confirmation.
+            state.status = .error("No speech detected")
+            scheduleAutoHide(after: 2.4)
+            log.info("No speech was detected in the completed recording")
         }
         usesVoiceDetectorForCurrentSession = false
         scheduleModelUnload()
@@ -510,31 +532,16 @@ final class TranscriptionController {
             // throttling and Jetsam (silent kills).
             mlConfig.computeUnits = .cpuAndGPU
 
-            let modelDir = try await self.ensureModelsLocally()
+            let modelDir = try Self.bundledModelDirectory()
 
             state.status = .preparing("Preparing speech model for your Mac…")
             log.info("Loading ASR model from \(modelDir.path, privacy: .public)")
 
-            let asrModels: AsrModels
-            do {
-                asrModels = try await AsrModels.load(
-                    from: modelDir,
-                    configuration: mlConfig,
-                    version: .v3
-                )
-            } catch {
-                // A freshly-downloaded model that fails to load is almost
-                // always bytes on disk that CoreML can't parse — wipe and
-                // retry once before giving up.
-                log.error("Initial model load failed (\(error.localizedDescription)); clearing cache and retrying.")
-                try? FileManager.default.removeItem(at: Self.cachedModelDir())
-                let freshModelDir = try await self.ensureModelsLocally()
-                asrModels = try await AsrModels.load(
-                    from: freshModelDir,
-                    configuration: mlConfig,
-                    version: .v3
-                )
-            }
+            let asrModels = try await AsrModels.load(
+                from: modelDir,
+                configuration: mlConfig,
+                version: .v3
+            )
 
             let asr = AsrManager(config: .default)
             try await asr.loadModels(asrModels)
@@ -563,204 +570,22 @@ final class TranscriptionController {
         "parakeet_vocab.json",
     ]
 
-    /// Small model pieces that ship inside the app bundle. The big
-    /// `Encoder.mlmodelc` is downloaded on first launch so the DMG stays small.
-    private static let bundledSmallModelFiles = [
-        "Preprocessor.mlmodelc",
-        "Decoder.mlmodelc",
-        "JointDecision.mlmodelc",
-        "parakeet_vocab.json",
-    ]
-
-    private static let encoderDownloadURL = URL(string:
-        "https://github.com/tmoreton/yaprflow/releases/download/models-v3/parakeet-v3-encoder.tar.gz"
-    )!
-
-    /// Full bundle (dev builds with the encoder still in the repo). If every
-    /// file is in the bundle, we use it directly.
-    private static func fullBundledModelDir() -> URL? {
-        guard let resources = Bundle.main.resourceURL else { return nil }
-        let dir = resources.appendingPathComponent(modelSubpath, isDirectory: true)
-        return allModelFilesPresent(in: dir) ? dir : nil
-    }
-
-    /// Production bundle (encoder stripped). Returns the bundle dir if the
-    /// small files are present — they'll be copied into the writable cache.
-    private static func partialBundledModelDir() -> URL? {
-        guard let resources = Bundle.main.resourceURL else { return nil }
-        let dir = resources.appendingPathComponent(modelSubpath, isDirectory: true)
-        let fm = FileManager.default
-        for file in bundledSmallModelFiles where !fm.fileExists(atPath: dir.appendingPathComponent(file).path) {
-            return nil
+    private static func bundledModelDirectory() throws -> URL {
+        guard let resources = Bundle.main.resourceURL else {
+            throw CocoaError(.fileNoSuchFile, userInfo: [
+                NSLocalizedDescriptionKey: "Yaprflow's bundled speech model is missing. Please reinstall the app.",
+            ])
         }
-        return dir
-    }
 
-    /// Writable cache location that `AsrModels.load` reads from. In a
-    /// sandboxed app this resolves under the app's container.
-    private static func cachedModelDir() -> URL {
-        let appSupport = FileManager.default.urls(
-            for: .applicationSupportDirectory, in: .userDomainMask
-        ).first!
-        return appSupport
-            .appendingPathComponent("FluidAudio", isDirectory: true)
-            .appendingPathComponent("Models", isDirectory: true)
-            .appendingPathComponent("parakeet-tdt-0.6b-v3", isDirectory: true)
-    }
-
-    private static func allModelFilesPresent(in dir: URL) -> Bool {
+        let dir = resources.appendingPathComponent(modelSubpath, isDirectory: true)
         let fm = FileManager.default
         for file in requiredModelFiles where !fm.fileExists(atPath: dir.appendingPathComponent(file).path) {
-            return false
-        }
-        return true
-    }
-
-    private func ensureModelsLocally() async throws -> URL {
-        // Dev builds with the encoder still in the repo.
-        if let bundle = Self.fullBundledModelDir() {
-            return bundle
-        }
-
-        // Cache already populated from a previous launch and looks healthy.
-        let cacheDir = Self.cachedModelDir()
-        if Self.cacheLooksHealthy(cacheDir) {
-            return cacheDir
-        }
-
-        // Anything less than a healthy cache — partial download, partial
-        // extraction, corrupt bytes — wipe and start over. Re-downloading is
-        // slower than shipping with a broken model.
-        if FileManager.default.fileExists(atPath: cacheDir.path) {
-            log.info("Cache at \(cacheDir.path, privacy: .public) is incomplete; clearing before re-populating.")
-            try? FileManager.default.removeItem(at: cacheDir)
-        }
-
-        try await populateModelCache(cacheDir)
-
-        guard Self.cacheLooksHealthy(cacheDir) else {
-            try? FileManager.default.removeItem(at: cacheDir)
-            throw NSError(domain: "yaprflow.model", code: 2, userInfo: [
-                NSLocalizedDescriptionKey:
-                    "Model files look incomplete after download. Please try again — if it keeps failing, your network may be blocking GitHub releases."
+            throw CocoaError(.fileNoSuchFile, userInfo: [
+                NSFilePathErrorKey: dir.appendingPathComponent(file).path,
+                NSLocalizedDescriptionKey: "Yaprflow's bundled speech model is incomplete. Please reinstall the app.",
             ])
         }
-        return cacheDir
-    }
-
-    /// A "healthy" cache has all required files AND the encoder's weight file
-    /// is at least 100 MB. Catches partial extractions where the directory
-    /// exists but its contents are truncated.
-    private static func cacheLooksHealthy(_ dir: URL) -> Bool {
-        guard allModelFilesPresent(in: dir) else { return false }
-        let weightFile = dir
-            .appendingPathComponent("Encoder.mlmodelc", isDirectory: true)
-            .appendingPathComponent("weights", isDirectory: true)
-            .appendingPathComponent("weight.bin")
-        guard let attrs = try? FileManager.default.attributesOfItem(atPath: weightFile.path),
-              let size = attrs[.size] as? Int64,
-              size > 100_000_000
-        else {
-            return false
-        }
-        return true
-    }
-
-    private func populateModelCache(_ cacheDir: URL) async throws {
-        let fm = FileManager.default
-        try fm.createDirectory(at: cacheDir, withIntermediateDirectories: true)
-
-        guard let partial = Self.partialBundledModelDir() else {
-            throw NSError(domain: "yaprflow.model", code: 1, userInfo: [
-                NSLocalizedDescriptionKey:
-                    "Bundled model files missing — please reinstall Yaprflow."
-            ])
-        }
-
-        for name in Self.bundledSmallModelFiles {
-            let src = partial.appendingPathComponent(name)
-            let dst = cacheDir.appendingPathComponent(name)
-            if fm.fileExists(atPath: dst.path) { continue }
-            try fm.copyItem(at: src, to: dst)
-        }
-
-        if !fm.fileExists(atPath: cacheDir.appendingPathComponent("Encoder.mlmodelc").path) {
-            try await downloadAndExtractEncoder(into: cacheDir)
-        }
-    }
-
-    private func downloadAndExtractEncoder(into cacheDir: URL) async throws {
-        state.status = .preparing("Downloading speech model... 0%")
-        log.info("Downloading encoder from \(Self.encoderDownloadURL.absoluteString, privacy: .public)")
-
-        let delegate = EncoderDownloadDelegate()
-        let session = URLSession(
-            configuration: .default,
-            delegate: delegate,
-            delegateQueue: nil
-        )
-        defer { session.finishTasksAndInvalidate() }
-
-        let (tempURL, response) = try await session.download(from: Self.encoderDownloadURL)
-        if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
-            try? FileManager.default.removeItem(at: tempURL)
-            throw NSError(domain: "yaprflow.download", code: http.statusCode, userInfo: [
-                NSLocalizedDescriptionKey: "Download failed (HTTP \(http.statusCode))"
-            ])
-        }
-
-        state.status = .preparing("Extracting speech model...")
-
-        // Extract into a staging sibling directory first; only move into the
-        // real cache if tar succeeds AND the expected files are there. This
-        // ensures a crashed/killed extract can never leave a half-written
-        // Encoder.mlmodelc that fools cacheLooksHealthy on the next launch.
-        let fm = FileManager.default
-        let stagingDir = cacheDir
-            .deletingLastPathComponent()
-            .appendingPathComponent(".encoder-staging-\(UUID().uuidString)", isDirectory: true)
-        try? fm.removeItem(at: stagingDir)
-        try fm.createDirectory(at: stagingDir, withIntermediateDirectories: true)
-        defer { try? fm.removeItem(at: stagingDir) }
-
-        log.info("Extracting encoder into staging \(stagingDir.path, privacy: .public)")
-
-        let tar = Process()
-        tar.executableURL = URL(fileURLWithPath: "/usr/bin/tar")
-        tar.arguments = ["-xzf", tempURL.path, "-C", stagingDir.path]
-        let errPipe = Pipe()
-        tar.standardError = errPipe
-
-        try tar.run()
-        tar.waitUntilExit()
-
-        try? fm.removeItem(at: tempURL)
-
-        guard tar.terminationStatus == 0 else {
-            let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
-            let errStr = String(data: errData, encoding: .utf8) ?? "unknown"
-            throw NSError(domain: "yaprflow.extract", code: Int(tar.terminationStatus), userInfo: [
-                NSLocalizedDescriptionKey: "Extract failed (exit \(tar.terminationStatus)): \(errStr)"
-            ])
-        }
-
-        let extractedEncoder = stagingDir.appendingPathComponent("Encoder.mlmodelc", isDirectory: true)
-        let extractedWeight = extractedEncoder
-            .appendingPathComponent("weights", isDirectory: true)
-            .appendingPathComponent("weight.bin")
-        guard fm.fileExists(atPath: extractedEncoder.path),
-              let attrs = try? fm.attributesOfItem(atPath: extractedWeight.path),
-              let size = attrs[.size] as? Int64,
-              size > 100_000_000
-        else {
-            throw NSError(domain: "yaprflow.extract", code: -1, userInfo: [
-                NSLocalizedDescriptionKey: "Extracted encoder looks incomplete — weight file missing or truncated. Try again."
-            ])
-        }
-
-        let finalEncoder = cacheDir.appendingPathComponent("Encoder.mlmodelc", isDirectory: true)
-        try? fm.removeItem(at: finalEncoder)
-        try fm.moveItem(at: extractedEncoder, to: finalEncoder)
+        return dir
     }
 
     private static let vadModelFile = "silero-vad-unified-256ms-v6.0.0.mlmodelc"
@@ -836,33 +661,5 @@ final class TranscriptionController {
         sessionSamples.removeAll(keepingCapacity: false)
         vadPending.removeAll(keepingCapacity: false)
         log.info("Released transcription models after \(reason, privacy: .public)")
-    }
-}
-
-/// URLSession delegate that pushes download progress into AppState.status so
-/// the overlay shows "Downloading speech model... 42%" during first launch.
-private final class EncoderDownloadDelegate: NSObject, URLSessionDownloadDelegate {
-    func urlSession(
-        _ session: URLSession,
-        downloadTask: URLSessionDownloadTask,
-        didWriteData bytesWritten: Int64,
-        totalBytesWritten: Int64,
-        totalBytesExpectedToWrite: Int64
-    ) {
-        guard totalBytesExpectedToWrite > 0 else { return }
-        let fraction = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
-        let pct = Int((fraction * 100).rounded())
-        Task { @MainActor in
-            AppState.shared.status = .preparing("Downloading speech model... \(pct)%")
-        }
-    }
-
-    func urlSession(
-        _ session: URLSession,
-        downloadTask: URLSessionDownloadTask,
-        didFinishDownloadingTo location: URL
-    ) {
-        // Intentionally empty — URLSession's async `download(from:)` moves the
-        // file to a temp location and returns its URL from the awaited call.
     }
 }

@@ -11,7 +11,7 @@ struct NotchOverlayView: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             statusIndicator
-                .frame(width: 14, height: 14)
+                .frame(width: 18, height: 18)
                 .padding(.top, 3)
 
             VStack(alignment: .leading, spacing: 2) {
@@ -110,7 +110,8 @@ struct NotchOverlayView: View {
         case .copied:
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(.green)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 16, weight: .bold))
+                .accessibilityLabel("Copied")
         case .error:
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(.yellow)

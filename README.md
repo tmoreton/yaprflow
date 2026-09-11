@@ -42,9 +42,8 @@ transcripts.
 
 Yaprflow requires macOS 14 Sonoma or later.
 
-On first use, Yaprflow may download the large Parakeet encoder model from this
-repository's GitHub Releases and warm up Core ML. That download is model data,
-not your audio.
+All speech-recognition models ship inside the app. The first dictation may take
+a little longer while Core ML prepares those bundled models for your Mac.
 
 ## Using Yaprflow
 
@@ -85,7 +84,6 @@ directory.
 
 - Transcripts: `Yaprflow/Transcripts/*.md`
 - Vocabulary: `Yaprflow/Vocabulary.md`
-- Speech model cache: `FluidAudio/Models/parakeet-tdt-0.6b-v3`
 
 Use the `Folder` action in History to reveal saved transcripts; sandboxed macOS
 apps place Application Support under their container.
@@ -106,11 +104,8 @@ Runtime flow:
 
 Model behavior:
 
-- Small Parakeet model files are bundled with the app.
-- The large `Encoder.mlmodelc` is downloaded and cached on first use when it is
-  not bundled.
-- Silero VAD is loaded from the bundle when present, with FluidAudio fallback
-  behavior if it is missing.
+- The complete Parakeet model and Silero VAD ship inside the app bundle.
+- Yaprflow does not download models or send audio to a server at runtime.
 - Models are loaded lazily on first dictation to avoid high memory use at
   launch.
 
@@ -131,7 +126,7 @@ Requirements:
 
 - macOS 14 or later
 - Xcode with command-line tools
-- Network access to GitHub Releases for model downloads
+- Network access to fetch build-time model files before compiling
 
 Clone and fetch model files:
 
@@ -182,10 +177,8 @@ GitHub CLI.
   Privacy & Security > Microphone.
 - **The hotkey does not fire**: another app may own the shortcut. Open Settings
   and choose a different shortcut.
-- **First dictation is slow**: the first run can download and warm up Core ML
+- **First dictation is slow**: the first run warms up the bundled Core ML
   models. Later dictations should start faster.
-- **Model download fails**: check network access to GitHub Releases, then quit
-  and reopen Yaprflow to retry.
 - **Need the last transcript again**: open History and copy it from there.
 
 ## License

@@ -237,7 +237,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -e\nSRC=\"$SRCROOT/Models\"\nDEST=\"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/Models\"\nif [ -d \"$SRC\" ]; then\n  mkdir -p \"$DEST\"\n  rsync -a --delete --exclude '.cache' --exclude '.DS_Store' \"$SRC/\" \"$DEST/\"\nelse\n  echo \"warning: Models/ missing — run scripts/fetch-models.sh\"\nfi\n";
+			shellScript = "set -e\nSRC=\"$SRCROOT/Models\"\nDEST=\"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/Models\"\nREQUIRED_PATHS=(\n  \"parakeet-tdt-0.6b-v3/Preprocessor.mlmodelc\"\n  \"parakeet-tdt-0.6b-v3/Encoder.mlmodelc\"\n  \"parakeet-tdt-0.6b-v3/Decoder.mlmodelc\"\n  \"parakeet-tdt-0.6b-v3/JointDecision.mlmodelc\"\n  \"parakeet-tdt-0.6b-v3/parakeet_vocab.json\"\n  \"silero-vad/silero-vad-unified-256ms-v6.0.0.mlmodelc\"\n)\nfor MODEL_PATH in \"${REQUIRED_PATHS[@]}\"; do\n  if [ ! -e \"$SRC/$MODEL_PATH\" ]; then\n    echo \"error: Missing required model: Models/$MODEL_PATH\" >&2\n    echo \"error: Run scripts/fetch-models.sh before building Yaprflow.\" >&2\n    exit 1\n  fi\ndone\nENCODER_WEIGHTS=\"$SRC/parakeet-tdt-0.6b-v3/Encoder.mlmodelc/weights/weight.bin\"\nif [ ! -f \"$ENCODER_WEIGHTS\" ] || [ \"$(wc -c < \"$ENCODER_WEIGHTS\")\" -lt 100000000 ]; then\n  echo \"error: The bundled encoder weights are missing or incomplete.\" >&2\n  echo \"error: Run scripts/fetch-models.sh before building Yaprflow.\" >&2\n  exit 1\nfi\nmkdir -p \"$DEST\"\nrsync -a --delete --exclude '.cache' --exclude '.DS_Store' \"$SRC/\" \"$DEST/\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -450,7 +450,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = yaprflow/yaprflow.entitlements;
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -458,11 +457,12 @@
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Yaprflow;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_LSUIElement = YES;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Tim Moreton";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Yaprflow needs the microphone to transcribe your voice into text.";
 				INFOPLIST_KEY_NSSupportsAutomaticTermination = NO;
 				INFOPLIST_KEY_NSSupportsSuddenTermination = NO;
@@ -473,7 +473,6 @@
 				MARKETING_VERSION = 4.0.14;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tmoreton.yaprflow;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -489,7 +488,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = yaprflow/yaprflow.entitlements;
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -497,11 +495,12 @@
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Yaprflow;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_LSUIElement = YES;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Tim Moreton";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Yaprflow needs the microphone to transcribe your voice into text.";
 				INFOPLIST_KEY_NSSupportsAutomaticTermination = NO;
 				INFOPLIST_KEY_NSSupportsSuddenTermination = NO;
@@ -512,7 +511,6 @@
 				MARKETING_VERSION = 4.0.14;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tmoreton.yaprflow;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
