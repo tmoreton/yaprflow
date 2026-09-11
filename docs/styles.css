@@ -653,3 +653,47 @@ h3 {
     transition-duration: 0.001ms !important;
   }
 }
+
+/* ---------- Legal pages ---------- */
+
+.legal-main {
+  width: min(100% - 40px, 760px);
+  margin: 0 auto;
+  padding: 72px 0 96px;
+}
+
+.legal-main h1 {
+  margin: 0 0 10px;
+  font-size: clamp(40px, 7vw, 64px);
+  letter-spacing: -0.045em;
+}
+
+.legal-updated {
+  margin: 0 0 44px;
+  color: var(--muted);
+}
+
+.legal-section {
+  margin-top: 36px;
+}
+
+.legal-section h2 {
+  margin: 0 0 12px;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+
+.legal-section p,
+.legal-section li {
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.legal-section a {
+  color: var(--ink);
+  text-underline-offset: 3px;
+}
+
+.legal-section ul {
+  padding-left: 22px;
+}
