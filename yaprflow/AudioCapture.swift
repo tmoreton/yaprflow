@@ -16,11 +16,34 @@ enum AudioCaptureError: LocalizedError {
 
 nonisolated final class AudioCapture: @unchecked Sendable {
     private let engine = AVAudioEngine()
+    private let stateLock = NSLock()
+    private let callbackGroup = DispatchGroup()
     private var running = false
-    private let bufferHandler: @Sendable (AVAudioPCMBuffer) -> Void
+    private var acceptingCallbacks = false
+    private var activeGeneration: UInt?
+    private var configurationObserver: NSObjectProtocol?
+    private let bufferHandler: @Sendable (UInt, AVAudioPCMBuffer) -> Void
+    private let configurationChangeHandler: @Sendable (UInt) -> Void
 
-    init(bufferHandler: @escaping @Sendable (AVAudioPCMBuffer) -> Void) {
+    init(
+        bufferHandler: @escaping @Sendable (UInt, AVAudioPCMBuffer) -> Void,
+        configurationChangeHandler: @escaping @Sendable (UInt) -> Void
+    ) {
         self.bufferHandler = bufferHandler
+        self.configurationChangeHandler = configurationChangeHandler
+        configurationObserver = NotificationCenter.default.addObserver(
+            forName: .AVAudioEngineConfigurationChange,
+            object: engine,
+            queue: nil
+        ) { [weak self] _ in
+            self?.handleConfigurationChange()
+        }
+    }
+
+    deinit {
+        if let configurationObserver {
+            NotificationCenter.default.removeObserver(configurationObserver)
+        }
     }
 
     func validateInputAvailable() throws {
@@ -29,31 +52,91 @@ nonisolated final class AudioCapture: @unchecked Sendable {
         }
     }
 
-    func start() throws {
-        guard !running else { return }
+    func start(sessionGeneration: UInt) throws {
+        stateLock.lock()
+        let isAlreadyRunning = running || acceptingCallbacks
+        stateLock.unlock()
+        guard !isAlreadyRunning else { return }
         try validateInputAvailable()
 
         let input = engine.inputNode
         let format = input.inputFormat(forBus: 0)
-        guard format.sampleRate > 0, format.channelCount > 0 else {
+        guard Self.supportsCaptureFormat(format) else {
             throw AudioCaptureError.invalidInputFormat
         }
 
-        input.installTap(onBus: 0, bufferSize: 4096, format: format) { [handler = bufferHandler] buffer, _ in
+        input.installTap(onBus: 0, bufferSize: 4096, format: format) { [weak self] buffer, _ in
+            guard let self else { return }
+            self.stateLock.lock()
+            guard self.acceptingCallbacks else {
+                self.stateLock.unlock()
+                return
+            }
+            self.callbackGroup.enter()
+            self.stateLock.unlock()
+            defer { self.callbackGroup.leave() }
             guard let copy = AudioCapture.copy(buffer: buffer) else { return }
-            handler(copy)
+            self.bufferHandler(sessionGeneration, copy)
         }
 
-        engine.prepare()
-        try engine.start()
-        running = true
+        stateLock.lock()
+        acceptingCallbacks = true
+        activeGeneration = sessionGeneration
+        stateLock.unlock()
+
+        do {
+            engine.prepare()
+            try engine.start()
+            stateLock.lock()
+            running = true
+            stateLock.unlock()
+        } catch {
+            // A failed start leaves the installed tap behind unless it is
+            // explicitly removed. That stale tap makes the next Start fail.
+            stateLock.lock()
+            acceptingCallbacks = false
+            activeGeneration = nil
+            stateLock.unlock()
+            engine.stop()
+            input.removeTap(onBus: 0)
+            callbackGroup.wait()
+            throw error
+        }
     }
 
     func stop() {
-        guard running else { return }
-        engine.inputNode.removeTap(onBus: 0)
-        engine.stop()
+        stateLock.lock()
+        let wasRunning = running
         running = false
+        acceptingCallbacks = false
+        activeGeneration = nil
+        stateLock.unlock()
+        guard wasRunning else { return }
+
+        engine.stop()
+        engine.inputNode.removeTap(onBus: 0)
+
+        // Once the tap is removed, wait for any callback already executing to
+        // finish handing its copied buffer to the session FIFO. This makes the
+        // caller's subsequent FIFO finish a real end-of-input barrier.
+        callbackGroup.wait()
+    }
+
+    private func handleConfigurationChange() {
+        stateLock.lock()
+        let generation = running ? activeGeneration : nil
+        stateLock.unlock()
+        guard let generation else { return }
+        configurationChangeHandler(generation)
+    }
+
+    static func supportsCaptureFormat(_ format: AVAudioFormat) -> Bool {
+        let supportsSampleStorage = format.commonFormat == .pcmFormatFloat32
+            || format.commonFormat == .pcmFormatInt16
+        return format.sampleRate > 0
+            && format.channelCount > 0
+            && supportsSampleStorage
+            && (!format.isInterleaved || format.channelCount == 1)
     }
 
     private static func copy(buffer: AVAudioPCMBuffer) -> AVAudioPCMBuffer? {
@@ -66,14 +149,26 @@ nonisolated final class AudioCapture: @unchecked Sendable {
         let channels = Int(buffer.format.channelCount)
         let frames = Int(buffer.frameLength)
 
-        if let src = buffer.floatChannelData, let dst = copy.floatChannelData {
-            for ch in 0..<channels {
-                dst[ch].update(from: src[ch], count: frames)
+        let channelBufferCount = buffer.format.isInterleaved ? 1 : channels
+        let samplesPerBuffer = frames * (buffer.format.isInterleaved ? channels : 1)
+
+        switch buffer.format.commonFormat {
+        case .pcmFormatFloat32:
+            guard let src = buffer.floatChannelData, let dst = copy.floatChannelData else {
+                return nil
             }
-        } else if let src = buffer.int16ChannelData, let dst = copy.int16ChannelData {
-            for ch in 0..<channels {
-                dst[ch].update(from: src[ch], count: frames)
+            for ch in 0..<channelBufferCount {
+                dst[ch].update(from: src[ch], count: samplesPerBuffer)
             }
+        case .pcmFormatInt16:
+            guard let src = buffer.int16ChannelData, let dst = copy.int16ChannelData else {
+                return nil
+            }
+            for ch in 0..<channelBufferCount {
+                dst[ch].update(from: src[ch], count: samplesPerBuffer)
+            }
+        default:
+            return nil
         }
         return copy
     }

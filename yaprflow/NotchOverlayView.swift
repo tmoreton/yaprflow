@@ -4,7 +4,6 @@ struct NotchOverlayView: View {
     @ObservedObject var state: AppState
 
     private static let transcriptFont = Font.system(size: 15, weight: .medium)
-    private static let subtitleFont = Font.system(size: 12, weight: .regular)
     private static let maxCharsPerLine = 56
     private static let cornerRadius: CGFloat = 22
 
@@ -21,15 +20,6 @@ struct NotchOverlayView: View {
                     .multilineTextAlignment(.leading)
                     .lineLimit(2)
                     .frame(maxWidth: .infinity, alignment: .leading)
-
-                if showSubtitle {
-                    Text(subtitleText)
-                        .font(Self.subtitleFont)
-                        .foregroundStyle(.white.opacity(0.5))
-                        .multilineTextAlignment(.leading)
-                        .lineLimit(1)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -52,8 +42,6 @@ struct NotchOverlayView: View {
             return message
         case .listening:
             return state.liveTranscript.isEmpty ? "Listening…" : Self.wrappedTail(of: state.liveTranscript)
-        case .finishing:
-            return state.liveTranscript.isEmpty ? "Processing…" : Self.wrappedTail(of: state.liveTranscript)
         case .copied:
             return copiedDisplayText
         case .error(let message):
@@ -64,16 +52,6 @@ struct NotchOverlayView: View {
     /// Shows appropriate text for the copied state.
     private var copiedDisplayText: String {
         return "Copied to clipboard"
-    }
-
-    private var showSubtitle: Bool {
-        guard case .copied = state.status else { return false }
-        return true
-    }
-
-    private var subtitleText: String {
-        guard showSubtitle else { return "" }
-        return "Ready to paste"
     }
 
     private static func wrappedTail(of text: String) -> String {
@@ -116,7 +94,7 @@ struct NotchOverlayView: View {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(.yellow)
                 .font(.system(size: 14, weight: .semibold))
-        case .preparing, .finishing:
+        case .preparing:
             ProgressView()
                 .controlSize(.small)
                 .tint(.white)

@@ -1,11 +1,14 @@
 #if os(iOS)
+import Combine
 import SwiftUI
 import UIKit
 
 struct ContentView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var engine = TranscriptionEngine.shared
     @StateObject private var history = HistoryStore.shared
     @State private var showHistory = false
+    @State private var showAcknowledgements = false
 
     var body: some View {
         ZStack {
@@ -40,19 +43,51 @@ struct ContentView: View {
         }
         .preferredColorScheme(.dark)
         .onAppear { engine.preload() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .background {
+                engine.applicationDidEnterBackground()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(
+            for: UIApplication.didReceiveMemoryWarningNotification
+        )) { _ in
+            engine.applicationDidReceiveMemoryWarning()
+        }
         .sheet(isPresented: $showHistory) {
-            HistorySheet(items: history.items)
+            HistorySheet(history: history)
                 .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Color.black)
+        }
+        .sheet(isPresented: $showAcknowledgements) {
+            AcknowledgementsSheet()
+                .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Color.black)
         }
     }
 
-    // MARK: - Top bar (just the history button on the right)
+    // MARK: - Top bar
 
     private var topBar: some View {
         HStack {
+            Button {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                showAcknowledgements = true
+            } label: {
+                Image(systemName: "info.circle")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.7))
+                    .frame(width: 36, height: 36)
+                    .background(
+                        Circle().fill(Color.white.opacity(0.08))
+                    )
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("About and acknowledgements")
+
             Spacer()
+
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 showHistory = true
@@ -72,6 +107,7 @@ struct ContentView: View {
             .buttonStyle(.plain)
             .disabled(history.items.isEmpty)
             .opacity(history.items.isEmpty ? 0.4 : 1)
+            .accessibilityLabel("Recent transcripts")
         }
     }
 
@@ -110,35 +146,84 @@ struct ContentView: View {
         } label: {
             ZStack {
                 Circle()
-                    .fill(engine.isRecording ? Color.red : Color.white)
+                    .fill(showsStopControl ? Color.red : Color.white)
                     .frame(width: 76, height: 76)
-                    .shadow(color: engine.isRecording ? Color.red.opacity(0.45) : .clear,
-                            radius: engine.isRecording ? 22 : 0)
+                    .shadow(color: showsStopControl ? Color.red.opacity(0.45) : .clear,
+                            radius: showsStopControl ? 22 : 0)
 
-                Image(systemName: engine.isRecording ? "stop.fill" : "mic.fill")
+                Image(systemName: showsStopControl ? "stop.fill" : "mic.fill")
                     .font(.system(size: 28, weight: .semibold))
-                    .foregroundStyle(engine.isRecording ? .white : .black)
+                    .foregroundStyle(showsStopControl ? .white : .black)
             }
-            .scaleEffect(engine.isRecording ? 1.04 : 1.0)
-            .animation(.spring(response: 0.32, dampingFraction: 0.7), value: engine.isRecording)
+            .scaleEffect(showsStopControl ? 1.04 : 1.0)
+            .animation(.spring(response: 0.32, dampingFraction: 0.7), value: showsStopControl)
         }
         .buttonStyle(.plain)
-        .disabled(isPreparing)
-        .opacity(isPreparing ? 0.4 : 1)
+        .accessibilityLabel(showsStopControl ? "Stop recording" : "Start recording")
     }
 
-    private var isPreparing: Bool {
-        if case .preparing = engine.status { return true }
-        return false
+    private var showsStopControl: Bool {
+        engine.isRecording || engine.isRecordingPending
+    }
+}
+
+// MARK: - Acknowledgements sheet
+
+private struct AcknowledgementsSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    private static let contents: String = {
+        guard
+            let url = Bundle.main.url(
+                forResource: "Acknowledgements",
+                withExtension: "txt"
+            ),
+            let text = try? String(contentsOf: url, encoding: .utf8)
+        else {
+            return "Acknowledgements are unavailable in this build."
+        }
+        return text
+    }()
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    Link(destination: URL(string: "https://yaprflow.com/privacy.html")!) {
+                        Label("Privacy Policy", systemImage: "hand.raised")
+                            .font(.headline)
+                    }
+
+                    Divider()
+
+                    Text(Self.contents)
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.8))
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(20)
+            }
+            .background(Color.black.ignoresSafeArea())
+            .navigationTitle("About")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
     }
 }
 
 // MARK: - History sheet
 
 private struct HistorySheet: View {
-    let items: [String]
+    @ObservedObject var history: HistoryStore
     @Environment(\.dismiss) private var dismiss
     @State private var copiedItem: String?
+    @State private var showClearConfirmation = false
 
     var body: some View {
         ZStack {
@@ -152,13 +237,19 @@ private struct HistorySheet: View {
                         .tracking(0.6)
                         .textCase(.uppercase)
                     Spacer()
+                    Button("Clear", role: .destructive) {
+                        showClearConfirmation = true
+                    }
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .disabled(history.items.isEmpty)
+                    .accessibilityLabel("Clear transcript history")
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
                 .padding(.bottom, 14)
 
                 VStack(spacing: 8) {
-                    ForEach(items, id: \.self) { item in
+                    ForEach(history.items, id: \.self) { item in
                         HistoryRow(
                             text: item,
                             isCopied: copiedItem == item,
@@ -170,6 +261,19 @@ private struct HistorySheet: View {
 
                 Spacer()
             }
+        }
+        .confirmationDialog(
+            "Clear recent transcripts?",
+            isPresented: $showClearConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Clear History", role: .destructive) {
+                history.clear()
+                dismiss()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This removes all saved transcript text from this device.")
         }
     }
 

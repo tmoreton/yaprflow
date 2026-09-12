@@ -21,11 +21,86 @@ struct TranscriptProcessingResult {
     let vocabularyReplacementCount: Int
 }
 
+struct VocabularyReplacement {
+    let spoken: String
+    let preferred: String
+}
+
+/// Immutable text-processing rules captured at the beginning of a recording.
+/// Keeping the compiled expressions here avoids reading Vocabulary.md and
+/// rebuilding every regular expression for each streaming partial result.
+struct TranscriptProcessor {
+    private struct CompiledVocabularyReplacement {
+        let regex: NSRegularExpression
+        let preferredTemplate: String
+    }
+
+    let mode: DictationMode
+    private let vocabulary: [CompiledVocabularyReplacement]
+
+    init(mode: DictationMode, vocabulary: [VocabularyReplacement]) {
+        self.mode = mode
+        self.vocabulary = vocabulary.compactMap { replacement in
+            let escaped = NSRegularExpression.escapedPattern(for: replacement.spoken)
+            let pattern = #"(?i)\b"# + escaped + #"\b"#
+            guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
+            return CompiledVocabularyReplacement(
+                regex: regex,
+                preferredTemplate: NSRegularExpression.escapedTemplate(
+                    for: replacement.preferred
+                )
+            )
+        }
+    }
+
+    func process(_ raw: String) -> TranscriptProcessingResult {
+        let modeProcessed: String
+        switch mode {
+        case .exact:
+            modeProcessed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        case .polished:
+            modeProcessed = TranscriptPolishing.polish(raw)
+        }
+
+        guard !modeProcessed.isEmpty, !vocabulary.isEmpty else {
+            return TranscriptProcessingResult(
+                text: modeProcessed,
+                vocabularyReplacementCount: 0
+            )
+        }
+
+        var processed = modeProcessed
+        var totalReplacements = 0
+        for replacement in vocabulary {
+            let range = NSRange(processed.startIndex..., in: processed)
+            let matches = replacement.regex.numberOfMatches(
+                in: processed,
+                options: [],
+                range: range
+            )
+            guard matches > 0 else { continue }
+
+            processed = replacement.regex.stringByReplacingMatches(
+                in: processed,
+                options: [],
+                range: range,
+                withTemplate: replacement.preferredTemplate
+            )
+            totalReplacements += matches
+        }
+
+        return TranscriptProcessingResult(
+            text: processed,
+            vocabularyReplacementCount: totalReplacements
+        )
+    }
+
+}
+
 enum TranscriptionStatus: Equatable {
     case idle
     case preparing(String)
     case listening
-    case finishing
     case copied
     case error(String)
 }
@@ -70,8 +145,8 @@ final class AppState: ObservableObject {
         self.isDesktopPreviewEnabled = UserDefaults.standard.object(
             forKey: Self.desktopPreviewEnabledKey
         ) as? Bool ?? true
-        self.dictationMode = .polished
-        UserDefaults.standard.set(DictationMode.polished.rawValue, forKey: Self.dictationModeKey)
+        self.dictationMode = UserDefaults.standard.string(forKey: Self.dictationModeKey)
+            .flatMap(DictationMode.init(rawValue:)) ?? .polished
     }
 
     /// Exercise preference-driven UI without changing the user's saved value.
@@ -85,40 +160,42 @@ final class AppState: ObservableObject {
     /// transcript as a standalone Markdown file.
     func recordTranscript(
         _ text: String,
+        mode: DictationMode? = nil,
         sourceApplication: String?,
         vocabularyReplacementCount: Int
-    ) {
+    ) throws {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         let recordedAt = Date()
-        let fileURL = try? Self.writeTranscriptMarkdown(
+        let recordedMode = mode ?? dictationMode
+
+        // Preserve the quick re-copy value even if the Markdown archive cannot
+        // be written, but propagate the disk error so the recording UI can be
+        // honest about the partial success.
+        lastTranscript = trimmed
+        let fileURL = try Self.writeTranscriptMarkdown(
             trimmed,
-            mode: dictationMode,
+            mode: recordedMode,
             sourceApplication: sourceApplication,
             vocabularyReplacementCount: vocabularyReplacementCount,
             recordedAt: recordedAt
         )
-        lastTranscript = trimmed
-
-        if let fileURL {
-            TranscriptMetadataEnricher.shared.enqueue(
-                url: fileURL,
-                transcript: trimmed,
-                recordedAt: recordedAt
-            )
-        }
+        TranscriptMetadataEnricher.shared.enqueue(
+            url: fileURL,
+            transcript: trimmed,
+            recordedAt: recordedAt
+        )
     }
 
     func processTranscript(_ raw: String) -> TranscriptProcessingResult {
-        let modeProcessed: String
-        switch dictationMode {
-        case .exact:
-            modeProcessed = Self.trimTranscript(raw)
-        case .polished:
-            modeProcessed = Self.polishTranscript(raw)
-        }
+        makeTranscriptProcessor().process(raw)
+    }
 
-        return Self.applyVocabulary(to: modeProcessed)
+    func makeTranscriptProcessor() -> TranscriptProcessor {
+        TranscriptProcessor(
+            mode: dictationMode,
+            vocabulary: (try? Self.loadVocabularyReplacements()) ?? []
+        )
     }
 
     func transcriptsDirectory() throws -> URL {
@@ -191,7 +268,7 @@ final class AppState: ObservableObject {
         # Examples:
         # yapper flow => Yaprflow
         # swift you eye => SwiftUI
-        # parakeet t d t => Parakeet TDT
+        # dot net => .NET
 
         """
         try template.write(to: url, atomically: true, encoding: .utf8)
@@ -230,70 +307,6 @@ final class AppState: ObservableObject {
         value
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
-    }
-
-    private static let fillerWordRegex: NSRegularExpression = {
-        let pattern = #"(?i)\b(?:u+h+m*|u+m+h*|e+r+h*|a+h+m*|hmm+|mm+|mhm+)\b[,\.]?\s*"#
-        return try! NSRegularExpression(pattern: pattern)
-    }()
-
-    private static func trimTranscript(_ raw: String) -> String {
-        raw.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private static func polishTranscript(_ raw: String) -> String {
-        let range = NSRange(raw.startIndex..., in: raw)
-        var text = fillerWordRegex.stringByReplacingMatches(
-            in: raw,
-            options: [],
-            range: range,
-            withTemplate: ""
-        )
-        while text.contains("  ") {
-            text = text.replacingOccurrences(of: "  ", with: " ")
-        }
-        text = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let first = text.first, ",.;:!?".contains(first) {
-            text = String(text.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-        return text
-    }
-
-    private struct VocabularyReplacement {
-        let spoken: String
-        let preferred: String
-    }
-
-    private static func applyVocabulary(to text: String) -> TranscriptProcessingResult {
-        guard !text.isEmpty, let replacements = try? loadVocabularyReplacements(), !replacements.isEmpty else {
-            return TranscriptProcessingResult(text: text, vocabularyReplacementCount: 0)
-        }
-
-        var processed = text
-        var totalReplacements = 0
-
-        for replacement in replacements {
-            let escaped = NSRegularExpression.escapedPattern(for: replacement.spoken)
-            let pattern = #"(?i)\b"# + escaped + #"\b"#
-            guard let regex = try? NSRegularExpression(pattern: pattern) else { continue }
-
-            let range = NSRange(processed.startIndex..., in: processed)
-            let matches = regex.numberOfMatches(in: processed, options: [], range: range)
-            guard matches > 0 else { continue }
-
-            processed = regex.stringByReplacingMatches(
-                in: processed,
-                options: [],
-                range: range,
-                withTemplate: NSRegularExpression.escapedTemplate(for: replacement.preferred)
-            )
-            totalReplacements += matches
-        }
-
-        return TranscriptProcessingResult(
-            text: processed,
-            vocabularyReplacementCount: totalReplacements
-        )
     }
 
     private static func loadVocabularyReplacements() throws -> [VocabularyReplacement] {

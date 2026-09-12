@@ -63,7 +63,7 @@ struct SettingsView: View {
                     PrivacyRow(
                         symbol: "waveform",
                         title: "Speech recognition",
-                        detail: "Processed with local Core ML models",
+                        detail: "Processed locally with Nemotron and sherpa-onnx",
                         status: "On-device"
                     )
                     Divider().padding(.leading, 38)
@@ -77,7 +77,7 @@ struct SettingsView: View {
                     PrivacyRow(
                         symbol: "person.crop.circle.badge.xmark",
                         title: "Accounts",
-                        detail: "No account or sign-in required",
+                        detail: "No Yaprflow account or sign-in required",
                         status: "None"
                     )
                     Divider().padding(.leading, 38)
@@ -183,7 +183,7 @@ private struct AcknowledgementsView: View {
             FeatureWindowHeader(
                 symbolName: "doc.text.fill",
                 title: "Acknowledgements",
-                subtitle: "Open-source software and model licenses bundled with Yaprflow.",
+                subtitle: "Third-party software and model licenses bundled with Yaprflow.",
                 accent: .blue,
                 badge: "Licenses",
                 badgeSymbol: "checkmark.seal.fill"

@@ -1,7 +1,6 @@
 @preconcurrency import AVFoundation
 import AppKit
 import CoreML
-import FluidAudio
 import Foundation
 import OSLog
 
@@ -42,62 +41,169 @@ struct RecordingSmokeTestResult {
     let message: String
 }
 
+nonisolated struct CapturedAudioPacket: @unchecked Sendable {
+    let generation: UInt
+    let buffer: AVAudioPCMBuffer
+}
+
+/// A generation-scoped FIFO between AVAudioEngine's realtime callback and the
+/// single async inference worker. The bounded stream prevents a slow decoder
+/// from turning an hour-long recording into an unbounded task/buffer backlog.
+nonisolated final class BoundedAudioIngress: @unchecked Sendable {
+    private struct Session {
+        let generation: UInt
+        let continuation: AsyncStream<CapturedAudioPacket>.Continuation
+        var droppedAudio = false
+    }
+
+    private let lock = NSLock()
+    private let capacity: Int
+    private var session: Session?
+
+    init(capacity: Int = 256) {
+        precondition(capacity > 0)
+        self.capacity = capacity
+    }
+
+    func beginSession(generation: UInt) -> AsyncStream<CapturedAudioPacket> {
+        let pair = AsyncStream<CapturedAudioPacket>.makeStream(
+            bufferingPolicy: .bufferingOldest(capacity)
+        )
+
+        lock.lock()
+        let previousContinuation = session?.continuation
+        session = Session(
+            generation: generation,
+            continuation: pair.continuation
+        )
+        lock.unlock()
+
+        previousContinuation?.finish()
+        return pair.stream
+    }
+
+    func enqueue(generation: UInt, buffer: AVAudioPCMBuffer) {
+        lock.lock()
+        guard var current = session, current.generation == generation else {
+            lock.unlock()
+            return
+        }
+
+        let result = current.continuation.yield(
+            CapturedAudioPacket(generation: generation, buffer: buffer)
+        )
+        if case .dropped = result {
+            current.droppedAudio = true
+            session = current
+        }
+        lock.unlock()
+    }
+
+    /// Finish the current generation and return whether bounded buffering ever
+    /// had to drop a newly captured packet.
+    @discardableResult
+    func finishSession(generation: UInt) -> Bool {
+        lock.lock()
+        guard let current = session, current.generation == generation else {
+            lock.unlock()
+            return false
+        }
+        session = nil
+        lock.unlock()
+
+        current.continuation.finish()
+        return current.droppedAudio
+    }
+}
+
 @MainActor
 final class TranscriptionController {
     static let shared = TranscriptionController()
 
+    private enum StopReason {
+        case userInitiated
+        case audioConfigurationChanged
+    }
+
     private let state = AppState.shared
+    private let audioIngress: BoundedAudioIngress
     private let capture: AudioCapture
-    private let audioConverter = AudioConverter()
+    private let audioConverter = StreamingAudioConverter()
     private let memoryPressureSource: DispatchSourceMemoryPressure
 
-    // Models stay warm between nearby recordings, then unload while idle so
-    // the ~1.8 GB Core ML allocation cannot make macOS kill the menu-bar app
-    // later under memory pressure.
-    private var asrManager: AsrManager?
-    private var vadManager: VadManager?
-    private var asrLoadingTask: Task<AsrManager, Error>?
+    // Models stay warm between nearby recordings, then unload while idle.
+    // Nemotron is comparatively large, so return its ONNX Runtime allocation
+    // after dictation has not been used for a while.
+    private var speechRecognizer: NemotronStreamingRecognizer?
+    private var vadManager: VoiceActivityDetector?
+    private var speechRecognizerLoadingTask: Task<NemotronStreamingRecognizer, Error>?
     private var voiceDetectorLoadingTask: Task<Void, Never>?
     private var modelUnloadTask: Task<Void, Never>?
 
     // Per-session state
-    private var sessionSamples: [Float] = []
+    private var sessionAudio = RollingSessionAudio()
     private var vadPending: [Float] = []
-    private var vadState: VadStreamState?
+    private var vadState: VoiceActivityStreamState?
     private var currentSpeechStart: Int?
+    private var currentSpeechFedThrough: Int?
+    private var lastFinalizedAudioEnd = 0
     private var confirmedText = ""
     private var volatileText = ""
     private var vocabularyReplacementCount = 0
     private var sessionSourceApplication: String?
-    private var lastSpeculativeSampleCount = 0
-    private var transcribeChain: Task<Void, Never>?
+    private var audioWorkerTask: Task<Void, Never>?
+    private var transcriptProcessor: TranscriptProcessor?
+    private var sessionGeneration: UInt = 0
+    private var recognizerStreamIsOpen = false
+    private var recognizerStreamHasLeadingOverlap = false
     private var usesVoiceDetectorForCurrentSession = false
 
-    private var isActive = false
-    private var isStarting = false
+    private var lifecycle: RecordingLifecyclePhase = .idle
+    private var isActive: Bool {
+        if case .recording = lifecycle { return true }
+        return false
+    }
+    private var isStarting: Bool {
+        if case .starting = lifecycle { return true }
+        return false
+    }
+    private var isStopping: Bool {
+        if case .stopping = lifecycle { return true }
+        return false
+    }
+    private var startRequested = false
     private var autoHideTask: Task<Void, Never>?
 
-    // Long maxSpeechDuration (60s) for continuous dictation without forced chunks.
-    // Silence-based segmentation handles natural pauses.
-    private let segmentationConfig = VadSegmentationConfig(
-        minSpeechDuration: 0.15,
-        minSilenceDuration: 0.3,
-        maxSpeechDuration: 60.0,
-        speechPadding: 0.1
+    private static let sampleRate = NemotronStreamingRecognizer.sampleRate
+    private static let hardSegmentSamples = 30 * sampleRate
+    private static let shortRecordingFallbackSamples = hardSegmentSamples
+    private static let forcedSegmentOverlapSamples = sampleRate / 2
+    private static let livePreviewCharacterLimit = 512
+
+    // Natural pauses are preferred boundaries. The controller independently
+    // enforces the 30-second segment ceiling used by the speech recognizer.
+    private let segmentationConfig = VoiceActivitySegmentationConfiguration(
+        minSilenceDuration: 0.6,
+        speechPadding: 0.15
     )
 
-    // Speculative partials: re-transcribe in-progress speech every 2.0s.
-    // Less frequent = fewer re-transcriptions for long recordings.
-    private let speculativeIntervalSamples = Int(2.0 * 16000)
-    private let speculativeMinSpeechSamples = Int(1.0 * 16000)
-
     private init() {
-        let bufferHandler: @Sendable (AVAudioPCMBuffer) -> Void = { buffer in
+        let audioIngress = BoundedAudioIngress()
+        self.audioIngress = audioIngress
+        let bufferHandler: @Sendable (UInt, AVAudioPCMBuffer) -> Void = { generation, buffer in
+            audioIngress.enqueue(generation: generation, buffer: buffer)
+        }
+        let configurationChangeHandler: @Sendable (UInt) -> Void = { generation in
             Task { @MainActor in
-                await TranscriptionController.shared.feed(buffer)
+                await TranscriptionController.shared.handleAudioConfigurationChange(
+                    generation: generation
+                )
             }
         }
-        self.capture = AudioCapture(bufferHandler: bufferHandler)
+        self.capture = AudioCapture(
+            bufferHandler: bufferHandler,
+            configurationChangeHandler: configurationChangeHandler
+        )
 
         let memoryPressureSource = DispatchSource.makeMemoryPressureSource(
             eventMask: [.warning, .critical],
@@ -113,11 +219,29 @@ final class TranscriptionController {
     }
 
     func toggle() {
-        log.info("Recording toggle requested (active: \(self.isActive, privacy: .public), starting: \(self.isStarting, privacy: .public))")
+        log.info("Recording toggle requested (active: \(self.isActive, privacy: .public), starting: \(self.isStarting, privacy: .public), stopping: \(self.isStopping, privacy: .public))")
         Task { @MainActor in
             if isActive {
+                startRequested = false
                 await stop()
+            } else if isStarting {
+                // Model construction is synchronous native work and cannot be
+                // interrupted safely. Toggle the user's intent instead, then
+                // either abandon the pending start or resume it when the shared
+                // cold-load task completes.
+                startRequested.toggle()
+                state.liveTranscript = ""
+                state.status = startRequested
+                    ? .preparing("Loading transcription model…")
+                    : .idle
+            } else if isStopping {
+                // Finalization continues off the capture path after Stop. Keep
+                // a new hotkey/menu request instead of silently dropping it;
+                // pressing the shortcut again cancels the queued restart.
+                startRequested.toggle()
+                log.info("Queued restart after finalization: \(self.startRequested, privacy: .public)")
             } else {
+                startRequested = true
                 await start()
             }
         }
@@ -137,9 +261,28 @@ final class TranscriptionController {
                 self.vadManager = try await Self.loadBundledVoiceDetector()
                 log.info("Voice detector prepared in the background")
             } catch {
-                // Recording remains usable without VAD: the entire session is
-                // transcribed when the user stops recording.
-                log.error("Voice detector preparation failed; using whole-session transcription: \(error.localizedDescription)")
+                // Recording remains usable without VAD through the same
+                // bounded streaming recognizer path.
+                log.error("Voice detector preparation failed; using continuous streaming: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    /// Warm the compact streaming recognizer at launch so the first recording
+    /// does not have to wait for ONNX Runtime to initialize its graphs.
+    func prepareSpeechRecognizer() {
+        guard speechRecognizer == nil, speechRecognizerLoadingTask == nil else { return }
+
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                _ = try await self.ensureLoaded(showLoadingStatus: false)
+                log.info("Speech recognizer prepared in the background")
+                self.scheduleModelUnload()
+            } catch {
+                // A later recording attempt retries and surfaces the error to
+                // the user. Background preparation must not open the overlay.
+                log.error("Speech recognizer background preparation failed: \(error.localizedDescription)")
             }
         }
     }
@@ -148,7 +291,7 @@ final class TranscriptionController {
         startAction: (@MainActor () -> Void)? = nil,
         stopAction: (@MainActor () -> Void)? = nil
     ) async -> RecordingSmokeTestResult {
-        guard !isActive, !isStarting else {
+        guard !isActive, !isStarting, !isStopping else {
             return RecordingSmokeTestResult(
                 succeeded: false,
                 message: "A recording was already active."
@@ -195,7 +338,7 @@ final class TranscriptionController {
 
     private func waitForRecordingToStop() async {
         for _ in 0..<1_200 {
-            if !isActive, !isStarting, state.status != .finishing { return }
+            if !isActive, !isStarting, !isStopping { return }
             try? await Task.sleep(for: .milliseconds(50))
         }
     }
@@ -210,17 +353,23 @@ final class TranscriptionController {
         case .idle: return "idle"
         case let .preparing(message): return message
         case .listening: return "listening"
-        case .finishing: return "finishing"
         case .copied: return "copied"
         case let .error(message): return message
         }
     }
 
     private func start() async {
-        guard !isActive, !isStarting else { return }
+        guard !isActive, !isStarting, !isStopping else { return }
         log.info("Starting recording pipeline")
-        isStarting = true
-        defer { isStarting = false }
+        startRequested = true
+        sessionGeneration &+= 1
+        let generation = sessionGeneration
+        lifecycle = .starting(generation)
+        defer {
+            if lifecycle == .starting(generation) {
+                lifecycle = .idle
+            }
+        }
 
         autoHideTask?.cancel()
         modelUnloadTask?.cancel()
@@ -228,36 +377,102 @@ final class TranscriptionController {
         confirmedText = ""
         volatileText = ""
         vocabularyReplacementCount = 0
+        transcriptProcessor = state.makeTranscriptProcessor()
         sessionSourceApplication = Self.frontmostApplicationName()
-        lastSpeculativeSampleCount = 0
+        audioWorkerTask = nil
+        audioConverter.reset()
+        sessionAudio.reset(keepingCapacity: true)
+        lastFinalizedAudioEnd = 0
+        recognizerStreamHasLeadingOverlap = false
         state.liveTranscript = ""
         // Present the transcript surface immediately. Permission failures are
         // still reported below, but an already-authorized microphone should
         // never leave the overlay sitting on a redundant access check.
+        _ = NotchOverlayWindowController.shared
         state.status = .listening
 
         do {
             try await ensureMicPermission()
+            guard startRequested else {
+                log.info("Pending recording cancelled before model loading")
+                transcriptProcessor = nil
+                scheduleModelUnload()
+                return
+            }
             try capture.validateInputAvailable()
             prepareVoiceDetector()
-            _ = try await ensureLoaded()
+            let recognizer = try await ensureLoaded()
+            guard startRequested else {
+                log.info("Pending recording cancelled after model loading")
+                transcriptProcessor = nil
+                scheduleModelUnload()
+                return
+            }
 
-            sessionSamples.removeAll(keepingCapacity: true)
             vadPending.removeAll(keepingCapacity: true)
             usesVoiceDetectorForCurrentSession = vadManager != nil
             if let vad = vadManager, usesVoiceDetectorForCurrentSession {
                 vadState = await vad.makeStreamState()
             } else {
                 vadState = nil
-                log.info("Voice detector is not ready; recording will use whole-session transcription")
+                log.info("Voice detector is not ready; recording will use bounded continuous streaming")
             }
             currentSpeechStart = nil
+            currentSpeechFedThrough = nil
+
+            // With VAD, start a recognizer stream only when speech begins and
+            // backfill the detector's padded onset. Without VAD, keep the
+            // bounded continuous fallback streaming from the first frame.
+            recognizerStreamIsOpen = false
+            if !usesVoiceDetectorForCurrentSession {
+                await recognizer.beginStream()
+                recognizerStreamIsOpen = true
+                currentSpeechStart = 0
+                currentSpeechFedThrough = 0
+            }
+
+            guard startRequested else {
+                if recognizerStreamIsOpen {
+                    await recognizer.discardStream()
+                    recognizerStreamIsOpen = false
+                }
+                log.info("Pending recording cancelled before microphone capture")
+                transcriptProcessor = nil
+                scheduleModelUnload()
+                return
+            }
 
             state.status = .listening
-            try capture.start()
-            isActive = true
-            log.info("Microphone capture started")
+            let stream = audioIngress.beginSession(generation: generation)
+            audioWorkerTask = Task { @MainActor [weak self] in
+                guard let self else { return }
+                for await packet in stream {
+                    guard packet.generation == generation,
+                          self.sessionGeneration == generation
+                    else { continue }
+                    await self.consumeCapturedBuffer(packet.buffer)
+                }
+            }
+            try capture.start(sessionGeneration: generation)
+            lifecycle = .recording(generation)
+            log.info("Microphone capture started (session: \(generation, privacy: .public))")
         } catch {
+            audioIngress.finishSession(generation: generation)
+            await audioWorkerTask?.value
+            audioWorkerTask = nil
+            let shouldReportError = startRequested
+            startRequested = false
+            transcriptProcessor = nil
+            if recognizerStreamIsOpen {
+                await speechRecognizer?.discardStream()
+                recognizerStreamIsOpen = false
+            }
+            guard shouldReportError else {
+                log.info("Suppressed start error after the pending recording was cancelled")
+                state.status = .idle
+                scheduleModelUnload()
+                return
+            }
             log.error("Start failed: \(error.localizedDescription)")
             state.status = .error(error.localizedDescription)
             scheduleAutoHide(after: 2.5)
@@ -265,54 +480,110 @@ final class TranscriptionController {
         }
     }
 
-    private func stop() async {
-        guard isActive else { return }
-        isActive = false
-        capture.stop()
-        state.status = .finishing
-
-        // Flush any pending speech segment so we don't lose the tail of what
-        // the user was saying.
-        if usesVoiceDetectorForCurrentSession {
-            if let start = currentSpeechStart, start < sessionSamples.count {
-                let tail = Array(sessionSamples[start..<sessionSamples.count])
-                currentSpeechStart = nil
-                enqueueTranscribe(samples: tail)
+    private func stop(reason: StopReason = .userInitiated) async {
+        guard case .recording(let generation) = lifecycle else { return }
+        lifecycle = .stopping(generation)
+        defer {
+            lifecycle = .idle
+            if startRequested {
+                Task { @MainActor [weak self] in
+                    await self?.start()
+                }
             }
-        } else if !sessionSamples.isEmpty {
-            enqueueTranscribe(samples: sessionSamples)
         }
-        await transcribeChain?.value
-        transcribeChain = nil
+        startRequested = false
+        autoHideTask?.cancel()
+        capture.stop()
+        state.liveTranscript = ""
+        state.status = .idle
 
-        var finalText = confirmedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        // AudioCapture.stop() drains callbacks already executing. Finish the
+        // matching generation only after that barrier, then let the one FIFO
+        // worker consume every accepted packet before closing the recognizer.
+        let droppedCapturedAudio = audioIngress.finishSession(
+            generation: generation
+        )
+        await audioWorkerTask?.value
+        audioWorkerTask = nil
 
-        // VAD is an optimization, not a requirement for producing a result.
-        // Very short recordings or speech that ends near the stop press can
-        // leave it without a completed segment. In that case, transcribe the
-        // entire captured session before deciding that no speech was found.
-        if finalText.isEmpty,
-           usesVoiceDetectorForCurrentSession,
-           !sessionSamples.isEmpty
-        {
-            log.info("Voice detector produced no final segment; transcribing the full recording")
-            await performTranscribe(samples: sessionSamples)
-            finalText = confirmedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let sessionEnd = sessionAudio.endIndex
+        if currentSpeechStart != nil {
+            await feedCurrentSpeech(upTo: sessionEnd)
+            lastFinalizedAudioEnd = max(
+                lastFinalizedAudioEnd,
+                currentSpeechFedThrough ?? sessionEnd
+            )
+            currentSpeechStart = nil
+            currentSpeechFedThrough = nil
+            await finishRecognizerStream()
+        } else if usesVoiceDetectorForCurrentSession, !sessionAudio.isEmpty {
+            // VAD may not emit an event for a very short final utterance. Feed
+            // only the retained tail rather than ever replaying an hour-long
+            // session at Stop.
+            let fallbackStart = max(lastFinalizedAudioEnd, sessionAudio.startIndex)
+            if fallbackStart < sessionEnd {
+                log.info("Transcribing the bounded final audio tail")
+                await beginCurrentSpeech(at: fallbackStart)
+                await feedCurrentSpeech(upTo: sessionEnd)
+                lastFinalizedAudioEnd = max(
+                    lastFinalizedAudioEnd,
+                    currentSpeechFedThrough ?? sessionEnd
+                )
+                currentSpeechStart = nil
+                currentSpeechFedThrough = nil
+                await finishRecognizerStream()
+            }
         }
-        state.liveTranscript = finalText
+        let finalText = TranscriptSegments.capitalizingFirstLetter(
+            in: confirmedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        )
+        let capturedSeconds = Double(sessionEnd) / Double(Self.sampleRate)
+        log.info("Finalized \(capturedSeconds, format: .fixed(precision: 2), privacy: .public) seconds of streaming audio")
+
+        sessionAudio.reset(keepingCapacity: false)
+        vadPending.removeAll(keepingCapacity: false)
+        vadState = nil
+        currentSpeechStart = nil
+        currentSpeechFedThrough = nil
+        lastFinalizedAudioEnd = 0
+        recognizerStreamHasLeadingOverlap = false
 
         if !finalText.isEmpty {
             let pb = NSPasteboard.general
             pb.clearContents()
             if pb.setString(finalText, forType: .string) {
-                state.recordTranscript(
-                    finalText,
-                    sourceApplication: sessionSourceApplication,
-                    vocabularyReplacementCount: vocabularyReplacementCount
-                )
-                state.status = .copied
-                scheduleAutoHide(after: 2.4)
-                log.info("Transcript copied to the clipboard; showing confirmation")
+                log.info("Transcript copied to the clipboard")
+                do {
+                    try state.recordTranscript(
+                        finalText,
+                        mode: transcriptProcessor?.mode,
+                        sourceApplication: sessionSourceApplication,
+                        vocabularyReplacementCount: vocabularyReplacementCount
+                    )
+                } catch {
+                    state.status = .error("Copied, but couldn’t save transcript history")
+                    scheduleAutoHide(after: 2.4)
+                    log.error("Could not archive the copied transcript: \(error.localizedDescription)")
+                }
+
+                if case .error = state.status {
+                    // Keep the more specific archive failure visible.
+                } else if droppedCapturedAudio {
+                    state.status = .error("Audio processing fell behind; copied text may be incomplete")
+                    scheduleAutoHide(after: 2.4)
+                    log.error("The bounded capture FIFO overflowed during this recording")
+                } else {
+                    switch reason {
+                    case .userInitiated:
+                        // Only claim success after NSPasteboard accepted the
+                        // finalized transcript.
+                        state.status = .copied
+                        scheduleAutoHide(after: 1.2)
+                    case .audioConfigurationChanged:
+                        state.status = .error("Microphone changed; captured text was copied")
+                        scheduleAutoHide(after: 2.4)
+                    }
+                }
             } else {
                 state.status = .error("Couldn’t copy the transcript")
                 scheduleAutoHide(after: 2.4)
@@ -321,17 +592,21 @@ final class TranscriptionController {
         } else {
             // Do not silently dismiss the overlay. This makes a genuinely
             // empty recording distinguishable from a missing confirmation.
-            state.status = .error("No speech detected")
+            switch reason {
+            case .userInitiated:
+                state.status = .error("No speech detected")
+            case .audioConfigurationChanged:
+                state.status = .error("Microphone changed; recording stopped")
+            }
             scheduleAutoHide(after: 2.4)
             log.info("No speech was detected in the completed recording")
         }
         usesVoiceDetectorForCurrentSession = false
+        transcriptProcessor = nil
         scheduleModelUnload()
     }
 
-    private func feed(_ buffer: AVAudioPCMBuffer) async {
-        guard isActive else { return }
-
+    private func consumeCapturedBuffer(_ buffer: AVAudioPCMBuffer) async {
         let samples: [Float]
         do {
             samples = try audioConverter.resampleBuffer(buffer)
@@ -339,28 +614,49 @@ final class TranscriptionController {
             log.error("Resample failed: \(error.localizedDescription)")
             return
         }
+        guard !samples.isEmpty else { return }
+        await feed(samples)
+    }
 
-        sessionSamples.append(contentsOf: samples)
+    private func handleAudioConfigurationChange(generation: UInt) async {
+        guard generation == sessionGeneration, isActive, !isStopping else { return }
+        log.error("Audio engine configuration changed; stopping the active recording safely")
+        await stop(reason: .audioConfigurationChanged)
+    }
 
-        guard usesVoiceDetectorForCurrentSession,
-              let vad = vadManager,
+    private func feed(_ samples: [Float]) async {
+        let appendStart = sessionAudio.endIndex
+        sessionAudio.append(samples)
+
+        if !usesVoiceDetectorForCurrentSession {
+            await continueWithoutVoiceDetector(from: appendStart)
+            return
+        }
+
+        guard let vad = vadManager,
               var currentVadState = vadState
         else { return }
         vadPending.append(contentsOf: samples)
 
-        while vadPending.count >= VadManager.chunkSize {
-            let chunk = Array(vadPending.prefix(VadManager.chunkSize))
-            vadPending.removeFirst(VadManager.chunkSize)
+        while vadPending.count >= VoiceActivityDetector.chunkSize {
+            let chunk = Array(vadPending.prefix(VoiceActivityDetector.chunkSize))
+            vadPending.removeFirst(VoiceActivityDetector.chunkSize)
 
-            let result: VadStreamResult
+            let result: VoiceActivityStreamResult
             do {
                 result = try await vad.processStreamingChunk(
                     chunk,
                     state: currentVadState,
-                    config: segmentationConfig
+                    configuration: segmentationConfig
                 )
             } catch {
                 log.error("VAD failed: \(error.localizedDescription)")
+                usesVoiceDetectorForCurrentSession = false
+                vadState = nil
+                vadPending.removeAll(keepingCapacity: false)
+                await continueWithoutVoiceDetector(
+                    from: max(lastFinalizedAudioEnd, sessionAudio.startIndex)
+                )
                 return
             }
             currentVadState = result.state
@@ -369,99 +665,235 @@ final class TranscriptionController {
             guard let event = result.event else { continue }
             switch event.kind {
             case .speechStart:
-                currentSpeechStart = event.sampleIndex
-                lastSpeculativeSampleCount = event.sampleIndex
+                await beginCurrentSpeech(at: event.sampleIndex)
             case .speechEnd:
-                guard let start = currentSpeechStart else { continue }
-                let clampedStart = max(0, min(start, sessionSamples.count))
-                let clampedEnd = max(clampedStart, min(event.sampleIndex, sessionSamples.count))
+                guard currentSpeechStart != nil else { continue }
+                let clampedEnd = max(
+                    sessionAudio.startIndex,
+                    min(event.sampleIndex, sessionAudio.endIndex)
+                )
+                await feedCurrentSpeech(upTo: clampedEnd)
+                lastFinalizedAudioEnd = max(
+                    lastFinalizedAudioEnd,
+                    currentSpeechFedThrough ?? clampedEnd
+                )
                 currentSpeechStart = nil
-                guard clampedEnd > clampedStart else { continue }
-                let segment = Array(sessionSamples[clampedStart..<clampedEnd])
-                enqueueTranscribe(samples: segment)
+                currentSpeechFedThrough = nil
+                await finishRecognizerStream()
+                trimRetainedSessionAudio()
             }
         }
 
-        maybeRunSpeculative()
+        await feedCurrentSpeech(upTo: sessionAudio.endIndex)
+        trimRetainedSessionAudio()
     }
 
-    /// While the user is still speaking, re-transcribe the in-progress speech
-    /// segment every ~2s and show it as volatile text. The confirmed segment
-    /// replaces this on speechEnd.
-    private func maybeRunSpeculative() {
-        guard let start = currentSpeechStart else { return }
-        let total = sessionSamples.count
-        guard total - lastSpeculativeSampleCount >= speculativeIntervalSamples else { return }
-        guard total - start >= speculativeMinSpeechSamples else { return }
-
-        lastSpeculativeSampleCount = total
-        let segment = Array(sessionSamples[start..<total])
-        let segmentStart = start
-        enqueueSpeculative(samples: segment, segmentStart: segmentStart)
-    }
-
-    /// Transcribe segments in the order they arrive by chaining Tasks.
-    private func enqueueTranscribe(samples: [Float]) {
-        let previous = transcribeChain
-        transcribeChain = Task { [weak self] in
-            await previous?.value
-            await self?.performTranscribe(samples: samples)
+    private func beginCurrentSpeech(at requestedStart: Int) async {
+        if currentSpeechStart != nil {
+            await feedCurrentSpeech(upTo: sessionAudio.endIndex)
+            lastFinalizedAudioEnd = max(
+                lastFinalizedAudioEnd,
+                currentSpeechFedThrough ?? sessionAudio.endIndex
+            )
+            currentSpeechStart = nil
+            currentSpeechFedThrough = nil
+            await finishRecognizerStream()
         }
+
+        let start = max(
+            sessionAudio.startIndex,
+            min(requestedStart, sessionAudio.endIndex)
+        )
+        currentSpeechStart = start
+        currentSpeechFedThrough = start
+        await beginRecognizerStream()
     }
 
-    private func performTranscribe(samples: [Float]) async {
-        guard let asr = asrManager else { return }
-        do {
-            let result = try await asr.transcribe(samples, source: .microphone)
-            let processed = state.processTranscript(result.text)
-            await MainActor.run {
-                if !processed.text.isEmpty {
-                    if self.confirmedText.isEmpty {
-                        self.confirmedText = processed.text
-                    } else {
-                        self.confirmedText += " " + processed.text
-                    }
-                    self.vocabularyReplacementCount += processed.vocabularyReplacementCount
+    private func feedCurrentSpeech(upTo requestedEnd: Int) async {
+        let targetEnd = max(
+            sessionAudio.startIndex,
+            min(requestedEnd, sessionAudio.endIndex)
+        )
+
+        while recognizerStreamIsOpen,
+              let recognizer = speechRecognizer,
+              let segmentStart = currentSpeechStart,
+              let fedThrough = currentSpeechFedThrough
+        {
+            let hardEnd = segmentStart + Self.hardSegmentSamples
+            let feedEnd = min(targetEnd, hardEnd)
+
+            if feedEnd > fedThrough {
+                let samples = sessionAudio.samples(from: fedThrough, to: feedEnd)
+                currentSpeechFedThrough = feedEnd
+                if !samples.isEmpty {
+                    let partialText = await recognizer.accept(samples)
+                    updateVolatileText(partialText)
                 }
-                self.volatileText = ""
-                self.state.liveTranscript = self.displayText()
             }
-        } catch {
-            log.error("Transcribe failed: \(error.localizedDescription)")
+
+            guard feedEnd >= hardEnd else { break }
+
+            // The VAD owns pause boundaries; ASR segment duration is enforced here.
+            // Close this decoder ourselves, then reopen with a short overlap so
+            // a word crossing the artificial boundary is not lost.
+            lastFinalizedAudioEnd = max(lastFinalizedAudioEnd, hardEnd)
+            currentSpeechStart = nil
+            currentSpeechFedThrough = nil
+            await finishRecognizerStream()
+
+            let continuationStart = max(
+                sessionAudio.startIndex,
+                hardEnd - Self.forcedSegmentOverlapSamples
+            )
+            currentSpeechStart = continuationStart
+            currentSpeechFedThrough = continuationStart
+            await beginRecognizerStream(hasLeadingOverlap: true)
+            log.info("Forced a streaming ASR segment boundary at 30 seconds")
         }
     }
 
-    private func enqueueSpeculative(samples: [Float], segmentStart: Int) {
-        let previous = transcribeChain
-        transcribeChain = Task { [weak self] in
-            await previous?.value
-            await self?.performSpeculative(samples: samples, segmentStart: segmentStart)
+    private func continueWithoutVoiceDetector(from requestedStart: Int) async {
+        if !recognizerStreamIsOpen {
+            let start = max(
+                sessionAudio.startIndex,
+                min(requestedStart, sessionAudio.endIndex)
+            )
+            currentSpeechStart = start
+            currentSpeechFedThrough = start
+            await beginRecognizerStream()
+        } else if currentSpeechStart == nil {
+            let start = max(
+                sessionAudio.startIndex,
+                min(requestedStart, sessionAudio.endIndex)
+            )
+            currentSpeechStart = start
+            currentSpeechFedThrough = start
         }
+
+        await feedCurrentSpeech(upTo: sessionAudio.endIndex)
+        trimRetainedSessionAudio()
     }
 
-    private func performSpeculative(samples: [Float], segmentStart: Int) async {
-        guard currentSpeechStart == segmentStart, isActive else { return }
-        guard let asr = asrManager else { return }
-        do {
-            let result = try await asr.transcribe(samples, source: .microphone)
-            let processed = state.processTranscript(result.text)
-            await MainActor.run {
-                guard self.isActive, self.currentSpeechStart == segmentStart else { return }
-                self.volatileText = processed.text
-                self.state.liveTranscript = self.displayText()
-            }
-        } catch {
-            log.error("Speculative transcribe failed: \(error.localizedDescription)")
-        }
+    private func beginRecognizerStream(hasLeadingOverlap: Bool = false) async {
+        guard !recognizerStreamIsOpen,
+              let recognizer = speechRecognizer
+        else { return }
+        await recognizer.beginStream()
+        recognizerStreamIsOpen = true
+        recognizerStreamHasLeadingOverlap = hasLeadingOverlap
     }
 
-    private func displayText() -> String {
-        switch (confirmedText.isEmpty, volatileText.isEmpty) {
-        case (true, true):   return ""
-        case (false, true):  return confirmedText
-        case (true, false):  return volatileText
-        case (false, false): return confirmedText + " " + volatileText
+    private func finishRecognizerStream() async {
+        guard recognizerStreamIsOpen,
+              let recognizer = speechRecognizer
+        else { return }
+
+        // Close the flag before awaiting so a stop that resumes on the main
+        // actor cannot finalize this stream a second time.
+        recognizerStreamIsOpen = false
+        let shouldDeduplicate = recognizerStreamHasLeadingOverlap
+        recognizerStreamHasLeadingOverlap = false
+        let rawText = await recognizer.finishStream()
+        appendConfirmedText(
+            rawText,
+            deduplicatingLeadingOverlap: shouldDeduplicate
+        )
+    }
+
+    private func trimRetainedSessionAudio() {
+        let retainFrom: Int
+        if let fedThrough = currentSpeechFedThrough {
+            retainFrom = max(
+                sessionAudio.startIndex,
+                fedThrough - Self.forcedSegmentOverlapSamples
+            )
+        } else {
+            retainFrom = max(
+                sessionAudio.startIndex,
+                sessionAudio.endIndex - Self.shortRecordingFallbackSamples
+            )
         }
+        sessionAudio.discard(before: retainFrom)
+    }
+
+    private func updateVolatileText(_ rawText: String) {
+        let processed = processRecognizerText(rawText)
+        volatileText = processed.text
+        state.liveTranscript = livePreviewText()
+    }
+
+    private func appendConfirmedText(
+        _ rawText: String,
+        deduplicatingLeadingOverlap: Bool
+    ) {
+        let processed = processRecognizerText(rawText)
+        if !processed.text.isEmpty {
+            confirmedText = TranscriptSegments.appending(
+                processed.text,
+                to: confirmedText,
+                deduplicatingLeadingOverlap: deduplicatingLeadingOverlap
+            )
+            vocabularyReplacementCount += processed.vocabularyReplacementCount
+        }
+        volatileText = ""
+        state.liveTranscript = livePreviewText()
+    }
+
+    private func processRecognizerText(_ rawText: String) -> TranscriptProcessingResult {
+        let processor: TranscriptProcessor
+        if let transcriptProcessor {
+            processor = transcriptProcessor
+        } else {
+            let created = state.makeTranscriptProcessor()
+            transcriptProcessor = created
+            processor = created
+        }
+        return processor.process(Self.normalizedRecognizerText(rawText))
+    }
+
+    /// Nemotron normally emits punctuation and casing. Keep those intact while
+    /// retaining compatibility with an all-uppercase compatible export.
+    private static func normalizedRecognizerText(_ rawText: String) -> String {
+        let collapsed = rawText
+            .split(whereSeparator: { $0.isWhitespace })
+            .joined(separator: " ")
+        guard !collapsed.isEmpty else { return "" }
+
+        var text = collapsed
+        if text.contains(where: { $0.isLetter }), text == text.uppercased() {
+            text = text.lowercased()
+        }
+        let range = NSRange(text.startIndex..., in: text)
+        text = standalonePronounRegex.stringByReplacingMatches(
+            in: text,
+            range: range,
+            withTemplate: "I"
+        )
+        return text
+    }
+
+    private static let standalonePronounRegex = try! NSRegularExpression(
+        pattern: #"\bi\b"#
+    )
+
+    private func livePreviewText() -> String {
+        let volatileTail = String(volatileText.suffix(Self.livePreviewCharacterLimit))
+        let separatorCount = confirmedText.isEmpty || volatileTail.isEmpty ? 0 : 1
+        let confirmedBudget = max(
+            0,
+            Self.livePreviewCharacterLimit - volatileTail.count - separatorCount
+        )
+        let confirmedTail = String(confirmedText.suffix(confirmedBudget))
+
+        let text: String
+        switch (confirmedTail.isEmpty, volatileTail.isEmpty) {
+        case (true, true):   text = ""
+        case (false, true):  text = confirmedTail
+        case (true, false):  text = volatileTail
+        case (false, false): text = confirmedTail + " " + volatileTail
+        }
+        return TranscriptSegments.capitalizingFirstLetter(in: text)
     }
 
     private static func frontmostApplicationName() -> String? {
@@ -515,60 +947,36 @@ final class TranscriptionController {
         }
     }
 
-    private func ensureLoaded() async throws -> AsrManager {
-        if let asr = asrManager { return asr }
-        if let existing = asrLoadingTask {
-            return try await existing.value
+    private func ensureLoaded(
+        showLoadingStatus: Bool = true
+    ) async throws -> NemotronStreamingRecognizer {
+        if let recognizer = speechRecognizer { return recognizer }
+        if showLoadingStatus {
+            state.status = .preparing("Loading transcription model…")
         }
 
-        state.status = .preparing("Loading transcription model…")
-
-        let task = Task<AsrManager, Error> { @MainActor in
-            let mlConfig = MLModelConfiguration()
-            // .cpuAndGPU instead of .cpuAndNeuralEngine: ANE forces a heavy
-            // AOT compile (~30s, ~2GB of disk writes) on every launch when the
-            // app is sandboxed, because the e5 bundle cache doesn't survive
-            // in the container's Caches dir. That tripped macOS disk-write
-            // throttling and Jetsam (silent kills).
-            mlConfig.computeUnits = .cpuAndGPU
-
+        let task: Task<NemotronStreamingRecognizer, Error>
+        if let existing = speechRecognizerLoadingTask {
+            task = existing
+        } else {
             let modelDir = try Self.bundledModelDirectory()
-
-            state.status = .preparing("Preparing speech model for your Mac…")
             log.info("Loading ASR model from \(modelDir.path, privacy: .public)")
-
-            let asrModels = try await AsrModels.load(
-                from: modelDir,
-                configuration: mlConfig,
-                version: .v3
-            )
-
-            let asr = AsrManager(config: .default)
-            try await asr.loadModels(asrModels)
-
-            return asr
+            task = Task.detached(priority: .userInitiated) {
+                try NemotronStreamingRecognizer(modelDirectory: modelDir)
+            }
+            speechRecognizerLoadingTask = task
         }
-        asrLoadingTask = task
 
         do {
-            let asr = try await task.value
-            asrLoadingTask = nil
-            self.asrManager = asr
-            return asr
+            let recognizer = try await task.value
+            speechRecognizerLoadingTask = nil
+            self.speechRecognizer = recognizer
+            return recognizer
         } catch {
-            asrLoadingTask = nil
+            speechRecognizerLoadingTask = nil
             throw error
         }
     }
-
-    private static let modelSubpath = "Models/parakeet-tdt-0.6b-v3"
-    private static let requiredModelFiles = [
-        "Preprocessor.mlmodelc",
-        "Encoder.mlmodelc",
-        "Decoder.mlmodelc",
-        "JointDecision.mlmodelc",
-        "parakeet_vocab.json",
-    ]
 
     private static func bundledModelDirectory() throws -> URL {
         guard let resources = Bundle.main.resourceURL else {
@@ -577,35 +985,49 @@ final class TranscriptionController {
             ])
         }
 
-        let dir = resources.appendingPathComponent(modelSubpath, isDirectory: true)
+        let dir = resources.appendingPathComponent(
+            BundledModelInventory.speechDirectory,
+            isDirectory: true
+        )
         let fm = FileManager.default
-        for file in requiredModelFiles where !fm.fileExists(atPath: dir.appendingPathComponent(file).path) {
-            throw CocoaError(.fileNoSuchFile, userInfo: [
-                NSFilePathErrorKey: dir.appendingPathComponent(file).path,
-                NSLocalizedDescriptionKey: "Yaprflow's bundled speech model is incomplete. Please reinstall the app.",
-            ])
+        for file in BundledModelInventory.speechFiles {
+            let url = dir.appendingPathComponent(file.name)
+            guard
+                fm.fileExists(atPath: url.path),
+                let attributes = try? fm.attributesOfItem(atPath: url.path),
+                let size = attributes[.size] as? NSNumber,
+                size.int64Value == file.byteCount
+            else {
+                throw CocoaError(.fileNoSuchFile, userInfo: [
+                    NSFilePathErrorKey: url.path,
+                    NSLocalizedDescriptionKey: "Yaprflow's bundled speech model is incomplete. Please reinstall the app.",
+                ])
+            }
         }
         return dir
     }
 
-    private static let vadModelFile = "silero-vad-unified-256ms-v6.0.0.mlmodelc"
-
     private static func bundledVADModelURL() -> URL? {
         guard let resources = Bundle.main.resourceURL else { return nil }
         let modelPath = resources
-            .appendingPathComponent("Models/silero-vad", isDirectory: true)
-            .appendingPathComponent(vadModelFile, isDirectory: true)
+            .appendingPathComponent(
+                BundledModelInventory.voiceDetectorDirectory,
+                isDirectory: true
+            )
+            .appendingPathComponent(
+                BundledModelInventory.voiceDetectorModel,
+                isDirectory: true
+            )
         guard FileManager.default.fileExists(atPath: modelPath.path) else { return nil }
         return modelPath
     }
 
-    /// Load the bundled VAD directly instead of routing through FluidAudio's
-    /// download-and-retry helper. The release always contains this model, and
-    /// direct loading avoids network checks and destructive retry behavior.
-    private static func loadBundledVoiceDetector() async throws -> VadManager {
+    /// Load the bundled VAD directly. The release always contains this model,
+    /// so voice detection never performs a runtime download or network check.
+    private static func loadBundledVoiceDetector() async throws -> VoiceActivityDetector {
         guard let modelURL = bundledVADModelURL() else {
             throw CocoaError(.fileNoSuchFile, userInfo: [
-                NSFilePathErrorKey: "Models/silero-vad/\(vadModelFile)",
+                NSFilePathErrorKey: "\(BundledModelInventory.voiceDetectorDirectory)/\(BundledModelInventory.voiceDetectorModel)",
                 NSLocalizedDescriptionKey: "The bundled voice detector is missing.",
             ])
         }
@@ -614,8 +1036,7 @@ final class TranscriptionController {
             let modelConfiguration = MLModelConfiguration()
             modelConfiguration.computeUnits = .cpuOnly
             let model = try MLModel(contentsOf: modelURL, configuration: modelConfiguration)
-            let vadConfiguration = VadConfig(computeUnits: .cpuOnly)
-            return VadManager(config: vadConfiguration, vadModel: model)
+            return VoiceActivityDetector(model: model)
         }.value
     }
 
@@ -636,29 +1057,31 @@ final class TranscriptionController {
         modelUnloadTask?.cancel()
         modelUnloadTask = Task { @MainActor [weak self] in
             do {
-                try await Task.sleep(for: .seconds(15 * 60))
+                try await Task.sleep(for: .seconds(5 * 60))
             } catch {
                 return
             }
-            self?.releaseModelsIfIdle(reason: "15 minutes idle")
+            self?.releaseModelsIfIdle(reason: "5 minutes idle")
         }
     }
 
     private func releaseModelsIfIdle(reason: String) {
         guard !isActive,
               !isStarting,
-              asrLoadingTask == nil,
-              transcribeChain == nil
+              !isStopping,
+              speechRecognizerLoadingTask == nil,
+              audioWorkerTask == nil,
+              !recognizerStreamIsOpen
         else {
             return
         }
-        guard asrManager != nil else { return }
+        guard speechRecognizer != nil else { return }
 
         modelUnloadTask?.cancel()
         modelUnloadTask = nil
-        asrManager = nil
+        speechRecognizer = nil
         vadState = nil
-        sessionSamples.removeAll(keepingCapacity: false)
+        sessionAudio.reset(keepingCapacity: false)
         vadPending.removeAll(keepingCapacity: false)
         log.info("Released transcription models after \(reason, privacy: .public)")
     }

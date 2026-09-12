@@ -22,17 +22,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             reason: "Yaprflow must remain available for its global hotkey"
         )
 
-        NSApp.setActivationPolicy(.accessory)
         installStatusItem()
-        _ = NotchOverlayWindowController.shared
+        if !isPreviewSmokeTest {
+            TranscriptionController.shared.prepareSpeechRecognizer()
+        }
         TranscriptionController.shared.prepareVoiceDetector()
         let hotkeyRegistered = registerHotkey()
 
-        // The large speech model loads lazily on the first hotkey press. Only
-        // the tiny voice detector is prepared in the background at launch.
-        // Preloading the speech model was causing CoreML to AOT-compile the encoder
-        // immediately, pinning ~1.8 GB of RAM and triggering silent Jetsam
-        // kills before the user ever pressed the hotkey.
+        // Nemotron is warmed above so the first hotkey press avoids its ONNX
+        // graph-loading cost; idle and memory-pressure paths still release it.
 
         if !isPreviewSmokeTest, !OnboardingWindowController.hasCompleted {
             OnboardingWindowController.shared.show()
@@ -55,6 +53,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         if ProcessInfo.processInfo.arguments.contains("--smoke-test-recording") {
             Task { @MainActor in
+                for _ in 0..<20 {
+                    if statusItem?.menu != nil { break }
+                    try? await Task.sleep(for: .milliseconds(25))
+                }
                 let result: RecordingSmokeTestResult
                 if let menu = statusItem?.menu {
                     menuNeedsUpdate(menu)
@@ -105,24 +107,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func installStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        if let button = item.button {
-            button.image = Self.statusItemImage()
-            button.contentTintColor = nil
+        statusItem = item
+
+        // Control Center hosts status items in a remote scene. Changing the
+        // button or attaching its menu during that scene's initial layout can
+        // make AppKit synchronously re-enter layout.
+        Task { @MainActor [weak self, weak item] in
+            try? await Task.sleep(for: .milliseconds(250))
+            guard let self, let item, self.statusItem === item else { return }
+
+            let menu = NSMenu()
+            menu.delegate = self
+            menu.autoenablesItems = false
+            item.menu = menu
+
+            self.statusCancellable = AppState.shared.$status
+                .removeDuplicates()
+                .sink { [weak self] status in
+                    self?.updateStatusItem(for: status)
+                }
         }
-
-        let menu = NSMenu()
-        menu.delegate = self
-        menu.autoenablesItems = false
-
-        item.menu = menu
-        self.statusItem = item
-
-        statusCancellable = AppState.shared.$status
-            .removeDuplicates()
-            .sink { [weak self] status in
-                self?.updateStatusItem(for: status)
-            }
-        updateStatusItem(for: AppState.shared.status)
     }
 
     private func updateStatusItem(for status: TranscriptionStatus) {
@@ -183,8 +187,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         // Keep the primary action native so AppKit owns the entire hit target.
         // The previous split custom row let its text fields swallow clicks.
+        let isStartingOrRecording: Bool
+        switch AppState.shared.status {
+        case .preparing, .listening:
+            isStartingOrRecording = true
+        default:
+            isStartingOrRecording = false
+        }
         let transcribeItem = NSMenuItem(
-            title: AppState.shared.status == .listening ? "Stop Recording" : "Transcribe",
+            title: isStartingOrRecording ? "Stop Recording" : "Transcribe",
             action: #selector(toggleTranscription),
             keyEquivalent: ""
         )

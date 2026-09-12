@@ -1,26 +1,64 @@
 Yaprflow
 Copyright 2026 Tim Moreton
-Licensed under the Apache License 2.0.
+Licensed under the PolyForm Shield License 1.0.0.
+https://polyformproject.org/licenses/shield/1.0.0
+Required Notice: Copyright 2026 Tim Moreton (https://yaprflow.com/)
 https://github.com/tmoreton/yaprflow
 
-FluidAudio
+Yaprflow-owned software in releases through 4.0.14 and repository revisions
+through 0af74ab27f24933d16c004336cf63eac95c0a6b0 remains available under the
+Apache License 2.0 that accompanied those versions.
+
+FluidAudio 0.13.6 (adapted VAD portions only)
 Licensed under the Apache License 2.0.
+Yaprflow retains a modified Core ML VAD invocation and streaming hysteresis
+implementation. The FluidAudio package, VBx, fastcluster, diarization,
+clustering, downloader, and TTS code are not linked or distributed.
 https://github.com/FluidInference/FluidAudio
 
-VBx
-Copyright 2021–2024 BUT Speech@FIT (original VBx project)
-Licensed under the Apache License 2.0.
+sherpa-onnx 1.13.8
+Licensed under the Apache License 2.0 reproduced below.
+Yaprflow's native build disables the optional TTS stack and does not distribute
+eSpeak-NG or Piper.
+The vendored upstream Swift wrapper has one local bridge exposing sherpa-onnx's
+existing per-stream option setter so Yaprflow can request automatic language
+detection. No inference logic is changed by that bridge.
+https://github.com/k2-fsa/sherpa-onnx
 
-fastcluster
-Until package version 1.1.23: Copyright 2011 Daniel Müllner
-All changes from version 1.1.24 on: Copyright Google Inc.
-Licensed under the BSD license reproduced below.
+Native sherpa-onnx build dependencies
+kaldi-native-fbank, kaldi-decoder, kaldifst, OpenFst, and
+simple-sentencepiece are licensed under the Apache License 2.0 reproduced
+below. OpenFst is copyright 2005-2026 Google LLC.
 
-Parakeet TDT 0.6B v3 Core ML model
-Core ML conversion by FluidInference, based on NVIDIA's Parakeet TDT 0.6B v3.
-Licensed under Creative Commons Attribution 4.0 International (CC BY 4.0).
-https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml
-https://creativecommons.org/licenses/by/4.0/
+KISS FFT
+Copyright (c) 2003-2010 Mark Borgerding. All rights reserved.
+Licensed under the BSD 3-Clause License reproduced below.
+
+JSON for Modern C++
+Copyright (c) 2013-2025 Niels Lohmann
+Licensed under the MIT License reproduced below.
+
+Eigen 5.0.1
+Primarily licensed under the Mozilla Public License 2.0. The complete upstream
+MPL-2.0, Apache, BSD, MINPACK, and explanatory license files are bundled in the
+SherpaOnnx-ThirdParty-v1.13.8 resource directory. Unmodified corresponding
+source is available from https://gitlab.com/libeigen/eigen at tag 5.0.1.
+
+ONNX Runtime 1.28.2
+Copyright (c) Microsoft Corporation
+Licensed under the MIT License reproduced below. The complete upstream notice
+inventory is bundled as ONNXRuntime-ThirdPartyNotices-v1.28.2.txt.
+https://github.com/microsoft/onnxruntime
+
+NVIDIA Nemotron 3.5 ASR Streaming 0.6B, 1120 ms chunk-size INT8 ONNX export
+Model materials are governed by the OpenMDW License Agreement, version 1.1.
+Yaprflow bundles the selected model files without modifying their contents.
+The complete agreement is bundled as OpenMDW-1.1.txt; NOTICE.txt retains the
+model origin. Source model/model-card revision reviewed:
+ea30d66debe3740a08b573244286791d423d6b3e. Exact export mirror revision:
+cba1c96ca5ef0e8393b50584ae153a79145dc492.
+https://huggingface.co/nvidia/nemotron-3.5-asr-streaming-0.6b
+https://huggingface.co/csukuangfj2/sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-1120ms-int8-2026-06-11
 
 Silero VAD Core ML model
 Copyright 2020–present Silero Team
@@ -166,7 +204,8 @@ any Contribution intentionally submitted for inclusion in the Work by
 You to the Licensor shall be under the terms and conditions of this
 License, without any additional terms or conditions. Notwithstanding
 the above, nothing herein shall supersede or modify the terms of any
-separate license agreement you may have executed with Licensor.
+separate license agreement you may have executed with Licensor
+regarding such Contributions.
 
 6. Trademarks. This License does not grant permission to use the trade
 names, trademarks, service marks, or product names of the Licensor,
@@ -208,25 +247,50 @@ or additional liability.
 
 END OF TERMS AND CONDITIONS
 
+APPENDIX: How to apply the Apache License to your work.
+
+To apply the Apache License to your work, attach the following
+boilerplate notice, with the fields enclosed by brackets "[]"
+replaced with your own identifying information. (Don't include
+the brackets!) The text should be enclosed in the appropriate
+comment syntax for the file format. We also recommend that a
+file or class name and description of purpose be included on the
+same "printed page" as the copyright notice for easier
+identification within third-party archives.
+
+Copyright [yyyy] [name of copyright owner]
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
 ------------------------------------------------------------------------
-FASTCLUSTER BSD LICENSE
+KISS FFT BSD 3-CLAUSE LICENSE
 ------------------------------------------------------------------------
 
-Copyright:
-  * Until package version 1.1.23: © 2011 Daniel Müllner
-    <https://danifold.net>
-  * All changes from version 1.1.24 on: © Google Inc.
-    <https://www.google.com>
-All rights reserved.
+Copyright (c) 2003-2010 Mark Borgerding. All rights reserved.
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
 
-* Redistributions of source code must retain the above copyright notice,
-  this list of conditions and the following disclaimer.
-* Redistributions in binary form must reproduce the above copyright notice,
-  this list of conditions and the following disclaimer in the documentation
-  and/or other materials provided with the distribution.
+1. Redistributions of source code must retain the above copyright notice,
+this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+this list of conditions and the following disclaimer in the documentation
+and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its contributors
+may be used to endorse or promote products derived from this software without
+specific prior written permission.
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
@@ -247,6 +311,58 @@ SILERO VAD MIT LICENSE
 MIT License
 
 Copyright (c) 2020-present Silero Team
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+------------------------------------------------------------------------
+JSON FOR MODERN C++ MIT LICENSE
+------------------------------------------------------------------------
+
+MIT License
+
+Copyright (c) 2013-2025 Niels Lohmann
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+------------------------------------------------------------------------
+ONNX RUNTIME MIT LICENSE
+------------------------------------------------------------------------
+
+MIT License
+
+Copyright (c) Microsoft Corporation
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

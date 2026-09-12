@@ -19,6 +19,9 @@ final class NotchOverlayWindowController: NSWindowController, NSWindowDelegate {
     convenience init() {
         let content = NotchOverlayView(state: AppState.shared)
         let host = NSHostingController(rootView: content)
+        // This window owns its fixed size. Propagating SwiftUI's fitting sizes
+        // can otherwise resize the window from inside AppKit's layout pass.
+        host.sizingOptions = []
 
         let window = NotchOverlayWindow(
             contentRect: NSRect(x: 0, y: 0, width: Self.previewWidth, height: Self.previewHeight),
@@ -71,18 +74,9 @@ final class NotchOverlayWindowController: NSWindowController, NSWindowDelegate {
         visibilitySequence += 1
         let sequence = visibilitySequence
         let screen = Self.preferredScreen()
-        prepareForDisplay(window)
-        positionOnScreenIfNeeded(window, preferredScreen: screen)
-        window.alphaValue = 1
-        window.orderFrontRegardless()
-        window.displayIfNeeded()
-        overlayLog.info(
-            "Showing desktop preview on \(screen?.localizedName ?? "unknown display", privacy: .public), frame \(NSStringFromRect(window.frame), privacy: .public)"
-        )
 
-        // SwiftUI performs its first layout on the next run-loop pass. Reapply
-        // the fixed size and ordering afterward so AppKit cannot resize or
-        // order out a just-created accessory window during that layout.
+        // Let a newly attached SwiftUI host finish its initial layout before
+        // sizing and displaying the AppKit window.
         Task { @MainActor [weak self, weak window] in
             await Task.yield()
             guard let self,
@@ -98,13 +92,26 @@ final class NotchOverlayWindowController: NSWindowController, NSWindowDelegate {
             window.alphaValue = 1
             window.orderFrontRegardless()
             window.displayIfNeeded()
+            overlayLog.info(
+                "Showing desktop preview on \(screen?.localizedName ?? "unknown display", privacy: .public), frame \(NSStringFromRect(window.frame), privacy: .public)"
+            )
         }
     }
 
-    func hide() {
+    func hide(immediately: Bool = false) {
         guard let window else { return }
         visibilitySequence += 1
         let sequence = visibilitySequence
+
+        // Turning the preview preference off is an explicit visibility
+        // request. Apply it synchronously instead of depending on AppKit's
+        // animator, which may not advance while an accessory app is inactive.
+        if immediately {
+            window.alphaValue = 0
+            window.orderOut(nil)
+            return
+        }
+
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = 0.18
             window.animator().alphaValue = 0
@@ -143,14 +150,13 @@ final class NotchOverlayWindowController: NSWindowController, NSWindowDelegate {
         if isEnabled, status != .idle {
             show(force: true)
         } else {
-            hide()
+            hide(immediately: !isEnabled)
         }
     }
 
     private func prepareForDisplay(_ window: NSWindow) {
         window.setContentSize(NSSize(width: Self.previewWidth, height: Self.previewHeight))
         window.contentView?.needsLayout = true
-        window.contentView?.layoutSubtreeIfNeeded()
         window.contentView?.needsDisplay = true
     }
 

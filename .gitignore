@@ -1,5 +1,6 @@
 # Build output
 build/
+.build/
 DerivedData/
 *.dmg
 *.app
@@ -15,6 +16,9 @@ xcuserdata/
 
 # Model weights — hosted in GitHub Releases, fetched via scripts/fetch-models.sh
 Models/
+
+# Reproducible ASR-only native frameworks; built by scripts/build-sherpa-onnx-asr.sh
+Vendor/SherpaOnnxASR/Artifacts/
 
 .env
 .claude

@@ -83,11 +83,11 @@ add_feature_cards() {
     -draw 'roundrectangle 1710,1260 2420,1450 28,28' \
     -stroke none -fill '#0D0F10' -font "$font_bold" -pointsize 38 \
     -annotate +190+1342 'Live transcript' \
-    -annotate +975+1342 '25 languages' \
+    -annotate +975+1342 '32 locales' \
     -annotate +1760+1342 'On-device' \
     -fill '#71787C' -font "$font_regular" -pointsize 27 \
     -annotate +190+1393 'See every word as you speak' \
-    -annotate +975+1393 'Automatically detected' \
+    -annotate +975+1393 'Automatic detection' \
     -annotate +1760+1393 'No cloud audio' \
     "$destination"
 }
@@ -102,9 +102,9 @@ magick "$work_dir/01-badge.png" \
   -font "$font_bold" -pointsize 116 -kerning -3 -interline-spacing 8 -fill '#0D0F10' \
   -annotate +140+400 $'Private dictation.\nOn your Mac.' \
   -font "$font_regular" -pointsize 42 -kerning 0 -interline-spacing 14 -fill '#3C4144' \
-  -annotate +145+715 $'Fast, accurate speech-to-text\nwith no account or cloud upload.' \
+  -annotate +145+715 $'Streaming speech-to-text in 32 locales\nwith automatic detection and no cloud upload.' \
   -font "$font_bold" -pointsize 28 -fill '#06695C' \
-  -annotate +145+1370 'NO ACCOUNTS  •  NO ADS  •  NO TRACKING' \
+  -annotate +145+1370 'NO YAPRFLOW ACCOUNT  •  NO ADS  •  NO TRACKING' \
   \( "$work_dir/onboarding-shadow.png" -resize 790x835 \) -geometry +1560+332 -composite \
   "$output_dir/01-private-offline-dictation.png"
 
@@ -137,7 +137,7 @@ magick "$work_dir/03-base.png" \
   -annotate +145+715 $'Speech stays on-device.\nNo sign-in required.\nNo analytics or tracking.' \
   -fill '#E6F7F3' -stroke none -draw 'roundrectangle 140,1080 510,1142 31,31' \
   -font "$font_bold" -pointsize 25 -fill '#06695C' \
-  -annotate +173+1097 'CORE ML  •  PRIVATE' \
+  -annotate +173+1097 'ON-DEVICE  •  PRIVATE' \
   "$work_dir/03-copy.png"
 
 make_shadowed "$asset_dir/settings-window.png" "$work_dir/settings-shadow.png"

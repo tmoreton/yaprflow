@@ -21,8 +21,8 @@ final class TranscriptMetadataEnricher {
 
     private struct Job {
         let url: URL
-        let transcript: String
-        let recordedAt: Date
+        let transcript: String?
+        let recordedAt: Date?
     }
 
     private let logger = Logger(
@@ -30,6 +30,7 @@ final class TranscriptMetadataEnricher {
         category: "TranscriptMetadata"
     )
     private var jobs: [Job] = []
+    private var jobHead = 0
     private var queuedURLs: Set<URL> = []
     private var isProcessing = false
 
@@ -53,26 +54,25 @@ final class TranscriptMetadataEnricher {
             return
         }
 
-        let documents = urls.compactMap { url -> TranscriptArchiveDocument? in
+        // Queue only URLs for backfill. Loading every full transcript up front
+        // can otherwise create a large memory spike for a long-lived archive.
+        let candidates = urls.compactMap { url -> (url: URL, date: Date)? in
             guard url.pathExtension.lowercased() == "md",
-                  let values = try? url.resourceValues(forKeys: [.isRegularFileKey]),
-                  values.isRegularFile != false,
-                  let document = try? TranscriptArchiveDocument.load(from: url),
-                  document.needsGeneratedMetadata,
-                  !document.transcript.isEmpty else {
-                return nil
-            }
-            return document
+                  !queuedURLs.contains(url),
+                  let values = try? url.resourceValues(
+                    forKeys: [.isRegularFileKey, .contentModificationDateKey]
+                  ),
+                  values.isRegularFile != false
+            else { return nil }
+            return (url, values.contentModificationDate ?? .distantPast)
         }
-        .sorted { $0.recordedAt > $1.recordedAt }
+        .sorted { $0.date > $1.date }
 
-        for document in documents {
-            enqueue(
-                url: document.url,
-                transcript: document.transcript,
-                recordedAt: document.recordedAt
-            )
+        for candidate in candidates {
+            queuedURLs.insert(candidate.url)
+            jobs.append(Job(url: candidate.url, transcript: nil, recordedAt: nil))
         }
+        processNextIfNeeded()
     }
 
     private var modelIsAvailable: Bool {
@@ -84,14 +84,20 @@ final class TranscriptMetadataEnricher {
     }
 
     private func processNextIfNeeded() {
-        guard !isProcessing, !jobs.isEmpty else { return }
+        guard !isProcessing, jobHead < jobs.count else { return }
         guard modelIsAvailable else {
             jobs.removeAll()
+            jobHead = 0
             queuedURLs.removeAll()
             return
         }
 
-        let job = jobs.removeFirst()
+        let job = jobs[jobHead]
+        jobHead += 1
+        if jobHead >= 64, jobHead * 2 >= jobs.count {
+            jobs.removeFirst(jobHead)
+            jobHead = 0
+        }
         isProcessing = true
 
         Task { [weak self] in
@@ -99,9 +105,27 @@ final class TranscriptMetadataEnricher {
 
             if #available(macOS 26.0, *) {
                 do {
-                    let generated = try await Self.generateMetadata(for: job.transcript)
+                    let transcript: String
+                    let recordedAt: Date
+                    if let queuedTranscript = job.transcript,
+                       let queuedDate = job.recordedAt {
+                        transcript = queuedTranscript
+                        recordedAt = queuedDate
+                    } else {
+                        let document = try TranscriptArchiveDocument.load(from: job.url)
+                        guard document.needsGeneratedMetadata,
+                              !document.transcript.isEmpty
+                        else {
+                            self.finish(job)
+                            return
+                        }
+                        transcript = document.transcript
+                        recordedAt = document.recordedAt
+                    }
+
+                    let generated = try await Self.generateMetadata(for: transcript)
                     let metadata = try Self.normalizedMetadata(from: generated)
-                    let newURL = try Self.write(metadata, to: job.url, recordedAt: job.recordedAt)
+                    let newURL = try Self.write(metadata, to: job.url, recordedAt: recordedAt)
                     NotificationCenter.default.post(
                         name: .yaprflowTranscriptArchiveChanged,
                         object: TranscriptArchiveChange(oldURL: job.url, newURL: newURL)
@@ -113,10 +137,14 @@ final class TranscriptMetadataEnricher {
                 }
             }
 
-            self.queuedURLs.remove(job.url)
-            self.isProcessing = false
-            self.processNextIfNeeded()
+            self.finish(job)
         }
+    }
+
+    private func finish(_ job: Job) {
+        queuedURLs.remove(job.url)
+        isProcessing = false
+        processNextIfNeeded()
     }
 
     @available(macOS 26.0, *)
