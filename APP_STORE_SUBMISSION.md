@@ -11,7 +11,7 @@ Last reviewed: September 12, 2026
 
 | Platform | Bundle ID | Version | Build | App Store record |
 | --- | --- | --- | --- | --- |
-| macOS | `com.tmoreton.yaprflow` | 5.0.0 | 3 | Apple ID `6810892725` |
+| macOS | `com.tmoreton.yaprflow` | 5.0.0 | 4 | Apple ID `6810892725` |
 | iPhone/iPad | `com.tmoreton.yaprflow.ios` | 1.0.0 | 2 | Not yet documented |
 
 Keep both bundle identifiers stable. In particular, changing the macOS bundle
@@ -173,7 +173,7 @@ dictation flow without it.
 Repository preparation:
 
 - [x] Preserve bundle ID `com.tmoreton.yaprflow` and team `GVXC5FQ2RP`.
-- [x] Set macOS Debug and Release to version 5.0.0 build 3.
+- [x] Set macOS Debug and Release to version 5.0.0 build 4.
 - [x] Keep App Sandbox and hardened runtime enabled.
 - [x] Limit entitlements to microphone audio input.
 - [x] Include the privacy manifest and acknowledgements resource.
@@ -233,10 +233,10 @@ been deployed by this repository change.
 - [ ] Re-run Xcode automatic distribution signing archive/export preflight for
   the Nemotron build and verify the installer plus nested application/framework
   signatures. The current Mac Team Store profile expires December 19, 2026.
-- [ ] If build 3 is rejected or another binary is uploaded for version 5.0.0,
+- [ ] If build 4 is rejected or another binary is uploaded for version 5.0.0,
   increment `CURRENT_PROJECT_VERSION`; App Store Connect will not accept a
   reused build number.
-- [ ] Upload and select build 5.0.0 (3), then perform TestFlight or equivalent
+- [ ] Upload and select build 5.0.0 (4), then perform TestFlight or equivalent
   installation testing before submission.
 - [ ] Run `scripts/ios-app-store-release.sh` for iOS 1.0.0 (2), inspect the
   verified `.ipa`, and upload it only after the iOS App Store relationship and

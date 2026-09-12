@@ -275,7 +275,7 @@ assets remain for compatibility with historical builds.
   to the macOS record may still be possible. Existing separate records cannot
   be merged, so otherwise keep separate paid records.
 - [ ] **Recheck target configuration values.** Confirm the intended Release
-  values are macOS 5.0.0 build 3 and iOS 1.0.0 build 2, and make any Debug versus
+  values are macOS 5.0.0 build 4 and iOS 1.0.0 build 2, and make any Debug versus
   Release differences intentional before archiving.
 - [ ] **Run a signed upgrade test.** Install the publicly released 4.0.14
   Developer ID build, create transcript history, vocabulary entries, and

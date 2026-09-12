@@ -206,7 +206,7 @@ swift test
 
 The shared schemes are:
 
-- `yaprflow`: macOS, bundle ID `com.tmoreton.yaprflow`, version 5.0.0 (3).
+- `yaprflow`: macOS, bundle ID `com.tmoreton.yaprflow`, version 5.0.0 (4).
 - `yaprflow-iOS`: iPhone/iPad, bundle ID `com.tmoreton.yaprflow.ios`, version
   1.0.0 (2).
 
