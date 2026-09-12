@@ -227,17 +227,23 @@ been deployed by this repository change.
   5.0.0 UI.
 - [ ] Reconfirm App Privacy, age rating, third-party-content, encryption, and
   microphone-usage answers in App Store Connect.
-- [ ] Re-run `scripts/app-store-release.sh` after the Nemotron implementation to
-  create and validate a new signed App Store archive. The prior September 11
-  Zipformer archive does not validate the replacement binary.
-- [ ] Re-run Xcode automatic distribution signing archive/export preflight for
-  the Nemotron build and verify the installer plus nested application/framework
-  signatures. The current Mac Team Store profile expires December 19, 2026.
+- [x] Re-ran `scripts/app-store-release.sh` for 5.0.0 (4) on September 12, 2026,
+  after the Nemotron implementation. The script passed all 21 tests and its
+  model, archive, installer, signature, entitlement, and profile checks. The
+  verified package SHA-256 is
+  `e7ec2910e7d9678bc0b77fc4067f78ad11f229f0f0cbb3e5c811625e782e9bd2`.
+- [x] Re-ran Xcode automatic distribution signing archive/export preflight for
+  the Nemotron build and verified the installer plus nested
+  application/framework signatures. The current Mac Team Store profile expires
+  December 19, 2026.
 - [ ] If build 4 is rejected or another binary is uploaded for version 5.0.0,
   increment `CURRENT_PROJECT_VERSION`; App Store Connect will not accept a
   reused build number.
-- [ ] Upload and select build 5.0.0 (4), then perform TestFlight or equivalent
-  installation testing before submission.
+- [x] Uploaded build 5.0.0 (4) to App Store Connect on September 12, 2026.
+  Delivery `f00c618c-7303-4a96-b05c-d47d10ed1a3b` completed processing with
+  binary state Validated and was added to the Internal TestFlight group.
+- [ ] Install build 5.0.0 (4) through TestFlight and perform the release smoke
+  test before App Review submission.
 - [ ] Run `scripts/ios-app-store-release.sh` for iOS 1.0.0 (2), inspect the
   verified `.ipa`, and upload it only after the iOS App Store relationship and
   metadata decisions below are complete. Use `IOS_ARCHIVE_ONLY=1` until an App
