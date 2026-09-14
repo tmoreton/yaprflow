@@ -7,20 +7,23 @@ private let log = Logger(subsystem: "com.tmoreton.yaprflow", category: "App")
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
+    private static let automaticTerminationReason =
+        "Yaprflow must remain available for its global hotkey"
+
     private var statusItem: NSStatusItem?
     private var statusCancellable: AnyCancellable?
-    private var residencyActivity: NSObjectProtocol?
+    private var residencyTask: Task<Void, Never>?
+    private var isAutomaticTerminationDisabled = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let isPreviewSmokeTest = ProcessInfo.processInfo.arguments.contains("--smoke-test-preview")
 
-        // A menu-bar app is useful even with no windows open. Keep a retained
-        // process activity for the entire app lifetime so macOS never treats
-        // the idle, windowless process as eligible for automatic termination.
-        residencyActivity = ProcessInfo.processInfo.beginActivity(
-            options: [.automaticTerminationDisabled, .suddenTerminationDisabled],
-            reason: "Yaprflow must remain available for its global hotkey"
-        )
+        // AppKit finishes its window-restoration bookkeeping after this
+        // callback and enables automatic termination for windowless apps.
+        // Declare support now, then opt out after that deferred pass so this
+        // menu-bar app remains available for its global hotkey while idle.
+        ProcessInfo.processInfo.automaticTerminationSupportEnabled = true
+        scheduleAutomaticTerminationOptOut()
 
         installStatusItem()
         if !isPreviewSmokeTest {
@@ -86,9 +89,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         GlobalHotkey.shared.unregister()
-        if let residencyActivity {
-            ProcessInfo.processInfo.endActivity(residencyActivity)
-            self.residencyActivity = nil
+        residencyTask?.cancel()
+        residencyTask = nil
+        if isAutomaticTerminationDisabled {
+            ProcessInfo.processInfo.enableAutomaticTermination(
+                Self.automaticTerminationReason
+            )
+            isAutomaticTerminationDisabled = false
         }
     }
 
@@ -103,6 +110,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         log.info("Application reopen requested; opening the status menu")
         statusItem?.button?.performClick(nil)
         return false
+    }
+
+    private func scheduleAutomaticTerminationOptOut() {
+        residencyTask?.cancel()
+        residencyTask = Task { @MainActor [weak self] in
+            // AppKit's "No windows open yet" termination assertion is
+            // released several seconds after applicationDidFinishLaunching.
+            // Applying our independent assertion afterward prevents that
+            // release from making the process automatically terminable.
+            try? await Task.sleep(for: .seconds(6))
+            guard !Task.isCancelled, let self else { return }
+
+            ProcessInfo.processInfo.disableAutomaticTermination(
+                Self.automaticTerminationReason
+            )
+            isAutomaticTerminationDisabled = true
+            residencyTask = nil
+            log.info("Disabled automatic termination for menu-bar residency")
+        }
     }
 
     private func installStatusItem() {
@@ -281,7 +307,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let originalPreference = state.isDesktopPreviewEnabled
         state.liveTranscript = ""
         state.setDesktopPreviewEnabledForSmokeTest(false)
-        state.status = .preparing("Loading transcription model…")
+        state.status = .preparing("Loading voice model…")
 
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(300))

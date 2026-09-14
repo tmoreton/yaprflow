@@ -10,7 +10,7 @@ private enum SmokeTestError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .usage:
-            return "Usage: yaprflow-asr-smoke MODEL_DIRECTORY WAV [WAV ...]"
+            return "Usage: yaprflow-asr-smoke [--language CODE] MODEL_DIRECTORY WAV [WAV ...]"
         case .missingModelFile(let path):
             return "Missing model file: \(path)"
         case .unreadableWave(let path):
@@ -75,13 +75,17 @@ private func makeRecognizer(modelDirectory: URL) throws -> SherpaOnnxRecognizer 
     return SherpaOnnxRecognizer(config: &config)
 }
 
-private func transcribe(path: String, with recognizer: SherpaOnnxRecognizer) throws -> String {
+private func transcribe(
+    path: String,
+    language: String,
+    with recognizer: SherpaOnnxRecognizer
+) throws -> String {
     let wave = SherpaOnnxWaveWrapper.readWave(filename: path)
     guard wave.wave != nil, wave.numSamples > 0 else {
         throw SmokeTestError.unreadableWave(path)
     }
     recognizer.reset()
-    recognizer.setOption(key: "language", value: "auto")
+    recognizer.setOption(key: "language", value: language)
 
     let samples = resampleToModelRate(wave.samples, from: wave.sampleRate)
     let feedSize = max(1, Int(Double(sampleRate) * feedDuration))
@@ -116,7 +120,13 @@ private func transcribe(path: String, with recognizer: SherpaOnnxRecognizer) thr
 }
 
 do {
-    let arguments = Array(CommandLine.arguments.dropFirst())
+    var arguments = Array(CommandLine.arguments.dropFirst())
+    var language = "auto"
+    if arguments.first == "--language" {
+        guard arguments.count >= 4 else { throw SmokeTestError.usage }
+        language = arguments[1]
+        arguments.removeFirst(2)
+    }
     guard arguments.count >= 2 else { throw SmokeTestError.usage }
 
     let modelDirectory = URL(fileURLWithPath: arguments[0], isDirectory: true)
@@ -126,9 +136,13 @@ do {
     for path in arguments.dropFirst() {
         let start = ContinuousClock.now
         do {
-            let transcript = try transcribe(path: path, with: recognizer)
+            let transcript = try transcribe(
+                path: path,
+                language: language,
+                with: recognizer
+            )
             let elapsed = start.duration(to: .now)
-            print("PASS \(URL(fileURLWithPath: path).lastPathComponent) [\(elapsed)]")
+            print("PASS \(URL(fileURLWithPath: path).lastPathComponent) [\(language), \(elapsed)]")
             print(transcript)
         } catch {
             failures += 1

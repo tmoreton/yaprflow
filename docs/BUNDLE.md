@@ -29,7 +29,7 @@ application.
 
 | Target | Bundle identifier | Intended version | Intended build |
 | --- | --- | --- | --- |
-| macOS | `com.tmoreton.yaprflow` | 5.0.0 | 3 |
+| macOS | `com.tmoreton.yaprflow` | 5.0.1 | 5 |
 | iOS | `com.tmoreton.yaprflow.ios` | 1.0.0 | 2 |
 
 These identifiers must remain stable. In particular, the macOS identifier owns
@@ -55,9 +55,11 @@ implemented and separately reviewed for privacy and App Store compliance.
 ## Core features
 
 - On-device multilingual streaming speech recognition in 32 production-ready
-  locales with automatic detection, using the 1120 ms chunk-size INT8 export
-  of NVIDIA Nemotron 3.5 ASR Streaming 0.6B through an ASR-only sherpa-onnx
-  build and ONNX Runtime.
+  locales, using the 1120 ms chunk-size INT8 export of NVIDIA Nemotron 3.5 ASR
+  Streaming 0.6B through an ASR-only sherpa-onnx build and ONNX Runtime.
+  On macOS, English (United States) is the saved default; every
+  production-ready locale is selectable and Automatic detection remains
+  available. The current iOS source target uses Automatic detection.
 - On-device Silero voice activity detection.
 - Live transcription preview and automatic clipboard copy.
 - Local Markdown transcript history and vocabulary replacement on macOS.
@@ -164,9 +166,11 @@ English-only Nemotron model have been removed. The current build uses the
 pinned June 11, 2026, 1120 ms chunk-size INT8 sherpa-onnx export of NVIDIA
 Nemotron 3.5 ASR Streaming 0.6B. The source model covers 40 locales across 35
 languages. Nineteen transcription-ready and 13 broad-coverage locales work out
-of the box; Yaprflow foregrounds those 32 production-ready locales with
-automatic detection. The remaining 8 adaptation-ready locales require
-fine-tuning and are not advertised as supported. OpenMDW-1.1 permits dealing in
+of the box. On macOS, Yaprflow exposes those 32 production-ready locales as
+explicit choices, defaults to English (United States), and also offers
+Automatic detection; the current iOS source target uses Automatic detection.
+The remaining 8 adaptation-ready locales require fine-tuning and are not
+advertised as supported. OpenMDW-1.1 permits dealing in
 the model materials subject to its conditions and requires the license plus
 applicable copyright and origin notices to be retained when redistributing.
 Both apps bundle the agreement and the exact retained-origin `NOTICE.txt`. The
@@ -179,8 +183,9 @@ Runtime is MIT-licensed. Yaprflow uses a pinned native sherpa build with
 and optional GPL eSpeak-NG/Piper TTS stack are not distributed. Release
 validation checks the final executable for the excluded TTS symbols. Its
 vendored upstream Swift wrapper has one local bridge to the existing per-stream
-option setter so Yaprflow can request `language=auto`; the reviewed wrapper and
-native output hashes are pinned by the release scripts.
+option setter so Yaprflow can provide a selected language code or
+`language=auto`; the reviewed wrapper and native output hashes are pinned by
+the release scripts.
 
 ## Commercial distribution
 
@@ -275,7 +280,7 @@ assets remain for compatibility with historical builds.
   to the macOS record may still be possible. Existing separate records cannot
   be merged, so otherwise keep separate paid records.
 - [ ] **Recheck target configuration values.** Confirm the intended Release
-  values are macOS 5.0.0 build 4 and iOS 1.0.0 build 2, and make any Debug versus
+  values are macOS 5.0.1 build 5 and iOS 1.0.0 build 2, and make any Debug versus
   Release differences intentional before archiving.
 - [ ] **Run a signed upgrade test.** Install the publicly released 4.0.14
   Developer ID build, create transcript history, vocabulary entries, and

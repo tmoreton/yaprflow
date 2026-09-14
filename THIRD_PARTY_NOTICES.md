@@ -41,8 +41,9 @@ stack is therefore not linked or distributed. The vendored Swift wrapper is
 based on the pinned upstream wrapper (SHA-256
 `a7ff8bbc35fc27017dc4f47271592054a2138b6e716c2abb5d8b5bdcbcf49ffd`) with one
 local public bridge that passes sherpa-onnx's existing per-stream option setter
-through to Yaprflow for `language=auto`; the reviewed modified wrapper is pinned
-at SHA-256 `d4731a95c3c7015f9e2f9acb024e6f1d3dfd3b1957836403b240805d9eb718a4`.
+through to Yaprflow for a selected language code or `language=auto`; the
+reviewed modified wrapper is pinned at SHA-256
+`d4731a95c3c7015f9e2f9acb024e6f1d3dfd3b1957836403b240805d9eb718a4`.
 The frameworks are rebuildable from these pinned inputs with
 [`scripts/build-sherpa-onnx-asr.sh`](scripts/build-sherpa-onnx-asr.sh). Because
 compiler/toolchain changes can alter output bytes, release validation separately
@@ -95,10 +96,12 @@ Yaprflow bundles the 1120 ms chunk-size INT8 encoder, decoder, joiner, and token
 table without modifying their contents. The upstream model covers 40 locales
 across 35 languages: 19 transcription-ready and 13 broad-coverage locales work
 out of the box, while 8 adaptation-ready locales require fine-tuning. Yaprflow
-exposes automatic language detection for the 32 production-ready locales. The
-complete agreement is preserved at
-[`LICENSES/OpenMDW-1.1.txt`](LICENSES/OpenMDW-1.1.txt) and bundled with both
-applications. The applicable model origin is retained in [`NOTICE.txt`](NOTICE.txt).
+for Mac exposes all 32 production-ready locales as explicit choices, defaults
+to English (United States), and also offers Automatic detection. The current
+iOS source target uses Automatic detection. The complete agreement is
+preserved at [`LICENSES/OpenMDW-1.1.txt`](LICENSES/OpenMDW-1.1.txt) and bundled
+with both applications. The applicable model origin is retained in
+[`NOTICE.txt`](NOTICE.txt).
 The export repository does not identify the precise NVIDIA commit used for its
 conversion; the export revision, official archive digest, and per-file hashes
 are the authoritative binary provenance.

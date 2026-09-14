@@ -37,8 +37,9 @@ licensed source builds.
   on supported Macs, Apple Intelligence adds a title, topic, and description.
 - **True streaming multilingual transcription**: a bundled Nemotron 3.5 ASR
   0.6B 1120 ms chunk-size export produces local partial results in 32
-  production-ready locales, with automatic language detection and no cloud
-  round trips.
+  production-ready locales. On Mac, English (United States) is the default;
+  choose a different locale or Automatic in Settings, with no cloud round
+  trips.
 - **Inspectable source**: current Yaprflow-owned code is source-available under
   PolyForm Shield 1.0.0; the historical Apache-2.0 boundary is preserved.
 
@@ -74,6 +75,9 @@ Yaprflow runs as a menu-bar app. Click the waveform icon to open the menu.
 - **Transcribe** starts or stops dictation.
 - **Change shortcut**: open Settings, click the keyboard shortcut button, then
   press the new key combination. Escape cancels shortcut capture.
+- **Choose speech language**: Settings defaults to English (United States) for
+  more consistent English dictation. Choose any other supported locale, or
+  Automatic when a recording may use different languages.
 - **AI Summary, History, and Settings** opens a single tabbed window for
   transforming transcripts, browsing local history, and changing settings.
 - **Command-Q** quits the app.
@@ -131,7 +135,8 @@ detection. The full FluidAudio package is not linked into the apps.
    Core ML VAD finds speech endpoints.
 4. The same audio is decoded continuously by the bundled 1120 ms chunk-size
    Nemotron 3.5 multilingual streaming model through an ASR-only sherpa-onnx
-   build using greedy search and automatic language detection.
+   build using greedy search and the saved speech-language prompt. English
+   (United States) is the default, and Automatic detection remains available.
 5. Yaprflow applies local cleanup and vocabulary replacements.
 6. Final text is copied to the clipboard and saved as Markdown.
 7. When available, Apple Foundation Models can summarize, restructure, or
@@ -146,8 +151,9 @@ pinned model files are absent.
 
 The upstream Nemotron 3.5 model covers 40 language-locales across 35 languages.
 NVIDIA classifies 19 locales as transcription-ready, 13 as broad-coverage, and
-8 as adaptation-ready. Yaprflow supports the 32 out-of-box locales with
-automatic detection; the 8 adaptation-ready locales require fine-tuning and
+8 as adaptation-ready. The Mac app makes the 32 out-of-box locales selectable
+and also offers Automatic detection. The current iOS source target uses
+Automatic detection. The 8 adaptation-ready locales require fine-tuning and
 are not advertised as production-ready.
 
 ## Repository layout
@@ -206,7 +212,7 @@ swift test
 
 The shared schemes are:
 
-- `yaprflow`: macOS, bundle ID `com.tmoreton.yaprflow`, version 5.0.0 (4).
+- `yaprflow`: macOS, bundle ID `com.tmoreton.yaprflow`, version 5.0.1 (5).
 - `yaprflow-iOS`: iPhone/iPad, bundle ID `com.tmoreton.yaprflow.ios`, version
   1.0.0 (2).
 
@@ -252,7 +258,7 @@ For an annotated tag and source-only GitHub release after the release commit is
 clean and ready:
 
 ```bash
-scripts/release.sh 5.0.0 --publish-source
+scripts/release.sh 5.0.1 --publish-source
 ```
 
 That command builds a local DMG for validation, but it does not upload the

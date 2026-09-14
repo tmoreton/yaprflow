@@ -21,9 +21,9 @@ Exact export mirror revision: ${EXPORT_MODEL_REVISION}
 Official sherpa-onnx archive SHA-256: ${UPSTREAM_ARCHIVE_SHA256}
 License: OpenMDW License Agreement, version 1.1
 
-The source model covers 40 language-locales across 35 languages. Yaprflow uses
-automatic detection for the 32 locales that transcribe out of the box; the 8
-adaptation-ready locales require fine-tuning and are not advertised as supported.
+The source model covers 40 language-locales across 35 languages. Thirty-two
+locales transcribe out of the box; the 8 adaptation-ready locales require
+fine-tuning and are not advertised as supported.
 
 The archive contains the 1120 ms chunk-size INT8 encoder, decoder, joiner, and token table
 without modifying their contents. The archive and release assets include the

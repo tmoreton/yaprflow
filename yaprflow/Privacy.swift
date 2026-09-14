@@ -5,138 +5,172 @@ struct SettingsView: View {
     @ObservedObject private var appState = AppState.shared
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            FeatureWindowHeader(
-                symbolName: "gearshape.fill",
-                title: "Settings",
-                subtitle: "Control Yaprflow and review how your data is handled.",
-                accent: .blue,
-                badge: "On-device",
-                badgeSymbol: "lock.fill"
-            )
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                FeatureWindowHeader(
+                    symbolName: "gearshape.fill",
+                    title: "Settings",
+                    subtitle: "Control Yaprflow and review how your data is handled.",
+                    accent: .blue,
+                    badge: "On-device",
+                    badgeSymbol: "lock.fill"
+                )
 
-            FeatureCard {
-                HStack(spacing: 12) {
-                    Image(systemName: appState.isDesktopPreviewEnabled ? "eye" : "eye.slash")
-                        .foregroundStyle(.secondary)
-                        .frame(width: 26)
+                FeatureCard {
+                    VStack(spacing: 0) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "globe")
+                                .foregroundStyle(.secondary)
+                                .frame(width: 26)
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Desktop preview")
-                            .font(.callout.weight(.medium))
-                        Text("Show the floating transcript while recording.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Speech language")
+                                    .font(.callout.weight(.medium))
+                                Text(speechLanguageDetail)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer(minLength: 12)
+
+                            Picker("Speech language", selection: speechLanguageBinding) {
+                                ForEach(SpeechLanguage.allCases) { language in
+                                    Text(language.displayName).tag(language)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                            .frame(width: 190)
+                            .accessibilityLabel("Speech language")
+                        }
+                        .padding(.vertical, 10)
+
+                        Divider().padding(.leading, 38)
+
+                        HStack(spacing: 12) {
+                            Image(systemName: appState.isDesktopPreviewEnabled ? "eye" : "eye.slash")
+                                .foregroundStyle(.secondary)
+                                .frame(width: 26)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Desktop preview")
+                                    .font(.callout.weight(.medium))
+                                Text("Show the floating transcript while recording.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+
+                            Toggle("Desktop preview", isOn: desktopPreviewBinding)
+                                .labelsHidden()
+                                .toggleStyle(.switch)
+                        }
+                        .padding(.vertical, 10)
                     }
-
-                    Spacer()
-
-                    Toggle("Desktop preview", isOn: desktopPreviewBinding)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
                 }
-            }
 
-            FeatureCard {
-                HStack(spacing: 12) {
-                    Image(systemName: "keyboard")
-                        .foregroundStyle(.secondary)
-                        .frame(width: 26)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Keyboard shortcut")
-                            .font(.callout.weight(.medium))
-                        Text("Start or stop dictation from any app.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Spacer()
-
-                    HotkeyRecorder(hotkey: appState.hotkey)
-                        .frame(width: 118, height: 28)
-                }
-            }
-
-            FeatureCard {
-                VStack(spacing: 0) {
-                    PrivacyRow(
-                        symbol: "waveform",
-                        title: "Speech recognition",
-                        detail: "Processed locally with Nemotron and sherpa-onnx",
-                        status: "On-device"
-                    )
-                    Divider().padding(.leading, 38)
-                    PrivacyRow(
-                        symbol: "sparkles",
-                        title: "AI Summary",
-                        detail: "Uses Apple's on-device model",
-                        status: "On-device"
-                    )
-                    Divider().padding(.leading, 38)
-                    PrivacyRow(
-                        symbol: "person.crop.circle.badge.xmark",
-                        title: "Accounts",
-                        detail: "No Yaprflow account or sign-in required",
-                        status: "None"
-                    )
-                    Divider().padding(.leading, 38)
-                    PrivacyRow(
-                        symbol: "chart.bar.xaxis",
-                        title: "Telemetry",
-                        detail: "No analytics or transcript data sent",
-                        status: "Off"
-                    )
-                }
-            }
-
-            FeatureCard {
-                VStack(spacing: 0) {
+                FeatureCard {
                     HStack(spacing: 12) {
-                        Image(systemName: "info.circle")
+                        Image(systemName: "keyboard")
                             .foregroundStyle(.secondary)
                             .frame(width: 26)
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Version")
+                            Text("Keyboard shortcut")
                                 .font(.callout.weight(.medium))
-                            Text("Your installed Yaprflow version.")
+                            Text("Start or stop dictation from any app.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
 
                         Spacer()
 
-                        Text(appVersion)
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(.secondary)
+                        HotkeyRecorder(hotkey: appState.hotkey)
+                            .frame(width: 118, height: 28)
                     }
-                    .padding(.vertical, 10)
-
-                    Divider().padding(.leading, 38)
-
-                    HStack(spacing: 20) {
-                        Link(destination: URL(string: "https://yaprflow.com/privacy.html")!) {
-                            Label("Privacy Policy", systemImage: "hand.raised")
-                        }
-
-                        Button {
-                            AcknowledgementsWindowController.show()
-                        } label: {
-                            Label("Acknowledgements", systemImage: "doc.text")
-                        }
-                        .buttonStyle(.link)
-
-                        Spacer()
-                    }
-                    .font(.caption.weight(.medium))
-                    .padding(.top, 12)
                 }
-            }
 
-            Spacer(minLength: 0)
+                FeatureCard {
+                    VStack(spacing: 0) {
+                        PrivacyRow(
+                            symbol: "waveform",
+                            title: "Speech recognition",
+                            detail: "Processed locally with Nemotron and sherpa-onnx",
+                            status: "On-device"
+                        )
+                        Divider().padding(.leading, 38)
+                        PrivacyRow(
+                            symbol: "sparkles",
+                            title: "AI Summary",
+                            detail: "Uses Apple's on-device model",
+                            status: "On-device"
+                        )
+                        Divider().padding(.leading, 38)
+                        PrivacyRow(
+                            symbol: "person.crop.circle.badge.xmark",
+                            title: "Accounts",
+                            detail: "No Yaprflow account or sign-in required",
+                            status: "None"
+                        )
+                        Divider().padding(.leading, 38)
+                        PrivacyRow(
+                            symbol: "chart.bar.xaxis",
+                            title: "Telemetry",
+                            detail: "No analytics or transcript data sent",
+                            status: "Off"
+                        )
+                    }
+                }
+
+                FeatureCard {
+                    VStack(spacing: 0) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "info.circle")
+                                .foregroundStyle(.secondary)
+                                .frame(width: 26)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Version")
+                                    .font(.callout.weight(.medium))
+                                Text("Your installed Yaprflow version.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+
+                            Text(appVersion)
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 10)
+
+                        Divider().padding(.leading, 38)
+
+                        HStack(spacing: 20) {
+                            Link(destination: URL(string: "https://yaprflow.com/privacy.html")!) {
+                                Label("Privacy Policy", systemImage: "hand.raised")
+                            }
+
+                            Button {
+                                AcknowledgementsWindowController.show()
+                            } label: {
+                                Label("Acknowledgements", systemImage: "doc.text")
+                            }
+                            .buttonStyle(.link)
+
+                            Spacer()
+                        }
+                        .font(.caption.weight(.medium))
+                        .padding(.top, 12)
+                    }
+                }
+
+            }
+            .padding(22)
+            .frame(maxWidth: .infinity)
         }
-        .padding(22)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .windowBackgroundColor))
     }
@@ -150,6 +184,24 @@ struct SettingsView: View {
             get: { appState.isDesktopPreviewEnabled },
             set: { appState.isDesktopPreviewEnabled = $0 }
         )
+    }
+
+    private var speechLanguageBinding: Binding<SpeechLanguage> {
+        Binding(
+            get: { appState.speechLanguage },
+            set: { appState.speechLanguage = $0 }
+        )
+    }
+
+    private var speechLanguageDetail: String {
+        switch appState.speechLanguage {
+        case .automatic:
+            return "Detect a language for each speech segment."
+        case .englishUS, .englishUK:
+            return "Keep recognition in English for more reliable short dictation."
+        default:
+            return "Keep recognition in the selected language for better accuracy."
+        }
     }
 }
 
@@ -171,7 +223,7 @@ private enum AcknowledgementsWindowController {
 private struct AcknowledgementsView: View {
     private let contents: String = {
         guard let url = Bundle.main.url(forResource: "Acknowledgements", withExtension: "txt"),
-              let text = try? String(contentsOf: url, encoding: .utf8)
+            let text = try? String(contentsOf: url, encoding: .utf8)
         else {
             return "Acknowledgements could not be loaded."
         }

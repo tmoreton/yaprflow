@@ -21,8 +21,8 @@ Licensed under the Apache License 2.0 reproduced below.
 Yaprflow's native build disables the optional TTS stack and does not distribute
 eSpeak-NG or Piper.
 The vendored upstream Swift wrapper has one local bridge exposing sherpa-onnx's
-existing per-stream option setter so Yaprflow can request automatic language
-detection. No inference logic is changed by that bridge.
+existing per-stream option setter so Yaprflow can request a selected language
+or automatic detection. No inference logic is changed by that bridge.
 https://github.com/k2-fsa/sherpa-onnx
 
 Native sherpa-onnx build dependencies

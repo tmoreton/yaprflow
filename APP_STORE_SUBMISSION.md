@@ -11,12 +11,17 @@ Last reviewed: September 12, 2026
 
 | Platform | Bundle ID | Version | Build | App Store record |
 | --- | --- | --- | --- | --- |
-| macOS | `com.tmoreton.yaprflow` | 5.0.0 | 4 | Apple ID `6810892725` |
+| macOS | `com.tmoreton.yaprflow` | 5.0.1 | 5 | Apple ID `6810892725` |
 | iPhone/iPad | `com.tmoreton.yaprflow.ios` | 1.0.0 | 2 | Not yet documented |
 
 Keep both bundle identifiers stable. In particular, changing the macOS bundle
 ID would break continuity with the existing sandbox container and App Store
 record.
+
+The uploaded macOS 5.0.0 build 4 predates the persisted speech-language
+selector and uses Automatic detection for every recording. Version 5.0.1 build
+5 is the next intended build and includes the selector and background-residency
+fixes.
 
 ## macOS product page
 
@@ -31,15 +36,16 @@ record.
 - **Privacy policy URL:** https://yaprflow.com/privacy.html
 - **Keywords:** dictation,voice,text,transcription,offline,private,speech,productivity
 
-### What's New in Version 5.0.0
+### Draft What's New in Version 5.0.1
 
 Yaprflow 5 adds on-device streaming dictation across 32 production-ready locales
-with automatic language detection. It remembers the selected dictation mode,
-improves recognition of very short recordings, makes empty recordings and
-clipboard failures clearer, promptly releases raw microphone buffers after
+with a saved speech-language selector. English (United States) is the default,
+and Automatic detection remains available. It remembers the selected dictation
+mode, improves recognition of very short recordings, makes empty recordings
+and clipboard failures clearer, promptly releases raw microphone buffers after
 transcription, and expands privacy and third-party licensing information.
 
-Use this text when 5.0.0 is submitted as an update to a version that reached
+Use this text when 5.0.1 is submitted as an update to a version that reached
 Ready for Distribution. App Store Connect may not show or require the field if
 the pending 4.0.14 version is withdrawn before its first release.
 
@@ -62,7 +68,8 @@ Features:
 - Automatically copy finished text to the clipboard.
 - Keep a browsable local Markdown history.
 - Correct names, acronyms, and preferred spellings with a local vocabulary.
-- Dictate across 32 production-ready locales with automatic language detection.
+- Choose among 32 production-ready dictation locales, with English (United
+  States) as the default and Automatic detection available.
 - Summarize, restructure, or rewrite transcripts with Apple Intelligence on
   supported Macs.
 - Generate local titles, topics, and descriptions for transcript history on
@@ -128,12 +135,13 @@ model/model-card revision reviewed is
 `ea30d66debe3740a08b573244286791d423d6b3e`; the exact export mirror revision is
 `cba1c96ca5ef0e8393b50584ae153a79145dc492`. The export does not identify the
 precise NVIDIA commit used for conversion, so the official archive digest and
-per-file hashes are the authoritative binary pins. The model covers 40 locales across
-35 languages: 32 transcribe out of the box and are exposed with automatic
-language detection, while 8 adaptation-ready locales require fine-tuning and
-are not a Yaprflow product claim. OpenMDW-1.1 permits dealing in the model
-materials subject to its conditions and requires redistributed copies to retain
-the agreement plus applicable copyright and origin notices. Both are bundled.
+per-file hashes are the authoritative binary pins. The model covers 40 locales
+across 35 languages: 32 transcribe out of the box and are exposed as explicit
+language choices plus Automatic detection, while 8 adaptation-ready locales
+require fine-tuning and are not a Yaprflow product claim. OpenMDW-1.1 permits
+dealing in the model materials subject to its conditions and requires
+redistributed copies to retain the agreement plus applicable copyright and
+origin notices. Both are bundled.
 This records the owner's release decision; it does not represent that counsel
 or every upstream rightsholder supplied a separate written chain-of-title
 opinion.
@@ -153,10 +161,12 @@ restore flow is required; Apple handles the ordinary paid-app entitlement.
 To test the main flow:
 
 1. Launch Yaprflow and grant microphone access during onboarding.
-2. Click the waveform icon in the menu bar, or press Command-T.
-3. Speak a sentence, then press Command-T again.
-4. The finished text is copied to the clipboard and saved in local History.
-5. Open the menu-bar item and choose History to view the saved transcript.
+2. Open Settings and confirm Speech language defaults to English (United
+   States). Choose Automatic only when testing language detection.
+3. Click the waveform icon in the menu bar, or press Command-T.
+4. Speak a sentence, then press Command-T again.
+5. The finished text is copied to the clipboard and saved in local History.
+6. Open the menu-bar item and choose History to view the saved transcript.
 
 The complete speech model is bundled with the app; no runtime model download is
 required. Yaprflow begins preparing the recognizer in the background at launch.
@@ -223,8 +233,8 @@ been deployed by this repository change.
   `/support.html` over HTTPS.
 - [ ] Verify the public App Store URL and replace or defer customer-facing links
   if Apple ID `6810892725` is not yet live.
-- [x] Regenerate and review the four 2560 × 1600 Mac screenshots against the
-  5.0.0 UI.
+- [ ] Recapture `AppStore/Assets/settings-window.png` with the speech-language
+  selector, then regenerate and review the four 2560 × 1600 Mac screenshots.
 - [ ] Reconfirm App Privacy, age rating, third-party-content, encryption, and
   microphone-usage answers in App Store Connect.
 - [x] Re-ran `scripts/app-store-release.sh` for 5.0.0 (4) on September 12, 2026,
@@ -242,8 +252,10 @@ been deployed by this repository change.
 - [x] Uploaded build 5.0.0 (4) to App Store Connect on September 12, 2026.
   Delivery `f00c618c-7303-4a96-b05c-d47d10ed1a3b` completed processing with
   binary state Validated and was added to the Internal TestFlight group.
-- [ ] Install build 5.0.0 (4) through TestFlight and perform the release smoke
-  test before App Review submission.
+- [ ] Upload an incremented build containing the persisted speech-language
+  selector; build 4 remains the earlier Automatic-only implementation.
+- [ ] Install the incremented selector build through TestFlight and perform the
+  release smoke test before App Review submission.
 - [ ] Run `scripts/ios-app-store-release.sh` for iOS 1.0.0 (2), inspect the
   verified `.ipa`, and upload it only after the iOS App Store relationship and
   metadata decisions below are complete. Use `IOS_ARCHIVE_ONLY=1` until an App

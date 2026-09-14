@@ -19,5 +19,5 @@ archives are checksum-verified, and the script normalizes its macOS framework
 links so Xcode emits a valid static-framework bundle hook. The tracked Swift
 wrapper is the pinned upstream file with one documented addition: a public
 bridge to sherpa-onnx's existing per-stream option setter. Yaprflow uses that
-bridge to set the multilingual model's language option to `auto`; no native
+bridge to set a selected multilingual model language code or `auto`; no native
 runtime behavior is patched.

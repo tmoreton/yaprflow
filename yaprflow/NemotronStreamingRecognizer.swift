@@ -85,18 +85,17 @@ actor NemotronStreamingRecognizer {
         )
 
         recognizer = SherpaOnnxRecognizer(config: &recognizerConfig)
-        recognizer.setOption(key: "language", value: "auto")
         pendingSamples.reserveCapacity(Self.chunkSampleCount * 2)
     }
 
-    func beginStream() {
+    func beginStream(language: SpeechLanguage) {
         if streamState != .fresh {
             // Passing no hotwords deliberately creates the normal stream. The
             // accuracy benchmark found that hotwords hurt this general-purpose
             // dictation corpus.
             recognizer.reset()
         }
-        recognizer.setOption(key: "language", value: "auto")
+        recognizer.setOption(key: "language", value: language.rawValue)
         pendingSamples.removeAll(keepingCapacity: true)
         streamState = .accepting
     }

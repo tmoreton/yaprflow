@@ -1,5 +1,94 @@
 import Foundation
 
+/// The language prompt applied to every recognition stream in one recording.
+/// Keep this list limited to the locales NVIDIA classifies as working without
+/// adaptation; the model also contains internal prompts for fine-tuning-only
+/// locales that Yaprflow does not present as supported choices.
+public enum SpeechLanguage: String, CaseIterable, Identifiable, Sendable {
+    case automatic = "auto"
+    case englishUS = "en-US"
+    case englishUK = "en-GB"
+    case spanishUS = "es-US"
+    case spanishSpain = "es-ES"
+    case frenchFrance = "fr-FR"
+    case frenchCanada = "fr-CA"
+    case italian = "it-IT"
+    case portugueseBrazil = "pt-BR"
+    case portuguesePortugal = "pt-PT"
+    case dutch = "nl-NL"
+    case german = "de-DE"
+    case turkish = "tr-TR"
+    case russian = "ru-RU"
+    case arabic = "ar-AR"
+    case hindi = "hi-IN"
+    case japanese = "ja-JP"
+    case korean = "ko-KR"
+    case vietnamese = "vi-VN"
+    case ukrainian = "uk-UA"
+    case polish = "pl-PL"
+    case swedish = "sv-SE"
+    case czech = "cs-CZ"
+    case norwegianBokmal = "nb-NO"
+    case danish = "da-DK"
+    case bulgarian = "bg-BG"
+    case finnish = "fi-FI"
+    case croatian = "hr-HR"
+    case slovak = "sk-SK"
+    case chineseSimplified = "zh-CN"
+    case hungarian = "hu-HU"
+    case romanian = "ro-RO"
+    case estonian = "et-EE"
+
+    public static let defaultSelection: Self = .englishUS
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .automatic: return "Automatic"
+        case .englishUS: return "English (United States)"
+        case .englishUK: return "English (United Kingdom)"
+        case .spanishUS: return "Spanish (United States)"
+        case .spanishSpain: return "Spanish (Spain)"
+        case .frenchFrance: return "French (France)"
+        case .frenchCanada: return "French (Canada)"
+        case .italian: return "Italian"
+        case .portugueseBrazil: return "Portuguese (Brazil)"
+        case .portuguesePortugal: return "Portuguese (Portugal)"
+        case .dutch: return "Dutch"
+        case .german: return "German"
+        case .turkish: return "Turkish"
+        case .russian: return "Russian"
+        case .arabic: return "Arabic"
+        case .hindi: return "Hindi"
+        case .japanese: return "Japanese"
+        case .korean: return "Korean"
+        case .vietnamese: return "Vietnamese"
+        case .ukrainian: return "Ukrainian"
+        case .polish: return "Polish"
+        case .swedish: return "Swedish"
+        case .czech: return "Czech"
+        case .norwegianBokmal: return "Norwegian Bokmål"
+        case .danish: return "Danish"
+        case .bulgarian: return "Bulgarian"
+        case .finnish: return "Finnish"
+        case .croatian: return "Croatian"
+        case .slovak: return "Slovak"
+        case .chineseSimplified: return "Mandarin (Simplified Chinese)"
+        case .hungarian: return "Hungarian"
+        case .romanian: return "Romanian"
+        case .estonian: return "Estonian"
+        }
+    }
+
+    /// Missing and unknown stored values deliberately choose English instead
+    /// of automatic detection. This also gives existing installs the safer
+    /// default the first time they run a build with this preference.
+    public static func selection(fromPersistedValue value: String?) -> Self {
+        value.flatMap(Self.init(rawValue:)) ?? defaultSelection
+    }
+}
+
 public struct BundledModelFile: Equatable, Sendable {
     public let name: String
     public let byteCount: Int64

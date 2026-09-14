@@ -151,6 +151,7 @@ final class TranscriptionController {
     private var volatileText = ""
     private var vocabularyReplacementCount = 0
     private var sessionSourceApplication: String?
+    private var sessionSpeechLanguage: SpeechLanguage = .defaultSelection
     private var audioWorkerTask: Task<Void, Never>?
     private var transcriptProcessor: TranscriptProcessor?
     private var sessionGeneration: UInt = 0
@@ -232,7 +233,7 @@ final class TranscriptionController {
                 startRequested.toggle()
                 state.liveTranscript = ""
                 state.status = startRequested
-                    ? .preparing("Loading transcription model…")
+                    ? .preparing("Preparing voice model…")
                     : .idle
             } else if isStopping {
                 // Finalization continues off the capture path after Stop. Keep
@@ -379,17 +380,18 @@ final class TranscriptionController {
         vocabularyReplacementCount = 0
         transcriptProcessor = state.makeTranscriptProcessor()
         sessionSourceApplication = Self.frontmostApplicationName()
+        sessionSpeechLanguage = state.speechLanguage
         audioWorkerTask = nil
         audioConverter.reset()
         sessionAudio.reset(keepingCapacity: true)
         lastFinalizedAudioEnd = 0
         recognizerStreamHasLeadingOverlap = false
         state.liveTranscript = ""
-        // Present the transcript surface immediately. Permission failures are
-        // still reported below, but an already-authorized microphone should
-        // never leave the overlay sitting on a redundant access check.
+        // Present honest startup progress immediately. Do not claim to be
+        // listening until the recognizer is ready and microphone capture has
+        // actually started.
         _ = NotchOverlayWindowController.shared
-        state.status = .listening
+        state.status = .preparing("Preparing voice model…")
 
         do {
             try await ensureMicPermission()
@@ -425,7 +427,7 @@ final class TranscriptionController {
             // bounded continuous fallback streaming from the first frame.
             recognizerStreamIsOpen = false
             if !usesVoiceDetectorForCurrentSession {
-                await recognizer.beginStream()
+                await recognizer.beginStream(language: sessionSpeechLanguage)
                 recognizerStreamIsOpen = true
                 currentSpeechStart = 0
                 currentSpeechFedThrough = 0
@@ -442,7 +444,6 @@ final class TranscriptionController {
                 return
             }
 
-            state.status = .listening
             let stream = audioIngress.beginSession(generation: generation)
             audioWorkerTask = Task { @MainActor [weak self] in
                 guard let self else { return }
@@ -453,8 +454,10 @@ final class TranscriptionController {
                     await self.consumeCapturedBuffer(packet.buffer)
                 }
             }
+            state.status = .preparing("Starting microphone…")
             try capture.start(sessionGeneration: generation)
             lifecycle = .recording(generation)
+            state.status = .listening
             log.info("Microphone capture started (session: \(generation, privacy: .public))")
         } catch {
             audioIngress.finishSession(generation: generation)
@@ -779,7 +782,7 @@ final class TranscriptionController {
         guard !recognizerStreamIsOpen,
               let recognizer = speechRecognizer
         else { return }
-        await recognizer.beginStream()
+        await recognizer.beginStream(language: sessionSpeechLanguage)
         recognizerStreamIsOpen = true
         recognizerStreamHasLeadingOverlap = hasLeadingOverlap
     }
@@ -952,7 +955,7 @@ final class TranscriptionController {
     ) async throws -> NemotronStreamingRecognizer {
         if let recognizer = speechRecognizer { return recognizer }
         if showLoadingStatus {
-            state.status = .preparing("Loading transcription model…")
+            state.status = .preparing("Loading voice model…")
         }
 
         let task: Task<NemotronStreamingRecognizer, Error>

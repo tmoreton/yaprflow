@@ -17,8 +17,10 @@ License text SHA-256: 2ab44b68365473c112f5092211a38f231cb23e50de68b75a13369adbd7
 Yaprflow bundles the 1120 ms chunk-size INT8 encoder, decoder, joiner, and
 token table without modifying their contents. The source model supports 40
 language-locales across 35 languages: 32 locales transcribe out of the box and
-8 adaptation-ready locales require fine-tuning. Yaprflow exposes automatic
-language detection for the 32 production-ready locales.
+8 adaptation-ready locales require fine-tuning. Yaprflow for Mac exposes all
+32 production-ready locales as explicit choices, defaults to English (United
+States), and also offers Automatic detection. The current iOS source target
+uses Automatic detection.
 
 The export repository links to the NVIDIA source model but does not record the
 exact NVIDIA commit used for conversion. The exported binaries are pinned by
