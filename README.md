@@ -240,8 +240,9 @@ by `scripts/native-asr-checksums.sha256`.
 
 ## Distribution and releases
 
-The Mac distribution path is a Developer ID signed, notarized DMG. Paid
-downloads need a private delivery service behind checkout. The release script
+The Mac distribution path is a Developer ID signed, notarized DMG. The private
+purchase and delivery service lives in [`checkout/`](checkout/README.md); it is
+not linked from the website until Stripe is configured and tested. The release script
 verifies the bundled app,
 entitlements, notices, privacy manifest, and model hashes before it publishes
 anything.
@@ -260,7 +261,7 @@ notarization credentials, put the Mac Aptabase app key in the ignored `.env`
 scripts/release.sh 5.1.0
 ```
 
-The resulting DMG is local until a private paid download service is configured.
+The resulting DMG stays private until the paid checkout is configured.
 The `--publish` option rejects public binary publication. A source-only release
 is still available with `--publish-source`. The historical
 App Store scripts remain in the repository for reference and are no longer the

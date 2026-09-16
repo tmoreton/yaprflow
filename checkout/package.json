@@ -1,0 +1,12 @@
+{
+  "name": "yaprflow-checkout",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@vercel/blob": "2.8.0",
+    "stripe": "22.6.2"
+  }
+}
