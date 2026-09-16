@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Privacy Policy - Yaprflow</title>
-  <meta name="description" content="Yaprflow privacy policy for macOS and iOS. Voice transcription and supported AI features run locally, without a Yaprflow account, analytics, or tracking.">
+  <meta name="description" content="Yaprflow privacy policy for macOS and iOS. Voice transcription runs locally; Mac users may choose on-device or their own AI provider.">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="https://yaprflow.com/privacy.html">
   <link rel="icon" type="image/png" href="icon.png">
@@ -28,11 +28,11 @@
 
   <main id="content" class="legal-main">
     <h1>Privacy Policy</h1>
-    <p class="legal-updated">Effective September 11, 2026</p>
+    <p class="legal-updated">Effective September 16, 2026</p>
 
     <section class="legal-section">
       <h2>Summary</h2>
-      <p>Yaprflow is designed to keep your dictation private. The macOS and iOS apps do not require a Yaprflow account and do not include advertising, analytics, or tracking. The apps do not send your audio, transcripts, or generated text to the developer.</p>
+      <p>Yaprflow is designed to keep your dictation private. The apps do not include advertising or cross-app tracking. The Mac app shares limited usage and error counts by default; you can turn this off in Settings. The apps do not send your audio, transcripts, or generated text to the developer.</p>
     </section>
 
     <section class="legal-section">
@@ -48,8 +48,18 @@
     </section>
 
     <section class="legal-section">
-      <h2>Apple Intelligence</h2>
-      <p>On supported Macs, optional AI Summary and transcript metadata features use Apple's on-device Foundation Models framework. Yaprflow does not send the transcript or generated result to a developer-operated server. Availability and processing are governed by your macOS and Apple Intelligence settings.</p>
+      <h2>Optional AI providers on Mac</h2>
+      <p>Apple Intelligence remains the default for optional AI Summary and transcript metadata on supported Macs. It uses Apple's on-device Foundation Models framework. You may instead select OpenAI, OpenRouter, or Ollama in Settings.</p>
+      <p>When you run AI Summary with OpenAI or OpenRouter, Yaprflow sends the selected transcript, your prompt, and task instructions directly from your Mac to that provider. The provider processes the request under its own terms and privacy policy and may charge your account. Your API key is saved in the Mac Keychain, not in Yaprflow preferences or on a Yaprflow server.</p>
+      <p>Automatic archive titles using a selected OpenAI, OpenRouter, or Ollama model are off by default. If you enable them, each new Mac transcript is sent to that model for its title, topic, and description. Existing saved transcripts are not automatically uploaded to a cloud provider for backfill.</p>
+      <p>Ollama requests go to the Ollama service at localhost:11434. A local Ollama model processes them on your Mac; an Ollama cloud model may send them to Ollama's service. Yaprflow does not send your AI requests or API keys to a developer-operated server.</p>
+    </section>
+
+    <section class="legal-section">
+      <h2>Mac usage telemetry</h2>
+      <p>The Mac app sends usage telemetry to Aptabase by default unless you turn it off in Settings. Events cover app launches, a possible unexpected exit of the previous run, opening major features, dictation starts and outcomes, AI Summary use, archive-title failures, and opening a feedback email draft. Failure details use fixed categories, and recording durations are broad ranges. An interrupted run can also result from a forced quit or power loss; it is not a crash report.</p>
+      <p>Events include the app version and build, macOS major and minor version, and a random session identifier that changes when the app launches or after an hour of inactivity. Yaprflow does not send a persistent device identifier, audio, transcript or generated text, AI prompts, vocabulary, feedback messages, the active app name, or free-form error text. Turning telemetry off stops new events and cancels pending requests. The telemetry service receives ordinary network information needed to process requests; see <a href="https://aptabase.com/legal/privacy" target="_blank" rel="noopener">Aptabase's privacy policy</a>.</p>
+      <p>Telemetry is only available in Mac builds configured with an Aptabase app key. It is not included in the iOS source app.</p>
     </section>
 
     <section class="legal-section">
@@ -59,13 +69,13 @@
     </section>
 
     <section class="legal-section">
-      <h2>App Store purchases</h2>
-      <p>Apple processes App Store purchases, payment information, and Apple Account activity under <a href="https://www.apple.com/legal/privacy/" target="_blank" rel="noopener">Apple's Privacy Policy</a>. Yaprflow does not create a separate account and does not receive your payment-card details. Apple may provide the developer with transaction and sales information under its App Store terms.</p>
+      <h2>Direct downloads</h2>
+      <p>The paid Mac download is not yet for sale. Purchase and private download providers will be identified here before checkout opens. The Mac app itself does not require sign-in.</p>
     </section>
 
     <section class="legal-section">
       <h2>Support email</h2>
-      <p>If you contact support, you voluntarily send the developer your email address, message, and any attachments you choose to include. That information is used to respond to your request and may be retained as needed to resolve it or meet legal and security obligations. You do not need to send a transcript or recording to receive support.</p>
+      <p>The in-app feedback form prepares an email draft with your message, Yaprflow version, and operating-system version. It does not attach a transcript or recording, and nothing is sent until you review and send the draft. If you contact support, you voluntarily send the developer your email address, message, and any attachments you choose to include. That information is used to respond to your request and may be retained as needed to resolve it or meet legal and security obligations. You do not need to send a transcript or recording to receive support.</p>
     </section>
 
     <section class="legal-section">
