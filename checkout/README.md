@@ -4,7 +4,7 @@ This Vercel project is the purchase and private download service for the Mac app
 
 ## Flow
 
-1. The purchase page submits a POST to `/api/checkout`. The server creates a one-time Stripe Checkout Session for the configured Price ID.
+1. Once sales open, the purchase page submits a POST to `/api/checkout`. The server creates a one-time Stripe Checkout Session for the configured Price ID. The button is currently disabled while the Stripe business and price are being decided.
 2. Stripe redirects to `/confirmation.html?session_id={CHECKOUT_SESSION_ID}`.
 3. The confirmation page asks `/api/status` to verify that Stripe marks this exact product and Price ID paid.
 4. `/api/download` repeats the Stripe verification, then redirects to a five-minute URL for the fixed file in a **private** Vercel Blob store.
@@ -19,6 +19,7 @@ The Vercel project is `tmoretons-projects/yaprflow-checkout`. Configure these **
 | --- | --- |
 | `STRIPE_SECRET_KEY` | Live secret key for the chosen Stripe business; store as a Vercel Secret. |
 | `STRIPE_PRICE_ID` | Live, one-time Stripe Price ID. This is the only price used for new sessions. |
+| `CHECKOUT_ENABLED` | Set to `true` only after final live verification and restoring the purchase button. Unset means checkout returns HTTP 503. |
 | `STRIPE_ALLOWED_PRICE_IDS` | Optional comma-separated previous Price IDs whose paid purchasers should keep access. |
 | `CHECKOUT_BASE_URL` | Canonical HTTPS origin of this checkout service, currently `https://yaprflow-checkout.vercel.app`. |
 | `BLOB_PATHNAME` | Fixed private DMG pathname, currently `releases/yaprflow-5.1.0.dmg`. |
@@ -32,4 +33,4 @@ Build, sign, and notarize the new DMG. Upload it to the private Blob store with 
 
 ## Verification
 
-Run `npm test` in this directory. Before linking from the marketing site, make a Stripe test-mode purchase against a separate Preview deployment and verify that an unpaid session cannot access `/api/download`, a paid session redirects to the private DMG, and the downloaded file has the expected SHA-256. Use a live low-value purchase/refund only after the chosen business and final price are confirmed. Update `docs/privacy.html` and `docs/support.html` before opening checkout to customers.
+Run `npm test` in this directory. Before linking from the marketing site, make a Stripe test-mode purchase against a separate Preview deployment and verify that an unpaid session cannot access `/api/download`, a paid session redirects to the private DMG, and the downloaded file has the expected SHA-256. Restore the purchase form in `index.html` only after the live merchant, price, and checkout have been verified. Update `docs/privacy.html` and `docs/support.html` before opening checkout to customers.

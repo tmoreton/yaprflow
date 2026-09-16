@@ -13,6 +13,7 @@ h1 { margin: 12px 0 20px; font-size: clamp(36px, 5vw, 53px); line-height: 1.08; 
 .details li { padding: 9px 13px; border-radius: 999px; color: #285960; background: #eaf6f3; font-size: 13px; font-weight: 600; }
 .button { display: inline-flex; align-items: center; justify-content: center; gap: 18px; width: 100%; min-height: 55px; padding: 14px 22px; border: 0; border-radius: 13px; background: #174d51; color: #fff; font: inherit; font-weight: 700; text-align: center; text-decoration: none; cursor: pointer; }
 .button:hover { background: #0f383b; }
+.button:disabled { background: #7e989a; cursor: not-allowed; }
 .button:focus-visible, a:focus-visible { outline: 3px solid #33aaa1; outline-offset: 3px; }
 .footnote { margin: 18px 0 0; color: #61757a; font-size: 13px; line-height: 1.6; }
 .footnote a { color: #197e78; }

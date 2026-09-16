@@ -4,7 +4,8 @@ import { stripeClient } from '../lib/stripe.js';
 export async function POST(request) {
   const price = process.env.STRIPE_PRICE_ID;
   const base = process.env.CHECKOUT_BASE_URL;
-  if (!/^price_[A-Za-z0-9]+$/.test(price || '') || !base) {
+  if (process.env.CHECKOUT_ENABLED !== 'true' ||
+      !/^price_[A-Za-z0-9]+$/.test(price || '') || !base) {
     return privateResponse('Checkout is not ready.', { status: 503 });
   }
 
