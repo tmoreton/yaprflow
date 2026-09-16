@@ -6,6 +6,7 @@ enum AppPanelTab: Hashable {
     case aiSummary
     case history
     case settings
+    case feedback
 }
 
 @MainActor
@@ -15,6 +16,7 @@ private final class AppPanelSelection: ObservableObject {
 
 private struct AppPanelView: View {
     @ObservedObject var selection: AppPanelSelection
+    @State private var isVisible = false
 
     var body: some View {
         TabView(selection: $selection.selectedTab) {
@@ -35,8 +37,33 @@ private struct AppPanelView: View {
                     Label("Settings", systemImage: "gearshape")
                 }
                 .tag(AppPanelTab.settings)
+
+            FeedbackView()
+                .tabItem {
+                    Label("Feedback", systemImage: "bubble.left")
+                }
+                .tag(AppPanelTab.feedback)
         }
         .frame(minWidth: 620, minHeight: 600)
+        .onAppear {
+            isVisible = true
+            Telemetry.shared.track(.featureOpened(telemetryFeature(for: selection.selectedTab)))
+        }
+        .onDisappear { isVisible = false }
+        .onChange(of: selection.selectedTab) { _, tab in
+            if isVisible {
+                Telemetry.shared.track(.featureOpened(telemetryFeature(for: tab)))
+            }
+        }
+    }
+
+    private func telemetryFeature(for tab: AppPanelTab) -> TelemetryFeature {
+        switch tab {
+        case .aiSummary: .aiSummary
+        case .history: .history
+        case .settings: .settings
+        case .feedback: .feedback
+        }
     }
 }
 

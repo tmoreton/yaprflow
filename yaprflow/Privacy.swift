@@ -3,6 +3,8 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject private var appState = AppState.shared
+    @ObservedObject private var aiSettings = AIProviderSettings.shared
+    @ObservedObject private var telemetry = Telemetry.shared
 
     var body: some View {
         ScrollView {
@@ -12,8 +14,8 @@ struct SettingsView: View {
                     title: "Settings",
                     subtitle: "Control Yaprflow and review how your data is handled.",
                     accent: .blue,
-                    badge: "On-device",
-                    badgeSymbol: "lock.fill"
+                    badge: "Your choice",
+                    badgeSymbol: "slider.horizontal.3"
                 )
 
                 FeatureCard {
@@ -92,6 +94,33 @@ struct SettingsView: View {
                 }
 
                 FeatureCard {
+                    AIProviderSettingsView()
+                }
+
+                FeatureCard {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "chart.bar.xaxis")
+                                .foregroundStyle(.secondary)
+                                .frame(width: 26)
+                            Text("Share anonymous usage and error counts")
+                                .font(.callout.weight(.medium))
+                            Spacer()
+                            Toggle("Share anonymous usage and error counts", isOn: $telemetry.isEnabled)
+                                .labelsHidden()
+                                .toggleStyle(.switch)
+                                .disabled(!telemetry.isConfigured && !telemetry.isEnabled)
+                        }
+                        Text(telemetry.isConfigured
+                             ? "On by default. Helps us see app launches, feature use, and broad failure categories by app and macOS version. No audio, transcript text, prompts, feedback messages, or app names are included. Turn this off at any time."
+                             : "Telemetry is not configured in this build.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.leading, 38)
+                    }
+                }
+
+                FeatureCard {
                     VStack(spacing: 0) {
                         PrivacyRow(
                             symbol: "waveform",
@@ -103,8 +132,10 @@ struct SettingsView: View {
                         PrivacyRow(
                             symbol: "sparkles",
                             title: "AI Summary",
-                            detail: "Uses Apple's on-device model",
-                            status: "On-device"
+                            detail: aiPrivacyDetail,
+                            status: aiSettings.provider == .ollama
+                                ? "Ollama"
+                                : (aiSettings.provider.sendsTranscriptOffDevice ? "Cloud" : "Local")
                         )
                         Divider().padding(.leading, 38)
                         PrivacyRow(
@@ -117,8 +148,10 @@ struct SettingsView: View {
                         PrivacyRow(
                             symbol: "chart.bar.xaxis",
                             title: "Telemetry",
-                            detail: "No analytics or transcript data sent",
-                            status: "Off"
+                            detail: "Anonymous usage and error counts only",
+                            status: telemetry.isConfigured
+                                ? (telemetry.isEnabled ? "On" : "Off")
+                                : "Unavailable"
                         )
                     }
                 }
@@ -177,6 +210,17 @@ struct SettingsView: View {
 
     private var appVersion: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Unknown"
+    }
+
+    private var aiPrivacyDetail: String {
+        switch aiSettings.provider {
+        case .appleIntelligence:
+            "Uses Apple's on-device model"
+        case .openAI, .openRouter:
+            "Sends AI requests to \(aiSettings.provider.displayName) when you run them"
+        case .ollama:
+            "Uses Ollama at localhost:11434"
+        }
     }
 
     private var desktopPreviewBinding: Binding<Bool> {

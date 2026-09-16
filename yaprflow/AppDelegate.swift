@@ -27,6 +27,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         installStatusItem()
         if !isPreviewSmokeTest {
+            Telemetry.shared.beginRun()
+        }
+        if !isPreviewSmokeTest {
             TranscriptionController.shared.prepareSpeechRecognizer()
         }
         TranscriptionController.shared.prepareVoiceDetector()
@@ -88,6 +91,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        Telemetry.shared.endRun()
         GlobalHotkey.shared.unregister()
         residencyTask?.cancel()
         residencyTask = nil
@@ -252,6 +256,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         )
         menu.addItem(historyItem)
 
+        let feedbackItem = NSMenuItem(
+            title: "Send Feedback…",
+            action: #selector(showFeedback),
+            keyEquivalent: ""
+        )
+        feedbackItem.target = self
+        feedbackItem.image = NSImage(
+            systemSymbolName: "bubble.left",
+            accessibilityDescription: "Send Feedback"
+        )
+        menu.addItem(feedbackItem)
+
         menu.addItem(NSMenuItem.separator())
 
         let footerItem = NSMenuItem()
@@ -280,6 +296,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func showSettings() {
         AppPanelWindowController.show(.settings)
+    }
+
+    @objc private func showFeedback() {
+        AppPanelWindowController.show(.feedback)
     }
 
     private func registerHotkey() -> Bool {

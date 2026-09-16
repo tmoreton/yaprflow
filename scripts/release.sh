@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 # Builds yaprflow.app, signs + notarizes + staples it, and packages it into a
-# local styled DMG. It can optionally tag and publish a source-only GitHub
-# release; commercial production binaries are distributed through the App Store.
+# local DMG. Paid binaries must be delivered through private checkout storage,
+# so this script does not publish them to public GitHub Releases.
 #
 # Usage:
 #   scripts/release.sh                                    # local DMG build (uses MARKETING_VERSION)
 #   scripts/release.sh 5.0.1                              # local DMG build with explicit version
-#   scripts/release.sh 5.0.0 --publish-source             # validate build + source-only release
-#   scripts/release.sh 5.1.0 --publish-source --draft
-#   scripts/release.sh 5.1.0 --publish-source --prerelease --notes "Release notes"
+#   scripts/release.sh 5.1.0 --publish              # rejected for paid builds
+#   scripts/release.sh 5.1.0 --publish-source             # source-only release
 #   SKIP_NOTARIZE=1 scripts/release.sh                    # unsigned local test build
 #
 # Notarization credentials: by default this uses the `notary-yaprflow` keychain
@@ -23,6 +22,7 @@ cd "$(dirname "$0")/.."
 
 VERSION=""
 PUBLISH_SOURCE=false
+PUBLISH_BINARY=false
 NOTES=""
 EXTRA_GH_ARGS=()
 
@@ -33,10 +33,8 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --publish)
-            echo "error: --publish was retired because it uploaded production DMGs publicly." >&2
-            echo "       Use --publish-source for a source-only GitHub release." >&2
-            echo "       Use the App Store archive/export flow for commercial binaries." >&2
-            exit 2
+            PUBLISH_BINARY=true
+            shift
             ;;
         --draft)
             EXTRA_GH_ARGS+=(--draft)
@@ -72,6 +70,19 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+if [[ "$PUBLISH_SOURCE" == true && "$PUBLISH_BINARY" == true ]]; then
+    echo "error: choose either --publish or --publish-source" >&2
+    exit 2
+fi
+if [[ "$PUBLISH_BINARY" == true ]]; then
+    echo "error: paid Mac binaries must not be uploaded to public GitHub Releases; build locally and use private checkout delivery" >&2
+    exit 2
+fi
+if [[ "$PUBLISH_BINARY" == true && "${SKIP_NOTARIZE:-0}" == "1" ]]; then
+    echo "error: --publish requires signing and notarization" >&2
+    exit 2
+fi
 
 # ---- Config ------------------------------------------------------------------
 
@@ -147,7 +158,7 @@ load_release_env() {
         case "$key" in
             APPLE_ID|APPLE_PASSWORD|APPLE_APP_PASSWORD|APPLE_TEAM_ID|\
             DEVELOPER_ID_APPLICATION|NOTARY_PROFILE|NOTARIZE_MAX_POLLS|\
-            NOTARIZE_APP_ID|NOTARIZE_DMG_ID|SKIP_NOTARIZE|USE_APP)
+            NOTARIZE_APP_ID|NOTARIZE_DMG_ID|SKIP_NOTARIZE|USE_APP|APTABASE_APP_KEY|PUBLIC_DOWNLOAD)
                 ;;
             *)
                 echo "error: $env_file:$line_number contains unsupported release setting: $key" >&2
@@ -164,6 +175,16 @@ load_release_env() {
 
 if [[ -f .env ]]; then
     load_release_env .env
+fi
+
+if [[ "$PUBLISH_BINARY" == true && "${PUBLIC_DOWNLOAD:-0}" != "1" ]]; then
+    echo "error: --publish makes the DMG publicly downloadable; set PUBLIC_DOWNLOAD=1 only for a public download" >&2
+    exit 2
+fi
+
+if [[ "$PUBLISH_BINARY" == true && -z "${USE_APP:-}" && ! "${APTABASE_APP_KEY:-}" =~ ^A-(US|EU)-[A-Za-z0-9]+$ ]]; then
+    echo "error: --publish requires an Aptabase app key (A-US-... or A-EU-...) in APTABASE_APP_KEY" >&2
+    exit 2
 fi
 
 # A pre-built bundle must not turn off source provenance enforcement. The app
@@ -239,6 +260,11 @@ Either:
 EOF
         exit 1
     fi
+fi
+
+if [[ "$PUBLISH_BINARY" == true && "$NOTARIZE" != true ]]; then
+    echo "error: --publish requires signing and notarization" >&2
+    exit 2
 fi
 
 CODESIGN_IDENTITY="${DEVELOPER_ID_APPLICATION:-Developer ID Application: Tim Moreton (GVXC5FQ2RP)}"
@@ -406,7 +432,7 @@ verify_bundled_app() {
 
 verify_distribution_signature() {
     local app_path="$1"
-    local signing_details embedded_team embedded_entitlements sandbox_entitlement microphone_entitlement
+    local signing_details embedded_team embedded_entitlements sandbox_entitlement microphone_entitlement client_network_entitlement
 
     codesign --verify --deep --strict --verbose=2 "$app_path"
     signing_details="$(codesign -d --verbose=4 "$app_path" 2>&1)"
@@ -428,22 +454,21 @@ verify_distribution_signature() {
     embedded_entitlements="$(codesign -d --entitlements :- "$app_path" 2>/dev/null)"
     sandbox_entitlement="$(/usr/libexec/PlistBuddy -c 'Print :com.apple.security.app-sandbox' /dev/stdin <<<"$embedded_entitlements" 2>/dev/null || true)"
     microphone_entitlement="$(/usr/libexec/PlistBuddy -c 'Print :com.apple.security.device.audio-input' /dev/stdin <<<"$embedded_entitlements" 2>/dev/null || true)"
-    if [[ "$sandbox_entitlement" != "true" || "$microphone_entitlement" != "true" ]]; then
-        echo "error: app signature is missing the sandbox or microphone entitlement" >&2
+    client_network_entitlement="$(/usr/libexec/PlistBuddy -c 'Print :com.apple.security.network.client' /dev/stdin <<<"$embedded_entitlements" 2>/dev/null || true)"
+    if [[ "$sandbox_entitlement" != "true" || "$microphone_entitlement" != "true" || "$client_network_entitlement" != "true" ]]; then
+        echo "error: app signature is missing the sandbox, microphone, or outbound network entitlement" >&2
         return 1
     fi
-    if /usr/libexec/PlistBuddy -c 'Print :com.apple.security.network.client' \
-        /dev/stdin <<<"$embedded_entitlements" >/dev/null 2>&1 \
-       || /usr/libexec/PlistBuddy -c 'Print :com.apple.security.network.server' \
+    if /usr/libexec/PlistBuddy -c 'Print :com.apple.security.network.server' \
         /dev/stdin <<<"$embedded_entitlements" >/dev/null 2>&1; then
-        echo "error: app signature unexpectedly allows outbound network access" >&2
+        echo "error: app signature unexpectedly allows inbound network access" >&2
         return 1
     fi
 }
 
 # ---- Pre-publish guards ------------------------------------------------------
 
-if [[ "$PUBLISH_SOURCE" == true ]]; then
+if [[ "$PUBLISH_SOURCE" == true || "$PUBLISH_BINARY" == true ]]; then
     if ! command -v gh >/dev/null 2>&1; then
         echo "error: gh (GitHub CLI) is not installed. brew install gh" >&2
         exit 1
@@ -493,6 +518,7 @@ else
         -archivePath "$ARCHIVE_PATH" \
         -destination "generic/platform=macOS" \
         MARKETING_VERSION="$VERSION" \
+        APTABASE_APP_KEY="${APTABASE_APP_KEY:-}" \
         archive
 
     # ---- Get a Developer-ID-signed .app -------------------------------------
@@ -554,6 +580,13 @@ EOF
 fi
 
 verify_bundled_app "$APP_PATH"
+if [[ "$PUBLISH_BINARY" == true ]]; then
+    BUNDLED_APTABASE_KEY="$(/usr/libexec/PlistBuddy -c 'Print :AptabaseAppKey' "$APP_PATH/Contents/Info.plist" 2>/dev/null || true)"
+    if [[ ! "$BUNDLED_APTABASE_KEY" =~ ^A-(US|EU)-[A-Za-z0-9]+$ ]]; then
+        echo "error: signed app is missing a valid Aptabase app key" >&2
+        exit 1
+    fi
+fi
 if [[ "$NOTARIZE" == true ]]; then
     verify_distribution_signature "$APP_PATH"
     if [[ -n "${USE_APP:-}" ]]; then
@@ -591,9 +624,9 @@ if [[ -z "$DEVICE" || -z "$MOUNT_PATH" ]]; then
     exit 1
 fi
 
-sleep 1
-
-osascript <<APPLESCRIPT
+if [[ "${SKIP_DMG_STYLE:-0}" != "1" ]]; then
+    sleep 1
+    osascript <<APPLESCRIPT
 tell application "Finder"
     tell disk "$APP_NAME"
         open
@@ -614,6 +647,7 @@ tell application "Finder"
     end tell
 end tell
 APPLESCRIPT
+fi
 
 sync
 
@@ -653,9 +687,9 @@ echo
 echo "==> Built: $DMG_PATH"
 ls -lh "$DMG_PATH"
 
-# ---- Publish source-only GitHub release -------------------------------------
+# ---- Publish GitHub release --------------------------------------------------
 
-if [[ "$PUBLISH_SOURCE" == true ]]; then
+if [[ "$PUBLISH_SOURCE" == true || "$PUBLISH_BINARY" == true ]]; then
     echo
     HEAD_COMMIT="$(git rev-parse HEAD)"
     TAG_EXISTS_LOCALLY=false
@@ -693,10 +727,25 @@ if [[ "$PUBLISH_SOURCE" == true ]]; then
     fi
 
     if gh release view "$TAG" >/dev/null 2>&1; then
+        if [[ "$PUBLISH_BINARY" == true ]]; then
+            echo "error: GitHub release $TAG already exists; refusing to replace its download" >&2
+            exit 1
+        fi
         echo "==> Source release $TAG already exists — leaving immutable release unchanged"
     else
-        echo "==> Creating source-only GitHub release"
-        RELEASE_ARGS=("$TAG" --title "Yaprflow $VERSION source")
+        RELEASE_ARGS=("$TAG")
+        if [[ "$PUBLISH_BINARY" == true ]]; then
+            echo "==> Publishing notarized DMG for website download"
+            DOWNLOAD_DMG="$BUILD_DIR/yaprflow.dmg"
+            DOWNLOAD_CHECKSUM="$BUILD_DIR/yaprflow.dmg.sha256"
+            rm -f "$DOWNLOAD_DMG" "$DOWNLOAD_CHECKSUM"
+            ln "$DMG_PATH" "$DOWNLOAD_DMG"
+            (cd "$BUILD_DIR" && shasum -a 256 yaprflow.dmg > yaprflow.dmg.sha256)
+            RELEASE_ARGS+=("$DOWNLOAD_DMG" "$DOWNLOAD_CHECKSUM" --title "Yaprflow $VERSION")
+        else
+            echo "==> Creating source-only GitHub release"
+            RELEASE_ARGS+=(--title "Yaprflow $VERSION source")
+        fi
         if [[ -n "$NOTES" ]]; then
             RELEASE_ARGS+=(--notes "$NOTES")
         else
@@ -709,5 +758,9 @@ if [[ "$PUBLISH_SOURCE" == true ]]; then
     fi
 
     echo
-    echo "==> Published source-only release $TAG"
+    if [[ "$PUBLISH_BINARY" == true ]]; then
+        echo "==> Published download: https://github.com/tmoreton/yaprflow/releases/latest/download/yaprflow.dmg"
+    else
+        echo "==> Published source-only release $TAG"
+    fi
 fi

@@ -20,7 +20,7 @@ final class TranscriptAIModel: ObservableObject {
     @Published private(set) var isRunning = false
     @Published private(set) var processingMessage: String?
     @Published private(set) var isModelAvailable = false
-    @Published private(set) var availabilityMessage = "Checking Apple Intelligence…"
+    @Published private(set) var availabilityMessage = "Checking AI provider…"
     @Published var errorMessage: String?
 
     init() {
@@ -29,6 +29,19 @@ final class TranscriptAIModel: ObservableObject {
     }
 
     func refreshAvailability() {
+        let settings = AIProviderSettings.shared
+        if settings.provider != .appleIntelligence {
+            isModelAvailable = settings.isConfigured
+            if settings.isConfigured {
+                availabilityMessage = "Configured for \(settings.provider.displayName) · \(settings.selectedModel)"
+            } else if settings.selectedModel.isEmpty {
+                availabilityMessage = "Choose a \(settings.provider.displayName) model in Settings."
+            } else {
+                availabilityMessage = "Add your \(settings.provider.displayName) API key in Settings."
+            }
+            return
+        }
+
         guard #available(macOS 26.0, *) else {
             isModelAvailable = false
             availabilityMessage = "AI Summary requires macOS 26 or later."
@@ -78,10 +91,22 @@ final class TranscriptAIModel: ObservableObject {
             return
         }
 
+        let provider = AIProviderSettings.shared.provider
+        let remoteConfiguration: AIChatConfiguration?
+        do {
+            remoteConfiguration = provider == .appleIntelligence
+                ? nil
+                : try AIProviderSettings.shared.configuration()
+        } catch {
+            errorMessage = Self.message(for: error)
+            Telemetry.shared.track(.aiSummaryFailed(provider, Self.telemetryFailure(for: error)))
+            return
+        }
+
         isRunning = true
         processingMessage = "Preparing transcript…"
         errorMessage = nil
-
+        Telemetry.shared.track(.aiSummaryStarted(provider))
         Task { [weak self] in
             guard let self else { return }
             defer {
@@ -90,17 +115,31 @@ final class TranscriptAIModel: ObservableObject {
             }
 
             do {
-                if #available(macOS 26.0, *) {
-                    self.result = try await TranscriptAIProcessor.generate(
+                if provider == .appleIntelligence {
+                    if #available(macOS 26.0, *) {
+                        self.result = try await TranscriptAIProcessor.generate(
+                            prompt: trimmedPrompt,
+                            transcript: trimmedTranscript,
+                            progress: { progress in
+                                self.processingMessage = progress.message
+                            }
+                        )
+                    }
+                } else {
+                    guard let configuration = remoteConfiguration else {
+                        throw AIProviderError.unsupportedProvider
+                    }
+                    self.result = try await RemoteTranscriptAIProcessor.generate(
                         prompt: trimmedPrompt,
                         transcript: trimmedTranscript,
-                        progress: { progress in
-                            self.processingMessage = progress.message
-                        }
+                        configuration: configuration,
+                        progress: { self.processingMessage = $0 }
                     )
                 }
+                Telemetry.shared.track(.aiSummaryCompleted(provider))
             } catch {
                 self.errorMessage = Self.message(for: error)
+                Telemetry.shared.track(.aiSummaryFailed(provider, Self.telemetryFailure(for: error)))
             }
         }
     }
@@ -108,9 +147,28 @@ final class TranscriptAIModel: ObservableObject {
     private static func message(for error: Error) -> String {
         let description = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
         if description.isEmpty {
-            return "Apple Intelligence could not process this transcript. Try a shorter transcript or prompt."
+            return "The selected model could not process this transcript. Try again or choose another model."
         }
         return description
+    }
+
+    private static func telemetryFailure(for error: Error) -> TelemetryFailure {
+        if let providerError = error as? AIProviderError {
+            switch providerError {
+            case let .httpStatus(status, _):
+                if status == 401 || status == 403 { return .authentication }
+                if status == 429 { return .rateLimit }
+                return .provider
+            case .invalidResponse, .emptyResponse, .truncatedResponse:
+                return .invalidResponse
+            case .ollamaUnavailable:
+                return .network
+            case .missingModel, .missingAPIKey, .unsupportedProvider:
+                return .provider
+            }
+        }
+        if error is URLError { return .network }
+        return .other
     }
 }
 
@@ -141,8 +199,8 @@ struct TranscriptAIView: View {
                 title: "AI Summary",
                 subtitle: "Summarize or transform any saved transcript.",
                 accent: .purple,
-                badge: "On-device",
-                badgeSymbol: "lock.fill"
+                badge: providerBadge,
+                badgeSymbol: providerBadgeSymbol
             )
 
             FeatureCard {
@@ -182,6 +240,9 @@ struct TranscriptAIView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .yaprflowTranscriptArchiveChanged)) {
             history.handleArchiveChange($0)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .yaprflowAIProviderSettingsChanged)) { _ in
+            ai.refreshAvailability()
         }
     }
 
@@ -293,6 +354,32 @@ struct TranscriptAIView: View {
                 .buttonStyle(.borderedProminent)
                 .disabled(runIsDisabled)
             }
+
+            if selectedProvider.sendsTranscriptOffDevice {
+                Text("Run sends this transcript and prompt to \(selectedProvider.displayName). Your provider may charge for the request.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var selectedProvider: AIProviderKind {
+        AIProviderSettings.shared.provider
+    }
+
+    private var providerBadge: String {
+        switch selectedProvider {
+        case .appleIntelligence: "On-device"
+        case .openAI, .openRouter: "Cloud"
+        case .ollama: "Ollama"
+        }
+    }
+
+    private var providerBadgeSymbol: String {
+        switch selectedProvider {
+        case .appleIntelligence: "lock.fill"
+        case .openAI, .openRouter: "cloud"
+        case .ollama: "desktopcomputer"
         }
     }
 

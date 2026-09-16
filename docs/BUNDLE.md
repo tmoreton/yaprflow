@@ -1,14 +1,18 @@
 # Yaprflow bundle profile
 
-Last reviewed: September 12, 2026
+> Historical App Store and bundle planning record. Current Mac distribution is
+> a direct download from yaprflow.com; see the README for the active release
+> process. The pricing and App Store checklists below are no longer current.
+
+Last reviewed: September 16, 2026
 
 ## Product
 
 **Product name:** Yaprflow
 
 **Description:** Private, local-first voice dictation that turns speech into
-clean text and uses on-device Apple Intelligence to summarize, rewrite, and
-organize local transcripts on supported Macs.
+clean text and can summarize, rewrite, and organize local transcripts using
+Apple Intelligence, a user-supplied OpenAI or OpenRouter key, or Ollama on Mac.
 
 Yaprflow is the voice and AI productivity application in the planned
 Productivity Bundle. It remains independently useful and purchasable. It does
@@ -67,6 +71,9 @@ implemented and separately reviewed for privacy and App Store compliance.
 - Optional on-device summaries, rewrites, custom transformations, titles,
   topics, and descriptions through Apple's Foundation Models framework on
   supported Macs.
+- Optional OpenAI, OpenRouter, and Ollama providers for Mac AI Summary. Cloud
+  keys are stored in the Mac Keychain. Automatic titles with these providers
+  require a separate opt-in.
 - No Yaprflow account, subscription, advertising, analytics, or tracking.
 
 ## Local and private architecture
@@ -75,12 +82,16 @@ Microphone audio is processed by models bundled with the official application.
 Raw audio is not retained after transcription. On macOS, transcripts,
 vocabulary, preferences, and custom AI prompts remain in the application's
 sandbox container. On iOS, up to three recent transcripts are kept in local app
-preferences. Optional AI processing uses Apple's on-device Foundation Models
-framework.
+preferences. Apple Intelligence processing uses the on-device Foundation
+Models framework. Selecting OpenAI or OpenRouter sends the selected transcript
+and prompt to that provider when AI Summary is run; automatic titles with a
+selected external provider require a separate opt-in. Ollama requests go to
+localhost, although an Ollama cloud model may use its own cloud service.
 
 The application does not send audio, transcripts, or generated results to a
-developer-operated server. The macOS target has no outbound-network sandbox
-entitlement, and neither target contains a first-party backend client.
+developer-operated server. The macOS target has an outbound-network sandbox
+entitlement for optional AI providers. Neither target contains a first-party
+backend client.
 
 Legacy 2.x/3.x installations, and 4.x installations that used the model
 fallback, can leave a roughly 400–450 MB model-only cache under

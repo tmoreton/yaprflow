@@ -280,9 +280,16 @@ enum TranscriptAIProcessor {
     }
 }
 
-@available(macOS 26.0, *)
 @MainActor
 enum TranscriptTextChunker {
+    enum ChunkError: LocalizedError {
+        case transcriptUnitTooLarge
+
+        var errorDescription: String? {
+            "Part of this transcript could not be divided safely."
+        }
+    }
+
     static func chunks(
         from text: String,
         fits: (String) async throws -> Bool
@@ -314,7 +321,7 @@ enum TranscriptTextChunker {
 
             let split = splitOversized(piece)
             guard split.count > 1 else {
-                throw TranscriptAIProcessor.ProcessingError.transcriptUnitTooLarge
+                throw ChunkError.transcriptUnitTooLarge
             }
             pending.replaceSubrange(index...index, with: split)
         }

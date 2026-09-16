@@ -1,7 +1,7 @@
 <div align="center">
   <img src="yaprflow/Assets.xcassets/AppIcon.appiconset/icon_256.png" width="128" alt="Yaprflow">
   <h1>Yaprflow</h1>
-  <p><strong>Private voice productivity for Apple devices, with on-device AI tools on supported Macs.</strong></p>
+  <p><strong>Private voice productivity for Apple devices, with your choice of AI provider on Mac.</strong></p>
   <p>Press Command-T. Speak. Press Command-T again. Paste clean text anywhere.</p>
 </div>
 
@@ -11,30 +11,35 @@ Yaprflow is the voice and AI productivity app planned for a privacy-first
 software bundle. The Mac app records microphone input, transcribes speech locally,
 copies the finished text to the clipboard, and keeps a local Markdown
 archive. Long-form dictation can be turned into summaries, structured notes,
-or other useful text with Apple's on-device Foundation Models on supported
-Macs.
+or other useful text with Apple's on-device model, your own OpenAI or
+OpenRouter key, or Ollama running on your Mac.
 
-Useful software without another subscription: the Mac App Store release is a
-US $29.00 one-time purchase, with Apple providing comparable local prices in
-other regions. There is no Yaprflow account, advertising, tracking, or cloud
+The Mac app is prepared for signed, notarized downloads from yaprflow.com.
+There is no in-app sign-in, advertising, cross-app tracking, or cloud
 transcription service. The source remains available for inspection and
 licensed source builds.
 
 ## Highlights
 
-- **Local by design**: microphone audio and transcripts are processed on the
-  device; there is no first-party backend or runtime telemetry.
+- **Local transcription**: microphone audio is processed on the device;
+  there is no first-party backend. Transcripts are sent to a cloud AI provider
+  only when you select and use one.
+- **Usage telemetry**: Mac users can share event counts and broad
+  failure categories with Aptabase from Settings. It starts on and never
+  includes audio, transcript text, prompts, or feedback messages.
 - **One hotkey workflow on Mac**: start and stop dictation with Command-T, or
   change the shortcut from the menu-bar item.
 - **Polished or exact text**: choose a cleaned-up result or retain the model's
   wording more closely.
 - **Local vocabulary**: deterministic phrase replacements for names, acronyms,
   product terms, and preferred spellings.
-- **On-device AI**: summarize, rewrite, structure, or transform the latest or
-  any saved transcript with a custom prompt using Apple Intelligence on
-  supported Macs. Long transcripts are divided and recombined automatically.
+- **AI Summary**: summarize, rewrite, structure, or transform the latest or
+  any saved transcript with a custom prompt. Use Apple Intelligence on a
+  supported Mac, your own OpenAI or OpenRouter key, or local Ollama. Long
+  transcripts are divided and recombined automatically.
 - **Smart Markdown archive**: each completed Mac transcript is saved locally;
-  on supported Macs, Apple Intelligence adds a title, topic, and description.
+  Apple Intelligence can add a title, topic, and description on supported Macs.
+  Automatic titles with another provider require a separate opt-in.
 - **True streaming multilingual transcription**: a bundled Nemotron 3.5 ASR
   0.6B 1120 ms chunk-size export produces local partial results in 32
   production-ready locales. On Mac, English (United States) is the default;
@@ -48,20 +53,15 @@ system audio or retain raw meeting recordings.
 
 ## Install
 
-The official commercial installation and update channel will be the Mac App
-Store, with a US $29.00 base price paid once and Apple's comparable local
-prices in other regions. Its product page will be linked here after Apple makes
-the listing public. A separate Yaprflow account is not required; the Apple
-Account used for the App Store purchase is sufficient.
+The Mac app is being prepared as a paid, signed, notarized DMG sold through the
+[Yaprflow website](https://yaprflow.com/). The purchase and private download
+flow is not live yet. No App Store account is required to run it.
 
-Historically published GitHub DMGs remain available as legacy Apache-2.0
-releases, but they are not the distribution channel for the current commercial
-generation. Developers may clone and build the source under its applicable
-license.
+Developers may also clone and build the source under its applicable license.
 
 The Mac app requires macOS 14 Sonoma or later. The repository also contains an
-iPhone/iPad app target requiring iOS 17 or later; its App Store listing
-and commercial relationship to the Mac app are not yet finalized.
+iPhone/iPad source target requiring iOS 17 or later; it is separate from the
+Mac direct download.
 
 All speech-recognition models ship inside official apps. The Mac app starts
 preparing its recognizer in the background at launch. Recording before that
@@ -80,6 +80,9 @@ Yaprflow runs as a menu-bar app. Click the waveform icon to open the menu.
   Automatic when a recording may use different languages.
 - **AI Summary, History, and Settings** opens a single tabbed window for
   transforming transcripts, browsing local history, and changing settings.
+- **Send Feedback** opens an in-app form for a problem, suggestion, or question.
+  Review and send the prepared email in your mail app; no transcript or audio
+  is attached.
 - **Command-Q** quits the app.
 
 While dictating, Yaprflow shows a compact black overlay near the Mac notch or
@@ -104,9 +107,16 @@ with `#` are ignored.
 ## Privacy and local data
 
 At runtime, Yaprflow does not contact a Yaprflow-operated service, download
-models, upload audio, or require a login. The optional Mac AI features use
-Apple's on-device Foundation Models framework. See the published
+speech models, upload audio, or require a login. Mac AI Summary uses Apple's
+on-device model by default. If you select OpenAI or OpenRouter, the selected
+transcript and prompt go directly to that provider using your own key. Ollama
+uses its service on your Mac; Ollama cloud models may contact Ollama's cloud.
+Automatic titles with these providers are a separate opt-in. See the published
 [Privacy Policy](https://yaprflow.com/privacy.html) for the full disclosure.
+
+The Mac telemetry switch sends fixed usage and failure events to
+Aptabase when a release build has an app key. It is on by default, can be
+turned off at any time, and includes no transcript or free-form text.
 
 On macOS, Yaprflow writes user data into its existing sandbox container's
 Application Support directory:
@@ -120,6 +130,11 @@ audio is held only for processing and is not retained after transcription.
 
 On iOS, up to three recent transcript strings and preferences are stored in the
 app's separate local container. There is currently no Mac/iOS sync.
+
+The iPhone and iPad app also has a feedback button in its top bar. Feedback is
+sent only when you choose to send the email draft. For a recommendation on
+measuring app usage without changing this privacy behavior, see
+[docs/ANALYTICS_PLAN.md](docs/ANALYTICS_PLAN.md).
 
 ## How it works
 
@@ -139,15 +154,17 @@ detection. The full FluidAudio package is not linked into the apps.
    (United States) is the default, and Automatic detection remains available.
 5. Yaprflow applies local cleanup and vocabulary replacements.
 6. Final text is copied to the clipboard and saved as Markdown.
-7. When available, Apple Foundation Models can summarize, restructure, or
-   enrich transcript text locally.
+7. The selected AI provider can summarize or restructure transcript text.
+   Apple Intelligence is on-device; cloud providers receive a transcript only
+   when used, and automatic cloud archive titles require opt-in.
 
 The complete Nemotron 3.5 ASR and Silero VAD models are bundled in official
 apps. On Mac, background preparation begins at launch, the speech recognizer
 stays warm between nearby dictations, and its large ONNX allocation is released
 after five idle minutes or memory pressure. A later cold start initializes it
-again. Network access is used only while preparing a source build when the
-pinned model files are absent.
+again. Source builds may fetch pinned model files when they are absent.
+At runtime, network access is used for optional cloud AI requests and enabled
+usage telemetry.
 
 The upstream Nemotron 3.5 model covers 40 language-locales across 35 languages.
 NVIDIA classifies 19 locales as transcription-ready, 13 as broad-coverage, and
@@ -167,9 +184,9 @@ scripts/fetch-models.sh         fetches and verifies pinned build-time models
 scripts/copy-models.sh          verifies and stages the exact Xcode model payload
 scripts/build-sherpa-onnx-asr.sh builds pinned Apple native ASR-only frameworks
 scripts/publish-models.sh       maintains the public source-build model mirror
-scripts/app-store-release.sh    archives and verifies Mac App Store packages
-scripts/ios-app-store-release.sh archives and verifies iOS App Store packages
-scripts/release.sh              creates local DMGs or source-only GitHub releases
+scripts/app-store-release.sh    historical Mac App Store packaging tool
+scripts/ios-app-store-release.sh historical iOS App Store packaging tool
+scripts/release.sh              creates signed DMGs and direct-download releases
 LICENSES/                       preserved historical and third-party license text
 THIRD_PARTY_NOTICES.md          dependency and model provenance
 ```
@@ -212,7 +229,7 @@ swift test
 
 The shared schemes are:
 
-- `yaprflow`: macOS, bundle ID `com.tmoreton.yaprflow`, version 5.0.1 (5).
+- `yaprflow`: macOS, bundle ID `com.tmoreton.yaprflow`, version 5.1.0 (6).
 - `yaprflow-iOS`: iPhone/iPad, bundle ID `com.tmoreton.yaprflow.ios`, version
   1.0.0 (2).
 
@@ -223,30 +240,11 @@ by `scripts/native-asr-checksums.sha256`.
 
 ## Distribution and releases
 
-Production binaries are archived, signed, and submitted through Apple's App
-Store workflow. They are not attached automatically to public GitHub releases.
-
-After the release commit is clean, create and verify the signed Mac App Store
-archive and installer with:
-
-```bash
-scripts/app-store-release.sh
-```
-
-Create and verify the iPhone/iPad archive and exported App Store `.ipa` with:
-
-```bash
-scripts/ios-app-store-release.sh
-```
-
-Set `ALLOW_PROVISIONING_UPDATES=1` if authenticated Xcode must download or
-manage signing assets. If the iOS App Store Connect record or distribution
-profile is not ready yet, set `IOS_ARCHIVE_ONLY=1` to produce and validate the
-signed archive without attempting export. Both entrypoints stop after local
-export and never upload to App Store Connect. They print the verified package
-location and SHA-256 digest and reject model drift, missing notices, unexpected
-permissions or capabilities, and native binaries containing excluded optional
-TTS code.
+The Mac distribution path is a Developer ID signed, notarized DMG. Paid
+downloads need a private delivery service behind checkout. The release script
+verifies the bundled app,
+entitlements, notices, privacy manifest, and model hashes before it publishes
+anything.
 
 For a local unsigned test DMG:
 
@@ -254,17 +252,19 @@ For a local unsigned test DMG:
 SKIP_NOTARIZE=1 scripts/release.sh
 ```
 
-For an annotated tag and source-only GitHub release after the release commit is
-clean and ready:
+For a signed local DMG, configure a Developer ID identity and Apple
+notarization credentials, put the Mac Aptabase app key in the ignored `.env`
+(see `.env.example`), then run:
 
 ```bash
-scripts/release.sh 5.0.1 --publish-source
+scripts/release.sh 5.1.0
 ```
 
-That command builds a local DMG for validation, but it does not upload the
-DMG. The retired `--publish` option now fails closed so it cannot accidentally
-publish a production binary. Existing historical binary releases are not
-deleted or rewritten.
+The resulting DMG is local until a private paid download service is configured.
+The `--publish` option rejects public binary publication. A source-only release
+is still available with `--publish-source`. The historical
+App Store scripts remain in the repository for reference and are no longer the
+distribution path.
 
 ## License and branding
 

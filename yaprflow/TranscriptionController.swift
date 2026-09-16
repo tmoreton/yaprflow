@@ -458,6 +458,7 @@ final class TranscriptionController {
             try capture.start(sessionGeneration: generation)
             lifecycle = .recording(generation)
             state.status = .listening
+            Telemetry.shared.track(.dictationStarted)
             log.info("Microphone capture started (session: \(generation, privacy: .public))")
         } catch {
             audioIngress.finishSession(generation: generation)
@@ -478,6 +479,7 @@ final class TranscriptionController {
             }
             log.error("Start failed: \(error.localizedDescription)")
             state.status = .error(error.localizedDescription)
+            Telemetry.shared.track(.dictationFailed(error is TranscriptionError ? .microphone : .startup))
             scheduleAutoHide(after: 2.5)
             scheduleModelUnload()
         }
@@ -541,6 +543,7 @@ final class TranscriptionController {
             in: confirmedText.trimmingCharacters(in: .whitespacesAndNewlines)
         )
         let capturedSeconds = Double(sessionEnd) / Double(Self.sampleRate)
+        var telemetryFailure: TelemetryFailure?
         log.info("Finalized \(capturedSeconds, format: .fixed(precision: 2), privacy: .public) seconds of streaming audio")
 
         sessionAudio.reset(keepingCapacity: false)
@@ -565,6 +568,7 @@ final class TranscriptionController {
                     )
                 } catch {
                     state.status = .error("Copied, but couldn’t save transcript history")
+                    telemetryFailure = .archive
                     scheduleAutoHide(after: 2.4)
                     log.error("Could not archive the copied transcript: \(error.localizedDescription)")
                 }
@@ -573,6 +577,7 @@ final class TranscriptionController {
                     // Keep the more specific archive failure visible.
                 } else if droppedCapturedAudio {
                     state.status = .error("Audio processing fell behind; copied text may be incomplete")
+                    telemetryFailure = .audioOverrun
                     scheduleAutoHide(after: 2.4)
                     log.error("The bounded capture FIFO overflowed during this recording")
                 } else {
@@ -584,11 +589,13 @@ final class TranscriptionController {
                         scheduleAutoHide(after: 1.2)
                     case .audioConfigurationChanged:
                         state.status = .error("Microphone changed; captured text was copied")
+                        telemetryFailure = .microphoneChanged
                         scheduleAutoHide(after: 2.4)
                     }
                 }
             } else {
                 state.status = .error("Couldn’t copy the transcript")
+                telemetryFailure = .clipboard
                 scheduleAutoHide(after: 2.4)
                 log.error("The system pasteboard rejected the transcript")
             }
@@ -598,11 +605,18 @@ final class TranscriptionController {
             switch reason {
             case .userInitiated:
                 state.status = .error("No speech detected")
+                telemetryFailure = .noSpeech
             case .audioConfigurationChanged:
                 state.status = .error("Microphone changed; recording stopped")
+                telemetryFailure = .microphoneChanged
             }
             scheduleAutoHide(after: 2.4)
             log.info("No speech was detected in the completed recording")
+        }
+        if let telemetryFailure {
+            Telemetry.shared.track(.dictationFailed(telemetryFailure))
+        } else {
+            Telemetry.shared.track(.dictationCompleted(durationSeconds: capturedSeconds))
         }
         usesVoiceDetectorForCurrentSession = false
         transcriptProcessor = nil

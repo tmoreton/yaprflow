@@ -344,6 +344,7 @@ verify_app_store_signature() {
     require_plist_value "$entitlements_plist" com.apple.developer.team-identifier "$EXPECTED_TEAM_ID"
     require_plist_value "$entitlements_plist" com.apple.security.app-sandbox "true"
     require_plist_value "$entitlements_plist" com.apple.security.device.audio-input "true"
+    require_plist_value "$entitlements_plist" com.apple.security.network.client "true"
 
     actual_entitlement_keys="$(
         /usr/libexec/PlistBuddy -c Print "$entitlements_plist" \
@@ -363,6 +364,7 @@ verify_app_store_signature() {
             com.apple.developer.team-identifier \
             com.apple.security.app-sandbox \
             com.apple.security.device.audio-input \
+            com.apple.security.network.client \
             | LC_ALL=C sort
     )"
     if [[ "$actual_entitlement_keys" != "$expected_entitlement_keys" ]]; then
@@ -371,14 +373,13 @@ verify_app_store_signature() {
                 <(printf '%s\n' "$expected_entitlement_keys") \
                 <(printf '%s\n' "$actual_entitlement_keys")
         )"
-        echo "error: signed entitlements are not the exact microphone-only App Store set:" >&2
+        echo "error: signed entitlements are not the expected App Store set:" >&2
         printf '%s\n' "$entitlement_difference" >&2
         exit 1
     fi
 
-    if plist_value "$entitlements_plist" com.apple.security.network.client >/dev/null 2>&1 \
-       || plist_value "$entitlements_plist" com.apple.security.network.server >/dev/null 2>&1; then
-        fail "the signed App Store app must not contain client or server network entitlements"
+    if plist_value "$entitlements_plist" com.apple.security.network.server >/dev/null 2>&1; then
+        fail "the signed App Store app must not contain the server network entitlement"
     fi
     if [[ "$(plist_value "$entitlements_plist" com.apple.security.get-task-allow || true)" == "true" ]]; then
         fail "the signed App Store app unexpectedly allows debugger attachment"

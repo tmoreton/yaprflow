@@ -1,11 +1,14 @@
 # App Store submission
 
+> Historical planning record. The current Mac distribution plan is a signed,
+> notarized download from yaprflow.com, not a Mac App Store submission.
+
 This is the working App Store Connect copy and release checklist for Yaprflow's
 commercial generation. It also preserves the state of the historical free
 4.0.14 submission so that the transition is not mistaken for a retroactive
 change.
 
-Last reviewed: September 12, 2026
+Last reviewed: September 16, 2026
 
 ## Intended release records
 
@@ -43,7 +46,9 @@ with a saved speech-language selector. English (United States) is the default,
 and Automatic detection remains available. It remembers the selected dictation
 mode, improves recognition of very short recordings, makes empty recordings
 and clipboard failures clearer, promptly releases raw microphone buffers after
-transcription, and expands privacy and third-party licensing information.
+transcription, and expands privacy and third-party licensing information. Mac
+users can now choose Apple Intelligence, their own OpenAI or OpenRouter key, or
+Ollama for AI Summary; external-provider archive titles require opt-in.
 
 Use this text when 5.0.1 is submitted as an update to a version that reached
 Ready for Distribution. App Store Connect may not show or require the field if
@@ -51,7 +56,7 @@ the pending 4.0.14 version is withdrawn before its first release.
 
 ### Description
 
-Yaprflow is private voice dictation and on-device AI productivity for your Mac.
+Yaprflow is private voice dictation and optional AI productivity for your Mac.
 Press Command-T, speak naturally, press Command-T again, and paste clean text
 into any app.
 
@@ -71,12 +76,15 @@ Features:
 - Choose among 32 production-ready dictation locales, with English (United
   States) as the default and Automatic detection available.
 - Summarize, restructure, or rewrite transcripts with Apple Intelligence on
-  supported Macs.
+  supported Macs, your own OpenAI or OpenRouter API key, or Ollama on your Mac.
 - Generate local titles, topics, and descriptions for transcript history on
-  supported Macs.
+  supported Macs; automatic titles with another provider require opt-in.
 
 Yaprflow requires macOS 14 Sonoma or later. Apple Intelligence features require
 a compatible Mac with Apple Intelligence enabled and macOS 26 or later.
+OpenAI and OpenRouter requests send selected transcript text and prompts to
+the provider. Ollama runs through its local service; Ollama cloud models may
+send requests to Ollama's service.
 
 Do not describe Yaprflow as retaining meeting recordings or capturing system
 audio. The current app captures microphone input for transcription, discards
@@ -84,14 +92,21 @@ raw audio after processing, and stores transcript text.
 
 ## App privacy answers
 
-- **Data collected:** No, for app functionality as currently implemented.
+- **Data collected:** The Mac privacy manifest now declares user content and
+  usage data linked to the provider account for optional cloud AI. Reassess the
+  App Store Connect answers against the selected providers and their retention
+  policies before submitting a build with this feature.
 - **Tracking:** No.
 - **Privacy manifest:** Included in each target's application bundle.
 
 The app processes microphone audio on-device, stores transcripts and settings
 only in its sandboxed container, and does not transmit user data to the
 developer. Optional Mac AI features use Apple's on-device Foundation Models
-framework. Apple separately processes App Store purchase and Apple Account
+framework by default. Users can choose OpenAI or OpenRouter with their own
+Keychain-stored API key, or Ollama locally; the selected transcript and prompt
+are sent to a cloud provider when the user runs AI Summary, and automatic
+titles with another provider require separate opt-in. Apple separately
+processes App Store purchase and Apple Account
 information under Apple's terms; Yaprflow does not receive payment-card data.
 
 Reconfirm these answers in App Store Connect against the final signed binary
@@ -174,9 +189,10 @@ Recording before that finishes—or after the speech recognizer is released
 following five idle minutes or memory pressure—can take longer while the local
 runtimes initialize it again.
 
-AI Summary is optional. It requires macOS 26, a supported Mac, and Apple
-Intelligence enabled in System Settings. Reviewers can evaluate the core
-dictation flow without it.
+AI Summary is optional. Its default Apple Intelligence provider requires
+macOS 26, a supported Mac, and Apple Intelligence enabled in System Settings.
+Reviewers can also select OpenAI or OpenRouter using their own key, or an
+installed Ollama model. They can evaluate core dictation without an AI provider.
 
 ## macOS 5.0.0 checklist
 

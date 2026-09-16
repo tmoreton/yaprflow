@@ -1,5 +1,6 @@
 #if os(iOS)
 import Combine
+import MessageUI
 import SwiftUI
 import UIKit
 
@@ -9,6 +10,7 @@ struct ContentView: View {
     @StateObject private var history = HistoryStore.shared
     @State private var showHistory = false
     @State private var showAcknowledgements = false
+    @State private var showFeedback = false
 
     var body: some View {
         ZStack {
@@ -65,6 +67,9 @@ struct ContentView: View {
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Color.black)
         }
+        .sheet(isPresented: $showFeedback) {
+            FeedbackSheet()
+        }
     }
 
     // MARK: - Top bar
@@ -87,6 +92,19 @@ struct ContentView: View {
             .accessibilityLabel("About and acknowledgements")
 
             Spacer()
+
+            Button {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                showFeedback = true
+            } label: {
+                Image(systemName: "bubble.left")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.7))
+                    .frame(width: 36, height: 36)
+                    .background(Circle().fill(Color.white.opacity(0.08)))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Send feedback")
 
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -164,6 +182,157 @@ struct ContentView: View {
 
     private var showsStopControl: Bool {
         engine.isRecording || engine.isRecordingPending
+    }
+}
+
+// MARK: - Feedback sheet
+
+private enum FeedbackKind: String, CaseIterable, Identifiable {
+    case problem = "Problem"
+    case suggestion = "Suggestion"
+    case question = "Question"
+
+    var id: Self { self }
+}
+
+private struct FeedbackSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
+    @State private var kind: FeedbackKind = .problem
+    @State private var subject = ""
+    @State private var message = ""
+    @State private var showMailComposer = false
+    @State private var mailUnavailable = false
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Picker("Type", selection: $kind) {
+                        ForEach(FeedbackKind.allCases) { option in
+                            Text(option.rawValue).tag(option)
+                        }
+                    }
+                    TextField("Short summary", text: $subject)
+                        .accessibilityLabel("Feedback summary")
+                    TextEditor(text: $message)
+                        .frame(minHeight: 150)
+                        .accessibilityLabel("Feedback details")
+                } header: {
+                    Text("What would you like us to know?")
+                } footer: {
+                    Text("Describe the issue or idea. Please leave out private transcripts and recordings.")
+                }
+
+                Section {
+                    Text("A Mail draft will open for you to review and send. The draft includes your message, Yaprflow version, and operating-system version.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    Button("Continue in Mail") { composeEmail() }
+                        .disabled(!canCompose)
+                }
+            }
+            .navigationTitle("Send Feedback")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+        .sheet(isPresented: $showMailComposer) {
+            FeedbackMailComposer(subject: emailSubject, body: emailBody) {
+                showMailComposer = false
+            }
+        }
+        .alert("Email app unavailable", isPresented: $mailUnavailable) {
+            Button("Copy message") { UIPasteboard.general.string = emailBody }
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Copy your message and email it to tim@yaprflow.com when an email app is available.")
+        }
+    }
+
+    private var canCompose: Bool {
+        !subject.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var emailSubject: String {
+        "Yaprflow \(kind.rawValue): \(subject.trimmingCharacters(in: .whitespacesAndNewlines))"
+    }
+
+    private var emailBody: String {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Unknown"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "Unknown"
+        return """
+        Type: \(kind.rawValue)
+        Summary: \(subject.trimmingCharacters(in: .whitespacesAndNewlines))
+
+        \(message.trimmingCharacters(in: .whitespacesAndNewlines))
+
+        ---
+        Yaprflow \(version) (\(build))
+        \(UIDevice.current.systemName) \(UIDevice.current.systemVersion)
+        """
+    }
+
+    private func composeEmail() {
+        if MFMailComposeViewController.canSendMail() {
+            showMailComposer = true
+            return
+        }
+
+        var components = URLComponents()
+        components.scheme = "mailto"
+        components.path = "tim@yaprflow.com"
+        components.queryItems = [
+            URLQueryItem(name: "subject", value: emailSubject),
+            URLQueryItem(name: "body", value: emailBody),
+        ]
+        guard let url = components.url else {
+            mailUnavailable = true
+            return
+        }
+        openURL(url) { accepted in
+            if !accepted { mailUnavailable = true }
+        }
+    }
+}
+
+private struct FeedbackMailComposer: UIViewControllerRepresentable {
+    let subject: String
+    let body: String
+    let onFinish: () -> Void
+
+    func makeUIViewController(context: Context) -> MFMailComposeViewController {
+        let composer = MFMailComposeViewController()
+        composer.mailComposeDelegate = context.coordinator
+        composer.setToRecipients(["tim@yaprflow.com"])
+        composer.setSubject(subject)
+        composer.setMessageBody(body, isHTML: false)
+        return composer
+    }
+
+    func updateUIViewController(_ uiViewController: MFMailComposeViewController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator { Coordinator(onFinish: onFinish) }
+
+    final class Coordinator: NSObject, MFMailComposeViewControllerDelegate {
+        let onFinish: () -> Void
+
+        init(onFinish: @escaping () -> Void) {
+            self.onFinish = onFinish
+        }
+
+        func mailComposeController(
+            _ controller: MFMailComposeViewController,
+            didFinishWith result: MFMailComposeResult,
+            error: Error?
+        ) {
+            onFinish()
+        }
     }
 }
 
