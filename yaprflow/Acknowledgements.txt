@@ -9,6 +9,13 @@ Yaprflow-owned software in releases through 4.0.14 and repository revisions
 through 0af74ab27f24933d16c004336cf63eac95c0a6b0 remains available under the
 Apache License 2.0 that accompanied those versions.
 
+Sparkle 2.10.0
+Copyright (c) 2006-2013 Andy Matuschak and the Sparkle contributors.
+Licensed under the MIT License with bundled third-party components under their
+respective permissive licenses. The complete upstream license inventory is
+bundled as Sparkle-2.10.0.txt.
+https://github.com/sparkle-project/Sparkle
+
 FluidAudio 0.13.6 (adapted VAD portions only)
 Licensed under the Apache License 2.0.
 Yaprflow retains a modified Core ML VAD invocation and streaming hysteresis

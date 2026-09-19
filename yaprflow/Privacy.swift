@@ -5,6 +5,7 @@ struct SettingsView: View {
     @ObservedObject private var appState = AppState.shared
     @ObservedObject private var aiSettings = AIProviderSettings.shared
     @ObservedObject private var telemetry = Telemetry.shared
+    @ObservedObject private var updater = AppUpdater.shared
     @State private var isShowingFeedback = false
 
     var body: some View {
@@ -201,6 +202,58 @@ struct SettingsView: View {
                             Text(appVersion)
                                 .font(.caption.weight(.medium))
                                 .foregroundStyle(.secondary)
+
+                            Button("Check Now") {
+                                updater.checkForUpdates()
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                        .padding(.vertical, 10)
+
+                        Divider().padding(.leading, 38)
+
+                        HStack(spacing: 12) {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                                .foregroundStyle(.secondary)
+                                .frame(width: 26)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Automatically check for updates")
+                                    .font(.callout.weight(.medium))
+                                Text("Check the signed Yaprflow release feed once a day.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+
+                            Toggle("Automatically check for updates", isOn: automaticUpdateChecksBinding)
+                                .labelsHidden()
+                                .toggleStyle(.switch)
+                        }
+                        .padding(.vertical, 10)
+
+                        Divider().padding(.leading, 38)
+
+                        HStack(spacing: 12) {
+                            Image(systemName: "arrow.down.app")
+                                .foregroundStyle(.secondary)
+                                .frame(width: 26)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Automatically download updates")
+                                    .font(.callout.weight(.medium))
+                                Text("Install verified updates when Yaprflow is ready to relaunch.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+
+                            Toggle("Automatically download updates", isOn: automaticUpdateDownloadsBinding)
+                                .labelsHidden()
+                                .toggleStyle(.switch)
+                                .disabled(!updater.automaticallyChecksForUpdates)
                         }
                         .padding(.vertical, 10)
 
@@ -238,7 +291,24 @@ struct SettingsView: View {
     }
 
     private var appVersion: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Unknown"
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+        guard let version else { return "Unknown" }
+        return build.map { "\(version) (\($0))" } ?? version
+    }
+
+    private var automaticUpdateChecksBinding: Binding<Bool> {
+        Binding(
+            get: { updater.automaticallyChecksForUpdates },
+            set: { updater.setAutomaticallyChecksForUpdates($0) }
+        )
+    }
+
+    private var automaticUpdateDownloadsBinding: Binding<Bool> {
+        Binding(
+            get: { updater.automaticallyDownloadsUpdates },
+            set: { updater.setAutomaticallyDownloadsUpdates($0) }
+        )
     }
 
     private var aiPrivacyDetail: String {

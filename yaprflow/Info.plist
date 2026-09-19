@@ -39,5 +39,21 @@
 	<string>Yaprflow needs the microphone to transcribe your voice into text.</string>
 	<key>NSSupportsAutomaticTermination</key>
 	<true/>
+	<key>SUAllowsAutomaticUpdates</key>
+	<true/>
+	<key>SUAutomaticallyUpdate</key>
+	<true/>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUEnableInstallerLauncherService</key>
+	<true/>
+	<key>SUEnableSystemProfiling</key>
+	<false/>
+	<key>SUFeedURL</key>
+	<string>https://yaprflow.com/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>+pDUc2ivfnr9FJrMcu8LIS+S19ek19DfS3XT209PmKE=</string>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
 </dict>
 </plist>

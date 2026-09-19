@@ -9,7 +9,7 @@ await mkdir(output, { recursive: true });
 // Explicit allowlist: never publish source, credentials, or private installers.
 export const publicFiles = [
   'index.html', 'confirmation.html', 'confirmation.js', 'checkout.js',
-  'analytics.js', 'meta-pixel.js', 'analytics.css', 'styles.css', 'assets', 'policies', 'support.html', 'robots.txt', 'sitemap.xml',
+  'analytics.js', 'meta-pixel.js', 'analytics.css', 'styles.css', 'assets', 'policies', 'support.html', 'robots.txt', 'sitemap.xml', 'appcast.xml',
 ];
 async function validateDirectory(url) {
   for (const entry of await readdir(url)) {

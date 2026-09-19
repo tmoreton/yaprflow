@@ -16,7 +16,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var isAutomaticTerminationDisabled = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let isPreviewSmokeTest = ProcessInfo.processInfo.arguments.contains("--smoke-test-preview")
+        let arguments = ProcessInfo.processInfo.arguments
+        let isPreviewSmokeTest = arguments.contains("--smoke-test-preview")
+        let isRecordingSmokeTest = arguments.contains("--smoke-test-recording")
 
         // AppKit finishes its window-restoration bookkeeping after this
         // callback and enables automatic termination for windowless apps.
@@ -31,6 +33,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         if !isPreviewSmokeTest {
             TranscriptionController.shared.prepareSpeechRecognizer()
+        }
+        if !isPreviewSmokeTest && !isRecordingSmokeTest {
+            AppUpdater.shared.start()
         }
         TranscriptionController.shared.prepareVoiceDetector()
         let hotkeyRegistered = registerHotkey()
@@ -57,7 +62,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
         }
 
-        if ProcessInfo.processInfo.arguments.contains("--smoke-test-recording") {
+        if isRecordingSmokeTest {
             Task { @MainActor in
                 for _ in 0..<20 {
                     if statusItem?.menu != nil { break }
@@ -256,6 +261,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         )
         menu.addItem(historyItem)
 
+        let updateItem = NSMenuItem()
+        updateItem.view = IconActionMenuItemView(
+            symbolName: "arrow.triangle.2.circlepath",
+            title: "Check for Updates…",
+            target: self,
+            action: #selector(checkForUpdates),
+            isEnabled: { AppUpdater.shared.canCheckForUpdates }
+        )
+        menu.addItem(updateItem)
+
         menu.addItem(NSMenuItem.separator())
 
         let footerItem = NSMenuItem()
@@ -280,6 +295,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func showHistory() {
         AppPanelWindowController.show(.history)
+    }
+
+    @objc private func checkForUpdates() {
+        AppUpdater.shared.checkForUpdates()
     }
 
     @objc private func showSettings() {

@@ -6,7 +6,7 @@ The redesigned website and enabled live Stripe checkout are published at `https:
 
 ## Current setup — September 19, 2026
 
-Production deployment `dpl_8PWF9FgXXRnYstJYyL52eBD4D8xP` is READY at `https://yaprflow-checkout-jtoglzwar-tmoretons-projects.vercel.app`. It is aliased to `yaprflow.com` and includes the enabled OpenAI Realtime microphone demo. The mobile sticky offer prompt now hides when the purchase section enters view, leaving the real checkout button unobstructed; fresh production browser checks passed at both the comparison and purchase sections. The stalled `dpl_BUGE9NTuHnepw8dewUccbGYHiHZo` and interim prebuilt deployment identified as `DCx` were canceled, with CANCELED confirmed. Vercel's [deployment incident](https://www.vercel-status.com/incidents/bwkmw4hmrgmk) delayed the original publication, but the current release is serving and its public smoke checks pass.
+Production deployment `dpl_GFHnFQhueD8DKEb9iao8BJ1enJAD` is READY at `https://yaprflow-checkout-7o4gdjjf2-tmoretons-projects.vercel.app`. It is aliased to `yaprflow.com`, publishes the empty Sparkle update feed and update privacy disclosure, and includes the enabled OpenAI Realtime microphone demo. The mobile sticky offer prompt now hides when the purchase section enters view, leaving the real checkout button unobstructed; fresh production browser checks passed at both the comparison and purchase sections. The stalled `dpl_BUGE9NTuHnepw8dewUccbGYHiHZo` and interim prebuilt deployment identified as `DCx` were canceled, with CANCELED confirmed. Vercel's [deployment incident](https://www.vercel-status.com/incidents/bwkmw4hmrgmk) delayed the original publication, but the current release is serving and its public smoke checks pass.
 
 Live Production settings are `CHECKOUT_ENABLED=true`, `CHECKOUT_BASE_URL=https://yaprflow.com`, and `BLOB_PATHNAME=releases/yaprflow-5.1.3.dmg`. Public `/api/config` verifies `enabled: true`, `mode: "live"`, price `{amount: 799, currency: "usd", formatted: "$7.99"}`, `downloadReady: true`, and `voiceDemoAvailable: true`. The live product is `prod_VHf8LJ6S6B1Rk6`, and the live Price ID is `price_1UH5oDAlzJZxFihrxO8VSy8p`.
 
@@ -58,11 +58,17 @@ With credentials absent, the landing page still loads and displays checkout as u
 
 `npm run build` runs `scripts/build.mjs` and creates `public/`, which is the Vercel static output directory. The build copies only this explicit allowlist:
 
-- `index.html`, `confirmation.html`, `support.html`
+- `index.html`, `confirmation.html`, `support.html`, `appcast.xml`
 - `checkout.js`, `confirmation.js`, `analytics.js`, `meta-pixel.js`, `analytics.css`, `styles.css`
 - `assets/`, `policies/`, `robots.txt`, `sitemap.xml`
 
 Asset directories reject hidden files, symlinks, and unexpected extensions. Source, environment files, and private installers are excluded. Vercel deploys the `api/` handlers separately; the static output alone does not implement checkout.
+
+`appcast.xml` is the public Sparkle 2 update feed. The committed feed has no
+release enclosure until an updater-enabled archive has been uploaded to its
+final HTTPS location. Publish the archive before replacing this feed with the
+output from `../scripts/prepare-sparkle-update.sh`; otherwise installed apps
+could discover an update they cannot download.
 
 The old `/privacy.html` route redirects to `/policies/#privacy`. The landing page, purchase confirmation, policies, and support share the new branding. Files under `assets/brand/` include the matching website favicon and icon artwork applied to the signed and notarized Mac 5.1.3 build. Its private upload is verified and configured in the active checkout release. The original 5.1.0 installer remains preserved.
 

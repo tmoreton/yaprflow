@@ -267,6 +267,38 @@ scripts/release.sh 5.1.3
 ```
 
 The resulting DMG stays private until the paid checkout is configured.
+
+### Direct-download updates
+
+The Mac target uses Sparkle 2.10.0 for updates outside the App Store. The menu
+and Settings include **Check for Updates…**, automatic checks default to once a
+day, and verified updates can download and install when Yaprflow next relaunches.
+Users can turn automatic checks or downloads off in Settings. Sparkle compares
+the appcast's `sparkle:version` with the app's increasing `CFBundleVersion`;
+every release must therefore increment `CURRENT_PROJECT_VERSION` as well as the
+marketing version.
+
+The stable feed is `https://yaprflow.com/appcast.xml`. It is intentionally empty
+until an updater-enabled release archive is uploaded. To stage a signed feed
+entry while producing a notarized release, run:
+
+```bash
+SPARKLE_DOWNLOAD_URL_PREFIX=https://your-update-host/releases/ \
+  scripts/release.sh 5.1.4 --prepare-update
+```
+
+This writes the signed archive and appcast to `build/sparkle-update/`. Upload the
+archive first, verify its HTTPS URL, then replace `checkout/appcast.xml` with the
+generated feed and deploy the website. The private Sparkle EdDSA key is stored
+in the macOS login Keychain under account `com.tmoreton.yaprflow`; only its
+public key is committed. Never export or commit the private key.
+
+The first updater-enabled Yaprflow release requires a manual website download
+because 5.1.3 does not contain Sparkle. Later releases can update automatically.
+Yaprflow currently has no in-app license entitlement, so an update archive URL
+that Sparkle can download without authentication is also downloadable outside
+the app. Keep the feed empty until update hosting is deliberately made public
+or a purchase-linked app entitlement is implemented.
 The `--publish` option rejects public binary publication. A source-only release
 is still available with `--publish-source`. The historical
 App Store scripts remain in the repository for reference and are no longer the

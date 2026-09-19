@@ -32,6 +32,8 @@
 		53DAA96B0F07428A9B67E003 /* AIProviderCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53DAA96B0F07428A9B67E001 /* AIProviderCore.swift */; };
 		53DAA96B0F07428A9B67E005 /* TelemetryCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53DAA96B0F07428A9B67E004 /* TelemetryCore.swift */; };
 		53DAA96B0F07428A9B67E006 /* TelemetryCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53DAA96B0F07428A9B67E004 /* TelemetryCore.swift */; };
+		6F53000131C5000100000001 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 6F53000131C5000100000003 /* Sparkle */; };
+		6F53000131C5000100000004 /* Sparkle-2.10.0.txt in Resources */ = {isa = PBXBuildFile; fileRef = 6F53000131C5000100000005 /* Sparkle-2.10.0.txt */; };
 		8C7A18FCDA66C92FA3E0F8F4 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEE8B6ADF5ACFBCED341D24E /* ContentView.swift */; };
 		8FADA1EF707898B72E315E15 /* AudioCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6843916C14C177A41165D16 /* AudioCapture.swift */; };
 		B21E4D0C5A51E7F58BD5FFB8 /* HistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8DB5A205EACDB4ACD590805 /* HistoryStore.swift */; };
@@ -55,6 +57,7 @@
 		2A57A00131C3000100000018 /* TranscriptPolishing.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Shared/TranscriptPolishing.swift; sourceTree = SOURCE_ROOT; };
 		53DAA96B0F07428A9B67E001 /* AIProviderCore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Shared/AIProviderCore.swift; sourceTree = SOURCE_ROOT; };
 		53DAA96B0F07428A9B67E004 /* TelemetryCore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Shared/TelemetryCore.swift; sourceTree = SOURCE_ROOT; };
+		6F53000131C5000100000005 /* Sparkle-2.10.0.txt */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text; path = "LICENSES/Sparkle-2.10.0.txt"; sourceTree = SOURCE_ROOT; };
 		8AC764B726D8D52670A9D93A /* yaprflow-iOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "yaprflow-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		AEE8B6ADF5ACFBCED341D24E /* ContentView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		AFA2BC972F97E6F00048D99B /* yaprflow.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = yaprflow.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -97,6 +100,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6F53000131C5000100000001 /* Sparkle in Frameworks */,
 				2A57A00131C1000100000001 /* SherpaOnnxASR in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -113,6 +117,7 @@
 				2A57A00131C3000100000018 /* TranscriptPolishing.swift */,
 				53DAA96B0F07428A9B67E001 /* AIProviderCore.swift */,
 				53DAA96B0F07428A9B67E004 /* TelemetryCore.swift */,
+				6F53000131C5000100000005 /* Sparkle-2.10.0.txt */,
 				2A2FDF2D31C00B9800A00001 /* Acknowledgements.txt */,
 				2A2FDF2F31C1000200000001 /* ONNXRuntime-ThirdPartyNotices-v1.28.2.txt */,
 				2A2FDF3231C1000200000001 /* SherpaOnnx-ThirdParty-v1.13.8 */,
@@ -190,6 +195,7 @@
 			);
 			name = yaprflow;
 			packageProductDependencies = (
+				6F53000131C5000100000003 /* Sparkle */,
 				2A57A00131C1000100000004 /* SherpaOnnxASR */,
 			);
 			productName = yaprflow;
@@ -221,6 +227,7 @@
 			mainGroup = AFA2BC8E2F97E6F00048D99B;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				6F53000131C5000100000002 /* XCRemoteSwiftPackageReference "Sparkle" */,
 				2A57A00131C1000100000003 /* XCLocalSwiftPackageReference "SherpaOnnxASR" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -239,6 +246,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6F53000131C5000100000004 /* Sparkle-2.10.0.txt in Resources */,
 				2A2FDF3031C1000200000001 /* ONNXRuntime-ThirdPartyNotices-v1.28.2.txt in Resources */,
 				2A2FDF3331C1000200000001 /* SherpaOnnx-ThirdParty-v1.13.8 in Resources */,
 				2A2FDF3531C1000300000001 /* OpenMDW-1.1.txt in Resources */,
@@ -636,6 +644,17 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		6F53000131C5000100000002 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = exactVersion;
+				version = 2.10.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
 		2A57A00131C1000100000004 /* SherpaOnnxASR */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -646,6 +665,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 2A57A00131C1000100000003 /* XCLocalSwiftPackageReference "SherpaOnnxASR" */;
 			productName = SherpaOnnxASR;
+		};
+		6F53000131C5000100000003 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 6F53000131C5000100000002 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

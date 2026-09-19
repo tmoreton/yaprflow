@@ -6,6 +6,7 @@
 # Usage:
 #   scripts/release.sh                                    # local DMG build (uses MARKETING_VERSION)
 #   scripts/release.sh 5.0.1                              # local DMG build with explicit version
+#   SPARKLE_DOWNLOAD_URL_PREFIX=https://updates.example/ scripts/release.sh 5.1.4 --prepare-update
 #   scripts/release.sh 5.1.0 --publish              # rejected for paid builds
 #   scripts/release.sh 5.1.0 --publish-source             # source-only release
 #   SKIP_NOTARIZE=1 scripts/release.sh                    # unsigned local test build
@@ -23,6 +24,7 @@ cd "$(dirname "$0")/.."
 VERSION=""
 PUBLISH_SOURCE=false
 PUBLISH_BINARY=false
+PREPARE_UPDATE=false
 NOTES=""
 EXTRA_GH_ARGS=()
 
@@ -34,6 +36,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --publish)
             PUBLISH_BINARY=true
+            shift
+            ;;
+        --prepare-update)
+            PREPARE_UPDATE=true
             shift
             ;;
         --draft)
@@ -83,6 +89,10 @@ if [[ "$PUBLISH_BINARY" == true && "${SKIP_NOTARIZE:-0}" == "1" ]]; then
     echo "error: --publish requires signing and notarization" >&2
     exit 2
 fi
+if [[ "$PREPARE_UPDATE" == true && "${SKIP_NOTARIZE:-0}" == "1" ]]; then
+    echo "error: Sparkle updates must be signed and notarized" >&2
+    exit 2
+fi
 
 # ---- Config ------------------------------------------------------------------
 
@@ -104,10 +114,13 @@ MODEL_ORIGIN_NOTICE_SOURCE="$(pwd)/NOTICE.txt"
 MODEL_LICENSE_SOURCE="$(pwd)/LICENSES/OpenMDW-1.1.txt"
 PRIVACY_MANIFEST_SOURCE="$(pwd)/yaprflow/PrivacyInfo.xcprivacy"
 ONNXRUNTIME_NOTICES_SOURCE="$(pwd)/LICENSES/ONNXRuntime-ThirdPartyNotices-v1.28.2.txt"
+SPARKLE_LICENSE_SOURCE="$(pwd)/LICENSES/Sparkle-2.10.0.txt"
 SHERPA_NOTICES_SOURCE="$(pwd)/LICENSES/SherpaOnnx-ThirdParty-v1.13.8"
 SHERPA_ARTIFACTS_ROOT="$(pwd)/Vendor/SherpaOnnxASR/Artifacts"
 EXPECTED_BUNDLE_ID="com.tmoreton.yaprflow"
 EXPECTED_TEAM_ID="GVXC5FQ2RP"
+EXPECTED_SPARKLE_FEED="https://yaprflow.com/appcast.xml"
+EXPECTED_SPARKLE_PUBLIC_KEY="+pDUc2ivfnr9FJrMcu8LIS+S19ek19DfS3XT209PmKE="
 
 source "$(pwd)/scripts/lib/model-release.sh"
 
@@ -334,13 +347,14 @@ verify_bundled_app() {
     local app_path="$1"
     local resources_path="$app_path/Contents/Resources"
     local info_plist="$app_path/Contents/Info.plist"
-    local embedded_version embedded_bundle_id
+    local embedded_version embedded_bundle_id sparkle_feed sparkle_public_key installer_service_enabled
     local executable_name executable_path bundled_link
 
     if [[ ! -f "$MODEL_CHECKSUMS" || ! -f "$ACKNOWLEDGEMENTS_SOURCE" \
        || ! -f "$MODEL_NOTICE_SOURCE" || ! -f "$MODEL_ORIGIN_NOTICE_SOURCE" \
        || ! -f "$MODEL_LICENSE_SOURCE" \
        || ! -f "$PRIVACY_MANIFEST_SOURCE" || ! -f "$ONNXRUNTIME_NOTICES_SOURCE" \
+       || ! -f "$SPARKLE_LICENSE_SOURCE" \
        || ! -d "$SHERPA_NOTICES_SOURCE" ]]; then
         echo "error: release verification sources are missing" >&2
         return 1
@@ -367,6 +381,20 @@ verify_bundled_app() {
         echo "error: unexpected bundle id: $embedded_bundle_id" >&2
         return 1
     fi
+    sparkle_feed="$(/usr/libexec/PlistBuddy -c 'Print :SUFeedURL' "$info_plist" 2>/dev/null || true)"
+    sparkle_public_key="$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$info_plist" 2>/dev/null || true)"
+    installer_service_enabled="$(/usr/libexec/PlistBuddy -c 'Print :SUEnableInstallerLauncherService' "$info_plist" 2>/dev/null || true)"
+    if [[ "$sparkle_feed" != "$EXPECTED_SPARKLE_FEED" \
+       || "$sparkle_public_key" != "$EXPECTED_SPARKLE_PUBLIC_KEY" \
+       || "$installer_service_enabled" != "true" ]]; then
+        echo "error: bundled Sparkle feed, public key, or installer service setting is invalid" >&2
+        return 1
+    fi
+    if [[ ! -d "$app_path/Contents/Frameworks/Sparkle.framework" \
+       || ! -d "$app_path/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices/Installer.xpc" ]]; then
+        echo "error: bundled Sparkle framework or installer service is missing" >&2
+        return 1
+    fi
 
     if ! cmp -s "$ACKNOWLEDGEMENTS_SOURCE" "$resources_path/Acknowledgements.txt"; then
         echo "error: bundled Acknowledgements.txt is missing or does not match the source notice" >&2
@@ -390,6 +418,12 @@ verify_bundled_app() {
         "$ONNXRUNTIME_NOTICES_SOURCE" \
         "$resources_path/ONNXRuntime-ThirdPartyNotices-v1.28.2.txt"; then
         echo "error: bundled ONNX Runtime notices are missing or do not match the source" >&2
+        return 1
+    fi
+    if ! cmp -s \
+        "$SPARKLE_LICENSE_SOURCE" \
+        "$resources_path/Sparkle-2.10.0.txt"; then
+        echo "error: bundled Sparkle license inventory is missing or changed" >&2
         return 1
     fi
     if ! diff -qr \
@@ -432,7 +466,7 @@ verify_bundled_app() {
 
 verify_distribution_signature() {
     local app_path="$1"
-    local signing_details embedded_team embedded_entitlements sandbox_entitlement microphone_entitlement client_network_entitlement
+    local signing_details embedded_team embedded_entitlements sandbox_entitlement microphone_entitlement client_network_entitlement sparkle_status_service sparkle_installer_service
 
     codesign --verify --deep --strict --verbose=2 "$app_path"
     signing_details="$(codesign -d --verbose=4 "$app_path" 2>&1)"
@@ -455,8 +489,15 @@ verify_distribution_signature() {
     sandbox_entitlement="$(/usr/libexec/PlistBuddy -c 'Print :com.apple.security.app-sandbox' /dev/stdin <<<"$embedded_entitlements" 2>/dev/null || true)"
     microphone_entitlement="$(/usr/libexec/PlistBuddy -c 'Print :com.apple.security.device.audio-input' /dev/stdin <<<"$embedded_entitlements" 2>/dev/null || true)"
     client_network_entitlement="$(/usr/libexec/PlistBuddy -c 'Print :com.apple.security.network.client' /dev/stdin <<<"$embedded_entitlements" 2>/dev/null || true)"
+    sparkle_status_service="$(/usr/libexec/PlistBuddy -c 'Print :com.apple.security.temporary-exception.mach-lookup.global-name:0' /dev/stdin <<<"$embedded_entitlements" 2>/dev/null || true)"
+    sparkle_installer_service="$(/usr/libexec/PlistBuddy -c 'Print :com.apple.security.temporary-exception.mach-lookup.global-name:1' /dev/stdin <<<"$embedded_entitlements" 2>/dev/null || true)"
     if [[ "$sandbox_entitlement" != "true" || "$microphone_entitlement" != "true" || "$client_network_entitlement" != "true" ]]; then
         echo "error: app signature is missing the sandbox, microphone, or outbound network entitlement" >&2
+        return 1
+    fi
+    if [[ "$sparkle_status_service" != "$EXPECTED_BUNDLE_ID-spks" \
+       || "$sparkle_installer_service" != "$EXPECTED_BUNDLE_ID-spki" ]]; then
+        echo "error: app signature is missing Sparkle's sandbox installer entitlements" >&2
         return 1
     fi
     if /usr/libexec/PlistBuddy -c 'Print :com.apple.security.network.server' \
@@ -686,6 +727,12 @@ fi
 echo
 echo "==> Built: $DMG_PATH"
 ls -lh "$DMG_PATH"
+
+if [[ "$PREPARE_UPDATE" == true ]]; then
+    echo
+    echo "==> Preparing signed Sparkle update feed"
+    scripts/prepare-sparkle-update.sh "$DMG_PATH"
+fi
 
 # ---- Publish GitHub release --------------------------------------------------
 
