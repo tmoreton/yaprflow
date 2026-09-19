@@ -30,7 +30,9 @@ test('an analytics loading failure cannot interrupt checkout or a verified downl
 function node(dataset = {}) {
   const listeners = new Map();
   return {
-    dataset, hidden: true, disabled: false, checked: false, textContent: '', href: '',
+    dataset, hidden: true, disabled: false, checked: false, textContent: '', href: '', open: false,
+    showModal() { this.open = true; },
+    close() { this.open = false; },
     addEventListener(type, callback) { listeners.set(type, callback); },
     dispatch(type, extra = {}) {
       const event = { ...extra, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
@@ -42,7 +44,8 @@ function node(dataset = {}) {
 
 function page(search = '') {
   const ids = new Map([
-    'checkout-form', 'checkout-button', 'checkout-status', 'checkout-notice', 'checkout-retry', 'purchase-terms',
+    'checkout-form', 'checkout-button', 'checkout-status', 'checkout-notice', 'checkout-retry', 'purchase-terms', 'purchase-terms-value',
+    'purchase-terms-open', 'purchase-terms-dialog', 'purchase-terms-close', 'purchase-terms-return',
     'price-comparison', 'status', 'ready', 'help', 'download', 'retry', 'test-badge',
     'live-transcriber', 'live-transcribe-button', 'live-transcribe-status', 'live-transcript',
   ].map((id) => [id, node()]));
@@ -205,12 +208,29 @@ test('checkout requires explicit purchase-term acceptance', async () => {
   const mounted = mountCheckout(ui.document, ui.window, async () => json(config));
   await mounted.ready;
   assert.equal(ui.ids.get('purchase-terms').disabled, false);
+  assert.equal(ui.ids.get('purchase-terms-value').disabled, true);
   assert.equal(ui.ids.get('checkout-button').disabled, true);
   assert.equal(ui.ids.get('checkout-form').dispatch('submit').defaultPrevented, true);
   ui.ids.get('purchase-terms').checked = true;
   ui.ids.get('purchase-terms').dispatch('change');
+  assert.equal(ui.ids.get('purchase-terms-value').disabled, false);
   assert.equal(ui.ids.get('checkout-button').disabled, false);
   assert.equal(ui.ids.get('checkout-form').dispatch('submit').defaultPrevented, false);
+});
+
+test('purchase terms open in a modal without changing or navigating away from checkout', async () => {
+  const ui = page();
+  await mountCheckout(ui.document, ui.window, async () => json(config)).ready;
+  ui.ids.get('purchase-terms').checked = false;
+  ui.ids.get('purchase-terms-open').dispatch('click');
+  assert.equal(ui.ids.get('purchase-terms-dialog').open, true);
+  assert.equal(ui.ids.get('purchase-terms').checked, false);
+  assert.equal(ui.window.location.search, '');
+  ui.ids.get('purchase-terms-return').dispatch('click');
+  assert.equal(ui.ids.get('purchase-terms-dialog').open, false);
+  ui.ids.get('purchase-terms-open').dispatch('click');
+  ui.ids.get('purchase-terms-close').dispatch('click');
+  assert.equal(ui.ids.get('purchase-terms-dialog').open, false);
 });
 
 test('checkout errors stay closed and a retry can recover without reloading the page', async () => {

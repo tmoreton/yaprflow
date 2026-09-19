@@ -74,7 +74,12 @@ export function mountCheckout(document, window, request = window.fetch.bind(wind
   const notice = document.getElementById('checkout-notice');
   const retry = document.getElementById('checkout-retry');
   const terms = document.getElementById('purchase-terms');
-  if (!form || !button || !status || !notice || !retry || !terms) return;
+  const termsValue = document.getElementById('purchase-terms-value');
+  const termsOpen = document.getElementById('purchase-terms-open');
+  const termsDialog = document.getElementById('purchase-terms-dialog');
+  const termsClose = document.getElementById('purchase-terms-close');
+  const termsReturn = document.getElementById('purchase-terms-return');
+  if (!form || !button || !status || !notice || !retry || !terms || !termsValue) return;
   const cancelled = new URLSearchParams(window.location.search).get('checkout') === 'cancelled';
   let current = checkoutPresentation(null);
   let submitting = false;
@@ -112,6 +117,7 @@ export function mountCheckout(document, window, request = window.fetch.bind(wind
     updateVoiceDemoAvailability(document, voiceDemoAvailable);
     updateDisplayedPrices(document, current.price);
     terms.disabled = !current.enabled;
+    termsValue.disabled = !current.enabled || !terms.checked;
     button.disabled = !current.enabled || !terms.checked;
     button.textContent = current.button;
     status.textContent = current.status;
@@ -120,12 +126,31 @@ export function mountCheckout(document, window, request = window.fetch.bind(wind
     loading = false;
   }
 
+  function openTerms() {
+    if (!termsDialog) return;
+    if (typeof termsDialog.showModal === 'function') termsDialog.showModal();
+    else termsDialog.open = true;
+  }
+
+  function closeTerms() {
+    if (!termsDialog) return;
+    if (typeof termsDialog.close === 'function') termsDialog.close();
+    else termsDialog.open = false;
+  }
+
+  termsOpen?.addEventListener('click', openTerms);
+  termsClose?.addEventListener('click', closeTerms);
+  termsReturn?.addEventListener('click', closeTerms);
+  termsDialog?.addEventListener('click', (event) => {
+    if (event.target === termsDialog) closeTerms();
+  });
+
   form.addEventListener('submit', (event) => {
     if (!current.enabled || !terms.checked || submitting) {
       event.preventDefault();
       return;
     }
-    // A native form POST follows Stripe's redirect without a cross-origin fetch.
+    termsValue.disabled = false;
     reportAnalytics(window, document, 'checkout', current);
     submitting = true;
     button.disabled = true;
@@ -135,6 +160,7 @@ export function mountCheckout(document, window, request = window.fetch.bind(wind
       : 'Opening your secure Stripe checkout…';
   });
   terms.addEventListener('change', () => {
+    termsValue.disabled = !current.enabled || !terms.checked;
     if (!submitting && !loading) button.disabled = !current.enabled || !terms.checked;
   });
   retry.addEventListener('click', loadAvailability);

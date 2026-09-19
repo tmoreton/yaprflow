@@ -25,7 +25,11 @@ export function createHandlers({
     if (!request && env.NODE_ENV === 'test') return true;
     if (!request || request.method !== 'POST') return false;
     const origin = request.headers.get('Origin');
-    if (origin !== settings.baseUrl?.origin) return false;
+    const fetchSite = request.headers.get('Sec-Fetch-Site');
+    const requestOrigin = new URL(request.url).origin;
+    const trustedOrigin = origin === settings.baseUrl?.origin ||
+      ((!origin || origin === 'null') && fetchSite === 'same-origin' && requestOrigin === settings.baseUrl?.origin);
+    if (!trustedOrigin) return false;
     const contentType = request.headers.get('Content-Type') || '';
     if (!contentType.toLowerCase().startsWith('application/x-www-form-urlencoded')) return false;
     try {

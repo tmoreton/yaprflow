@@ -193,7 +193,19 @@ test('production checkout requires same-origin acceptance of the published terms
     headers: { Origin: 'https://checkout.example.com', 'Content-Type': 'application/x-www-form-urlencoded' },
     body: 'terms=accepted',
   }))).status, 303);
-  assert.equal(api.calls.creates.length, 1);
+  for (const origin of [undefined, 'null']) {
+    const headers = { 'Sec-Fetch-Site': 'same-origin', 'Content-Type': 'application/x-www-form-urlencoded' };
+    if (origin) headers.Origin = origin;
+    assert.equal((await api.checkout(new Request('https://checkout.example.com/api/checkout', {
+      method: 'POST', headers, body: 'terms=accepted',
+    }))).status, 303);
+  }
+  assert.equal((await api.checkout(new Request('https://checkout.example.com/api/checkout', {
+    method: 'POST',
+    headers: { 'Sec-Fetch-Site': 'cross-site', 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'terms=accepted',
+  }))).status, 400);
+  assert.equal(api.calls.creates.length, 3);
 });
 
 test('checkout rejects unsafe redirect targets', async () => {

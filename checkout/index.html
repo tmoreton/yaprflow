@@ -968,7 +968,18 @@
     .offer-fine { margin: 14px 0 0; font-size: 12px; text-align: center; color: var(--ink-soft); }
     .purchase-consent { display:flex; align-items:flex-start; gap:10px; margin:0 0 14px; font-size:13px; line-height:1.4; }
     .purchase-consent input { width:18px; height:18px; margin:1px 0 0; flex:0 0 auto; accent-color:var(--orange); }
-    .purchase-consent a { font-weight:700; }
+    .purchase-terms-trigger { padding:0; border:0; background:transparent; color:inherit; font:inherit; font-weight:800; text-decoration:underline; text-underline-offset:3px; cursor:pointer; }
+    .purchase-terms-dialog { width:min(680px, calc(100% - 32px)); max-height:min(760px, calc(100dvh - 32px)); padding:0; overflow:auto; border:3px solid var(--ink); border-radius:0; background:var(--white); color:var(--ink); box-shadow:10px 10px 0 var(--ink); }
+    .purchase-terms-dialog::backdrop { background:rgba(17,17,15,.72); backdrop-filter:blur(4px); }
+    .purchase-terms-dialog header { display:flex; align-items:flex-start; justify-content:space-between; gap:20px; padding:24px 26px; border-bottom:2px solid var(--ink); background:var(--green); }
+    .purchase-terms-dialog h2 { margin:0; font-family:var(--display); font-size:clamp(27px, 5vw, 42px); line-height:.95; letter-spacing:-.05em; text-transform:uppercase; }
+    .purchase-terms-close { width:42px; height:42px; flex:0 0 auto; border:2px solid var(--ink); background:var(--white); color:var(--ink); box-shadow:3px 3px 0 var(--ink); font-size:24px; font-weight:900; line-height:1; cursor:pointer; }
+    .purchase-terms-body { padding:26px; }
+    .purchase-terms-summary { margin:0 0 22px; padding:14px 16px; border:2px solid var(--ink); background:var(--paper); font-weight:800; }
+    .purchase-terms-body h3 { margin:22px 0 7px; font-size:15px; letter-spacing:.07em; text-transform:uppercase; }
+    .purchase-terms-body p { margin:0; color:var(--ink-soft); }
+    .purchase-terms-body p + p { margin-top:10px; }
+    .purchase-terms-return { width:100%; margin-top:26px; }
 
     .faq-layout { display: grid; grid-template-columns: minmax(240px, .6fr) minmax(0, 1.4fr); gap: 80px; align-items: start; }
     .faq-layout .section-heading { position: sticky; top: 110px; margin-top: 10px; font-size: clamp(46px, 4vw, 58px); }
@@ -1468,7 +1479,8 @@
             <li>No word caps or Yaprflow usage charges</li>
           </ul>
           <form id="checkout-form" action="/api/checkout" method="post">
-            <label class="purchase-consent"><input id="purchase-terms" name="terms" value="accepted" type="checkbox" required disabled><span>I agree to the <a href="/policies/#license">purchase and license terms</a>, including the 14-day refund policy.</span></label>
+            <div class="purchase-consent"><input id="purchase-terms" type="checkbox" required disabled><label for="purchase-terms">I agree to the <button id="purchase-terms-open" class="purchase-terms-trigger" type="button" aria-haspopup="dialog">purchase and license terms</button>, including the 14-day refund policy.</label></div>
+            <input id="purchase-terms-value" name="terms" value="accepted" type="hidden" disabled>
             <button id="checkout-button" class="button checkout-button" type="submit" disabled>Checking availability…</button>
           </form>
           <p id="checkout-status" class="offer-status" role="status" aria-live="polite">Checking secure checkout availability…</p>
@@ -1479,6 +1491,26 @@
         </aside>
       </div>
     </section>
+
+    <dialog id="purchase-terms-dialog" class="purchase-terms-dialog" aria-labelledby="purchase-terms-title">
+      <header>
+        <div><p class="section-kicker">Direct website purchase</p><h2 id="purchase-terms-title">Purchase &amp; license terms</h2></div>
+        <button id="purchase-terms-close" class="purchase-terms-close" type="button" aria-label="Close purchase terms">×</button>
+      </header>
+      <div class="purchase-terms-body">
+        <p class="purchase-terms-summary">Yaprflow for Mac · one payment of US <span data-price>$7.99</span> plus applicable tax · no subscription.</p>
+        <h3>Your license</h3>
+        <p>Your completed purchase gives you a personal, non-exclusive, non-transferable license to install and use the official Yaprflow Mac app on Macs you own or control. You may use it for personal work and your own internal business or professional work.</p>
+        <h3>What is not included</h3>
+        <p>You may not resell, sublicense, rent, share paid download access, distribute copies, offer Yaprflow as a hosted service, or remove copyright or attribution notices. Buying the app does not grant commercial rights to redistribute or sell its source code.</p>
+        <h3>Refunds</h3>
+        <p>You may request a refund for a direct website purchase within 14 calendar days by emailing <a href="mailto:tim@yaprflow.com?subject=Yaprflow%20Refund%20Request">tim@yaprflow.com</a> from the checkout email address. Approved refunds return to the original payment method. After a full refund, the license ends and you must stop using and delete the app. Rights that cannot be waived by applicable law still apply.</p>
+        <h3>Updates, services, and responsibility</h3>
+        <p>The website edition can receive compatible maintenance updates through its built-in updater. The purchase does not promise a particular feature, update schedule, support period, or separate future product. Optional cloud AI providers have their own terms and charges. Review transcripts and AI output before relying on them.</p>
+        <p>To the maximum extent permitted by law, Yaprflow is provided “as is,” and total liability arising from a direct purchase is limited to the amount paid. These limits do not apply where applicable law does not allow them.</p>
+        <button id="purchase-terms-return" class="button purchase-terms-return" type="button">Return to checkout</button>
+      </div>
+    </dialog>
 
     <section class="section" id="faq">
       <div class="shell faq-layout">
