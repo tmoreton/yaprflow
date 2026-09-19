@@ -17,7 +17,7 @@ OpenRouter key, or Ollama running on your Mac.
 The Mac app is prepared for signed, notarized downloads from yaprflow.com.
 There is no in-app sign-in, advertising, cross-app tracking, or cloud
 transcription service. The source remains available for inspection and
-licensed source builds.
+licensed noncommercial builds.
 
 ## Highlights
 
@@ -46,7 +46,8 @@ licensed source builds.
   choose a different locale or Automatic in Settings, with no cloud round
   trips.
 - **Inspectable source**: current Yaprflow-owned code is source-available under
-  PolyForm Shield 1.0.0; the historical Apache-2.0 boundary is preserved.
+  PolyForm Noncommercial 1.0.0. Commercial use requires a separate license;
+  the historical Apache-2.0 and PolyForm Shield boundaries are preserved.
 
 Yaprflow captures microphone speech and transcript text. It does not capture
 system audio or retain raw meeting recordings.
@@ -58,7 +59,8 @@ The Mac app is distributed as a paid, signed, notarized DMG through the
 current private installer after purchase; see [`checkout/`](checkout/README.md)
 for the verified deployment status. No App Store account is required to run it.
 
-Developers may also clone and build the source under its applicable license.
+Developers may also clone and build the source for uses permitted by its
+applicable license. Commercial source use requires a separate written license.
 
 The Mac app requires macOS 14 Sonoma or later. The repository also contains an
 iPhone/iPad source target requiring iOS 17 or later; it is separate from the
@@ -189,6 +191,9 @@ scripts/publish-models.sh       maintains the public source-build model mirror
 scripts/app-store-release.sh    creates and verifies Mac App Store packages
 scripts/ios-app-store-release.sh historical iOS App Store packaging tool
 scripts/release.sh              creates signed DMGs and direct-download releases
+LICENSE                         current source license and historical boundaries
+COMMERCIAL-LICENSING.md         separate commercial source-license inquiries
+CONTRIBUTING.md                 issue and contribution policy
 LICENSES/                       preserved historical and third-party license text
 THIRD_PARTY_NOTICES.md          dependency and model provenance
 ```
@@ -337,12 +342,24 @@ switches the installed copy to the newly installed channel.
 
 ## License and branding
 
-Yaprflow-owned software in releases through version 4.0.14 and repository
+Yaprflow-owned source code in releases through version 4.0.14 and repository
 revisions through commit
 `0af74ab27f24933d16c004336cf63eac95c0a6b0` remains available under Apache
-License 2.0. Later revisions, beginning with the 5.0.0 release line, are offered
-under PolyForm Shield License 1.0.0; the transition was adopted September 11,
-2026. See [LICENSE](LICENSE) for the complete terms.
+License 2.0. Revisions after that boundary through commit
+`0153bbd696421d07cca72822c8840a028e064ebb` remain available under PolyForm
+Shield 1.0.0. Later revisions are offered under PolyForm Noncommercial 1.0.0,
+adopted September 19, 2026. Previously granted rights remain available under
+the license attached to those historical revisions.
+
+The current license permits noncommercial use, modification, and distribution
+under its terms. Commercial use, including commercial resale, requires a
+separate written license. Copyright ownership remains with Tim Moreton. See
+[LICENSE](LICENSE) for the complete terms and
+[COMMERCIAL-LICENSING.md](COMMERCIAL-LICENSING.md) for commercial inquiries.
+Because it restricts commercial use, this is a source-available license rather
+than an OSI-approved open-source license.
+Yaprflow currently accepts outside code only under a prior written contributor
+agreement; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Third-party libraries and models retain their own licenses. Nemotron 3.5 ASR
 model materials are available under OpenMDW-1.1, sherpa-onnx is Apache-2.0,

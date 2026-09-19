@@ -146,11 +146,15 @@ customer-facing App Store links after the listing is available.
 
 Yaprflow-owned code in releases through 4.0.14 and repository revisions through
 commit `0af74ab27f24933d16c004336cf63eac95c0a6b0` remains under Apache License
-2.0. The 5.0.0 release line is source available under PolyForm Shield License
-1.0.0 beginning September 11, 2026. See [`../LICENSE`](../LICENSE) for the
-complete transition notice and current terms. Product names, icons, logos,
-domains, and associated branding are addressed separately in
-[`../TRADEMARKS.md`](../TRADEMARKS.md).
+2.0. Revisions after that boundary through commit
+`0153bbd696421d07cca72822c8840a028e064ebb` remain available under PolyForm
+Shield 1.0.0. Later revisions are source available under PolyForm
+Noncommercial 1.0.0 beginning September 19, 2026. Commercial source use
+requires a separate written license. See [`../LICENSE`](../LICENSE) for the
+complete transition notice and current terms, and
+[`../COMMERCIAL-LICENSING.md`](../COMMERCIAL-LICENSING.md) for commercial
+inquiries. Product names, icons, logos, domains, and associated branding are
+addressed separately in [`../TRADEMARKS.md`](../TRADEMARKS.md).
 
 The repository owner confirmed on September 11, 2026 that the git author
 identities Tim Moreton, Homelab, and Tim Moreton Jr are under the same ownership

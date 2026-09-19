@@ -1,13 +1,19 @@
 Yaprflow
 Copyright 2026 Tim Moreton
-Licensed under the PolyForm Shield License 1.0.0.
-https://polyformproject.org/licenses/shield/1.0.0
+Current Yaprflow-owned repository source is available under the PolyForm
+Noncommercial License 1.0.0.
+https://polyformproject.org/licenses/noncommercial/1.0.0
 Required Notice: Copyright 2026 Tim Moreton (https://yaprflow.com/)
 https://github.com/tmoreton/yaprflow
 
 Yaprflow-owned software in releases through 4.0.14 and repository revisions
 through 0af74ab27f24933d16c004336cf63eac95c0a6b0 remains available under the
 Apache License 2.0 that accompanied those versions.
+Repository revisions after that boundary through
+0153bbd696421d07cca72822c8840a028e064ebb remain available under PolyForm
+Shield 1.0.0. Official Yaprflow app binaries are distributed under their
+applicable end-user purchase or store terms. Commercial repository source
+licenses are available separately from tim@yaprflow.com.
 
 Sparkle 2.10.0
 Copyright (c) 2006-2013 Andy Matuschak and the Sparkle contributors.
