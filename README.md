@@ -238,7 +238,7 @@ swift test
 The shared schemes are:
 
 - `yaprflow`: direct-download macOS build with Sparkle, bundle ID
-  `com.tmoreton.yaprflow`, version 5.1.4 (10).
+  `com.tmoreton.yaprflow`, version 5.1.4 (11).
 - `yaprflow-AppStore`: Mac App Store build without Sparkle, using the same app
   identity and version so both editions are produced from the same source.
 - `yaprflow-iOS`: iPhone/iPad, bundle ID `com.tmoreton.yaprflow.ios`, version
@@ -340,12 +340,12 @@ number used for the direct edition:
 
 ```bash
 APP_STORE_VERSION=5.1.4 \
-  APP_STORE_BUILD_NUMBER=10 \
+  APP_STORE_BUILD_NUMBER=11 \
   scripts/app-store-release.sh
 ```
 
 The script archives the `yaprflow-AppStore` scheme, exports an App Store signed
-installer to `build/app-store/5.1.4-10/`, and verifies its identity, receipt
+installer to `build/app-store/5.1.4-11/`, and verifies its identity, receipt
 profile, entitlements, models, notices, privacy manifest, and universal binary.
 It also rejects any Sparkle setting, framework, file, or binary linkage. The
 script does not upload the package; upload the verified package with Transporter

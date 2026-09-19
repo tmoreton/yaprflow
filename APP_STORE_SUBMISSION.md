@@ -15,7 +15,7 @@ Last reviewed: September 19, 2026
 
 | Platform | Bundle ID | Version | Build | App Store record |
 | --- | --- | --- | --- | --- |
-| macOS | `com.tmoreton.yaprflow` | 5.1.4 | 10 | Apple ID `6810892725` |
+| macOS | `com.tmoreton.yaprflow` | 5.1.4 | 11 | Apple ID `6810892725` |
 | iPhone/iPad | `com.tmoreton.yaprflow.ios` | 1.0.0 | 2 | Not yet documented |
 
 Keep both bundle identifiers stable. In particular, changing the macOS bundle
@@ -23,8 +23,8 @@ ID would break continuity with the existing sandbox container and App Store
 record.
 
 The historical uploaded macOS 5.0.0 build 4 predates the current product.
-Version 5.1.4 build 10 is the next intended App Store upload and matches the
-direct edition's features except for its update channel.
+Version 5.1.4 build 11 is the next intended App Store upload. It is a clean
+rebuild using the flat red website icon and otherwise matches build 10.
 
 The verified package at
 `build/app-store/5.1.4-10/export/yaprflow.pkg` with SHA-256
