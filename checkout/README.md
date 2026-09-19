@@ -6,7 +6,7 @@ The redesigned website and enabled live Stripe checkout are published at `https:
 
 ## Current setup — September 19, 2026
 
-Production deployment `dpl_8TV5MrexMYcR138bPv8edKTrRepN` is READY at `https://yaprflow-checkout-2lna3qnar-tmoretons-projects.vercel.app` and aliased to `yaprflow.com`. It publishes the channel-specific purchase and update disclosure: direct purchases receive the private Stripe download and Sparkle updates, while Mac App Store purchases and updates are handled by Apple. Checkout-specific purchase and license terms open in an on-page modal and include the 14-day refund policy. The signed empty Sparkle feed is available for the direct edition, and the OpenAI Realtime microphone demo remains enabled.
+Production deployment `dpl_Co8YMpdaBRCKt9YrkuGbFTmk5waL` is READY at `https://yaprflow-checkout-hy1z98fi4-tmoretons-projects.vercel.app` and aliased to `yaprflow.com`. It publishes the channel-specific purchase and update disclosure: direct purchases receive the private Stripe download and Sparkle updates, while Mac App Store purchases and updates are handled by Apple. Checkout-specific purchase and license terms open in an on-page modal and include the 14-day refund policy. The signed empty Sparkle feed is available for the direct edition, and the OpenAI Realtime microphone demo remains enabled.
 
 Live Production settings are `CHECKOUT_ENABLED=true`, `CHECKOUT_BASE_URL=https://yaprflow.com`, and `BLOB_PATHNAME=releases/yaprflow-5.1.4.dmg`. Public `/api/config` verifies `enabled: true`, `mode: "live"`, price `{amount: 799, currency: "usd", formatted: "$7.99"}`, `downloadReady: true`, and `voiceDemoAvailable: true`. The live product is `prod_VHf8LJ6S6B1Rk6`, and the live Price ID is `price_1UH5oDAlzJZxFihrxO8VSy8p`.
 

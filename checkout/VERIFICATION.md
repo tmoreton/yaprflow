@@ -5,7 +5,7 @@ Last updated: September 19, 2026
 ## Active release
 
 - Public site: `https://yaprflow.com/`
-- Vercel deployment: `dpl_8TV5MrexMYcR138bPv8edKTrRepN`
+- Vercel deployment: `dpl_Co8YMpdaBRCKt9YrkuGbFTmk5waL`
 - Direct app: Yaprflow 5.1.4, build 10, universal Intel and Apple silicon
 - Private installer: `releases/yaprflow-5.1.4.dmg`
 - Installer size: 491,696,385 bytes
@@ -40,6 +40,7 @@ Last updated: September 19, 2026
 - Checkout-specific terms open in an accessible modal without leaving the offer. The accepted value is submitted through a dedicated successful form control, including after browser page restoration.
 - The server rejects missing and cross-origin acceptance, accepts a browser-verified same-site fallback when Safari omits `Origin`, and records the terms version in Stripe Checkout metadata.
 - The exact production flow passed: open the terms modal, return to checkout, select the checkbox, and buy. It navigated to live Stripe Checkout instead of the terms error page; no payment was submitted.
+- The live microphone status keeps a measured 20-pixel gap below the record button, including its ready state, with no browser errors or error overlay.
 - `/api/download` returned HTTP 403 without a verified purchase.
 - `https://yaprflow.com/appcast.xml` serves the signed empty production feed.
 - The active production environment uses `BLOB_PATHNAME=releases/yaprflow-5.1.4.dmg`.
