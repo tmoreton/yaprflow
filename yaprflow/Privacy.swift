@@ -5,6 +5,7 @@ struct SettingsView: View {
     @ObservedObject private var appState = AppState.shared
     @ObservedObject private var aiSettings = AIProviderSettings.shared
     @ObservedObject private var telemetry = Telemetry.shared
+    @State private var isShowingFeedback = false
 
     var body: some View {
         ScrollView {
@@ -121,6 +122,30 @@ struct SettingsView: View {
                 }
 
                 FeatureCard {
+                    HStack(spacing: 12) {
+                        Image(systemName: "bubble.left.and.text.bubble.right")
+                            .foregroundStyle(.secondary)
+                            .frame(width: 26)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Send feedback")
+                                .font(.callout.weight(.medium))
+                            Text("Report a problem, ask a question, or suggest an improvement.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Spacer(minLength: 12)
+
+                        Button("Send Feedback…") {
+                            Telemetry.shared.track(.featureOpened(.feedback))
+                            isShowingFeedback = true
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
+
+                FeatureCard {
                     VStack(spacing: 0) {
                         PrivacyRow(
                             symbol: "waveform",
@@ -206,6 +231,10 @@ struct SettingsView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .windowBackgroundColor))
+        .sheet(isPresented: $isShowingFeedback) {
+            FeedbackView()
+                .frame(minWidth: 620, minHeight: 600)
+        }
     }
 
     private var appVersion: String {

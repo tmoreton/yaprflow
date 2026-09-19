@@ -1,0 +1,11 @@
+.analytics-choice[hidden] { display: none; }
+.analytics-choice { position: fixed; z-index: 100; inset: auto 20px 20px; max-width: 1040px; margin: auto; padding: 20px 24px; display: flex; gap: 24px; align-items: center; color: #11110f; background: #f3f0e7; border: 2px solid #11110f; box-shadow: 5px 5px 0 #11110f; font: 15px/1.5 "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif; }
+.analytics-choice strong { font-size: 17px; }
+.analytics-choice p { margin: 5px 0 0; }
+.analytics-choice a { color: inherit; text-decoration: underline; }
+.analytics-choice-actions { display: flex; gap: 10px; flex-shrink: 0; }
+.analytics-choice button { appearance: none; padding: 11px 14px; border: 2px solid #11110f; background: #f3f0e7; color: #11110f; font: inherit; font-weight: 700; cursor: pointer; }
+.analytics-choice button[data-analytics-choice="all"] { background: #c9ff4a; }
+.analytics-choice button:focus-visible, .analytics-settings:focus-visible { outline: 3px solid #ff4b2b; outline-offset: 3px; }
+.analytics-settings { appearance: none; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+@media (max-width: 860px) { .analytics-choice { inset: auto 12px 12px; padding: 16px; display: block; } .analytics-choice-actions { margin-top: 14px; flex-wrap: wrap; } .analytics-choice-actions button { flex: 1; padding: 11px 10px; } }

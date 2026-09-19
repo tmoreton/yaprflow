@@ -1,22 +1,34 @@
-:root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-* { box-sizing: border-box; }
-body { min-height: 100vh; margin: 0; color: #17333a; background: radial-gradient(circle at 5% 3%, #d6f2ed, transparent 36%), radial-gradient(circle at 95% 90%, #dae8f7, transparent 42%), #fafaf8; display: flex; flex-direction: column; }
-.site-header { width: min(100%, 1000px); margin: 0 auto; padding: 28px 24px; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
-.brand { color: #163c43; font-size: 21px; font-weight: 750; letter-spacing: -.04em; text-decoration: none; }
-.back-link, footer a { color: #425e64; font-size: 14px; text-decoration: none; }
-.back-link:hover, footer a:hover { text-decoration: underline; }
-.card { width: min(100% - 32px, 650px); margin: auto; padding: clamp(32px, 6vw, 64px); border: 1px solid #dbe8e5; border-radius: 28px; background: #fff; box-shadow: 0 22px 70px rgb(23 51 58 / 9%); }
-.eyebrow { color: #197e78; font-size: 12px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
-h1 { margin: 12px 0 20px; font-size: clamp(36px, 5vw, 53px); line-height: 1.08; letter-spacing: -.055em; }
-.lede { color: #465f65; font-size: 17px; line-height: 1.65; }
-.details { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; margin: 30px 0; list-style: none; }
-.details li { padding: 9px 13px; border-radius: 999px; color: #285960; background: #eaf6f3; font-size: 13px; font-weight: 600; }
-.button { display: inline-flex; align-items: center; justify-content: center; gap: 18px; width: 100%; min-height: 55px; padding: 14px 22px; border: 0; border-radius: 13px; background: #174d51; color: #fff; font: inherit; font-weight: 700; text-align: center; text-decoration: none; cursor: pointer; }
-.button:hover { background: #0f383b; }
-.button:disabled { background: #7e989a; cursor: not-allowed; }
-.button:focus-visible, a:focus-visible { outline: 3px solid #33aaa1; outline-offset: 3px; }
-.footnote { margin: 18px 0 0; color: #61757a; font-size: 13px; line-height: 1.6; }
-.footnote a { color: #197e78; }
+/* Shared purchase and download details complement the supplied landing design. */
 [hidden] { display: none !important; }
-footer { width: min(100%, 1000px); margin: 0 auto; padding: 25px 24px; display: flex; justify-content: center; gap: 24px; }
-@media (max-width: 560px) { .site-header { padding: 20px; } .card { border-radius: 20px; padding: 32px 24px; } }
+.checkout-notice { padding: 14px 24px; border-bottom: 2px solid #11110f; background: #c9ff4a; color: #11110f; text-align: center; font-size: 14px; font-weight: 700; }
+.checkout-notice[data-mode="test"]::before { content: "TEST CHECKOUT / "; font-weight: 900; }
+.checkout-button { width: 100%; margin: 14px 0 2px; }
+.button:disabled { cursor: not-allowed; background: #d9d4c8; color: #57554d; transform: none; box-shadow: 3px 3px 0 #11110f; }
+.checkout-retry { padding: 0; border: 0; background: transparent; color: inherit; text-decoration: underline; text-underline-offset: 4px; font-weight: 700; cursor: pointer; }
+.offer-detail .offer-status { font-size: 14px; line-height: 1.6; }
+.confirmation-page { --paper: #f3f0e7; --ink: #11110f; --orange: #ff4b2b; --green: #c9ff4a; margin: 0; min-height: 100vh; display: flex; flex-direction: column; color: var(--ink); background: repeating-linear-gradient(0deg, transparent, transparent 31px, rgb(17 17 15 / 4%) 31px, rgb(17 17 15 / 4%) 32px), var(--paper); font: 16px/1.6 "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+.confirmation-page * { box-sizing: border-box; }
+.confirmation-page a { color: inherit; text-underline-offset: 4px; }
+.confirmation-page .site-header { border-bottom: 2px solid var(--ink); }
+.confirmation-page .nav-shell { width: min(100% - 40px, 1240px); min-height: 76px; margin: auto; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.confirmation-page .brand { display: inline-flex; align-items: center; gap: 12px; font-family: "Archivo Black", "Arial Black", sans-serif; font-size: 18px; letter-spacing: -.04em; text-decoration: none; }
+.confirmation-page .brand-mark { width: 28px; height: 28px; display: grid; place-items: center; background: var(--orange); border: 2px solid var(--ink); box-shadow: 3px 3px 0 var(--ink); }
+.confirmation-page .brand-mark svg { width: 18px; height: 18px; }
+.confirmation-page .back-link { font-size: 14px; font-weight: 700; }
+.confirmation-page .card { width: min(100% - 48px, 760px); margin: 70px auto; padding: clamp(26px, 5vw, 58px); border: 3px solid var(--ink); box-shadow: 10px 10px 0 var(--ink); background: #fffdf7; }
+.confirmation-page .eyebrow { margin: 0 0 16px; font-size: 12px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+.confirmation-page h1 { font-family: "Archivo Black", "Arial Black", sans-serif; font-size: clamp(42px, 7vw, 70px); line-height: 1.03; letter-spacing: -.06em; text-transform: uppercase; margin: 0 0 24px; }
+.confirmation-page .lede { font-size: 20px; line-height: 1.5; }
+.confirmation-page .button { display: inline-flex; justify-content: center; align-items: center; gap: 14px; min-height: 54px; padding: 14px 20px; border: 2px solid var(--ink); border-radius: 4px; box-shadow: 5px 5px 0 var(--ink); background: var(--orange); color: var(--ink); font: inherit; font-weight: 800; text-decoration: none; cursor: pointer; }
+.confirmation-page .button:hover { transform: translate(2px, 2px); box-shadow: 3px 3px 0 var(--ink); }
+.confirmation-page .button--light { background: var(--paper); }
+.confirmation-page .footnote { color: #4b4b43; font-size: 14px; }
+.confirmation-page .install-steps { margin: 35px 0 20px; padding: 22px 22px 22px 44px; border: 2px solid var(--ink); background: var(--paper); }
+.confirmation-page .install-steps li + li { margin-top: 10px; }
+.confirmation-page .test-badge { display: inline-block; margin: 0 0 18px; padding: 6px 10px; border: 2px solid var(--ink); background: var(--green); font-size: 12px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+.confirmation-page :focus-visible { outline: 4px solid #8eaf19; outline-offset: 5px; }
+.confirmation-page footer { margin-top: auto; padding: 26px 24px; display: flex; flex-wrap: wrap; justify-content: center; gap: 24px; border-top: 2px solid var(--ink); font-size: 14px; }
+.confirmation-page .skip-link { position: absolute; left: 16px; top: -100px; padding: 12px; background: var(--green); }
+.confirmation-page .skip-link:focus { top: 8px; z-index: 10; }
+@media (max-width: 560px) { .confirmation-page .card { margin-block: 38px; } .confirmation-page .brand { font-size: 15px; } .confirmation-page .back-link { font-size: 12px; } .confirmation-page .button { width: 100%; } }
+@media (prefers-reduced-motion: reduce) { .confirmation-page .button:hover { transform: none; } }

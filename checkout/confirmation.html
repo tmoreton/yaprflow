@@ -4,30 +4,52 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow, noarchive">
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#f3f0e7">
   <title>Your Yaprflow download</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/brand/yaprflow-favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
-  <script src="/confirmation.js" defer></script>
+  <script type="module" src="/confirmation.js"></script>
+  <link rel="stylesheet" href="/analytics.css">
+  <script type="module" src="/analytics.js"></script>
 </head>
-<body>
+<body class="confirmation-page">
+  <a class="skip-link" href="#content">Skip to download</a>
   <header class="site-header">
-    <a class="brand" href="https://yaprflow.com/">Yaprflow</a>
-    <a class="back-link" href="https://yaprflow.com/">Back to the app</a>
+    <nav class="nav-shell" aria-label="Download navigation">
+      <a class="brand" href="/" aria-label="Yaprflow home"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M4 12h3m2-5v10m3-14v18m3-14v10m3-7v4m2-2h1" stroke="currentColor" stroke-width="2.4"/></svg></span>YAPRFLOW</a>
+      <a class="back-link" href="/">Back to the app →</a>
+    </nav>
   </header>
 
   <main class="card" id="content">
-    <p class="eyebrow">Yaprflow for Mac</p>
-    <h1>Your download</h1>
+    <p id="test-badge" class="test-badge" hidden>Test purchase · No real charge</p>
+    <p class="eyebrow">Yaprflow for Mac / Your words, your way</p>
+    <h1>Your next<br>good thought.</h1>
     <p id="status" class="lede" role="status" aria-live="polite">Checking your payment with Stripe…</p>
     <div id="ready" hidden>
       <a id="download" class="button" rel="noreferrer" href="#">Download Yaprflow for Mac <span aria-hidden="true">↓</span></a>
-      <p class="footnote">The download link is refreshed when you select it. Move Yaprflow to Applications after opening the disk image.</p>
+      <ol class="install-steps" aria-label="Install Yaprflow">
+        <li>Open the downloaded disk image.</li>
+        <li>Drag Yaprflow to your Applications folder.</li>
+        <li>Open Yaprflow, allow microphone access, and press Command-T to start dictating.</li>
+      </ol>
+      <p class="footnote">Requires macOS 14 or later. Works with Intel and Apple silicon. Apple Intelligence features require macOS 26 and a supported Mac; other AI providers can be selected in Settings.</p>
+      <p class="footnote">You can return to this page in the same browser for 30 days. A secure purchase cookie remembers your download access; no Yaprflow account is required. If you clear cookies or change browsers, contact support with your purchase email.</p>
     </div>
-    <p id="help" class="footnote" hidden>If you completed checkout but this page is still waiting, please <a href="https://yaprflow.com/support.html">contact support</a> with the email used at checkout.</p>
+    <button id="retry" class="button button--light" type="button" hidden>Check payment again</button>
+    <p id="help" class="footnote" hidden>If you completed checkout but your download is not ready, <a href="mailto:tim@yaprflow.com?subject=Yaprflow%20download%20help">contact tim@yaprflow.com</a> with the email used at checkout. Please do not send card details.</p>
+    <noscript><p class="footnote">Turn on JavaScript to confirm your payment and access your private download. For help, email <a href="mailto:tim@yaprflow.com">tim@yaprflow.com</a>.</p></noscript>
   </main>
 
   <footer>
-    <a href="https://yaprflow.com/privacy.html">Privacy</a>
-    <a href="https://yaprflow.com/support.html">Support</a>
+    <a href="/policies/#privacy">Privacy</a>
+    <a href="/policies/#offer">Purchase terms</a>
+    <a href="/support.html">Support</a>
+    <button class="analytics-settings" type="button" data-analytics-settings>Cookie settings</button>
   </footer>
 </body>
 </html>

@@ -53,9 +53,10 @@ system audio or retain raw meeting recordings.
 
 ## Install
 
-The Mac app is being prepared as a paid, signed, notarized DMG sold through the
-[Yaprflow website](https://yaprflow.com/). The purchase and private download
-flow is not live yet. No App Store account is required to run it.
+The Mac app is distributed as a paid, signed, notarized DMG through the
+[Yaprflow website](https://yaprflow.com/). Live Stripe checkout delivers the
+current private installer after purchase; see [`checkout/`](checkout/README.md)
+for the verified deployment status. No App Store account is required to run it.
 
 Developers may also clone and build the source under its applicable license.
 
@@ -80,9 +81,9 @@ Yaprflow runs as a menu-bar app. Click the waveform icon to open the menu.
   Automatic when a recording may use different languages.
 - **AI Summary, History, and Settings** opens a single tabbed window for
   transforming transcripts, browsing local history, and changing settings.
-- **Send Feedback** opens an in-app form for a problem, suggestion, or question.
-  Review and send the prepared email in your mail app; no transcript or audio
-  is attached.
+- **Send Feedback** is available in Settings for reporting a problem, making a
+  suggestion, or asking a question. Review and send the prepared email in your
+  mail app; no transcript or audio is attached.
 - **Command-Q** quits the app.
 
 While dictating, Yaprflow shows a compact black overlay near the Mac notch or
@@ -179,7 +180,8 @@ are not advertised as production-ready.
 yaprflow/                       macOS menu-bar app
 yaprflow-iOS/                   iPhone and iPad app target
 yaprflow.xcodeproj/             Xcode project and shared schemes
-docs/                           yaprflow.com static website and bundle brief
+docs/                           current GitHub Pages website and bundle brief
+checkout/                       redesigned website, Stripe checkout, private downloads
 scripts/fetch-models.sh         fetches and verifies pinned build-time models
 scripts/copy-models.sh          verifies and stages the exact Xcode model payload
 scripts/build-sherpa-onnx-asr.sh builds pinned Apple native ASR-only frameworks
@@ -229,7 +231,7 @@ swift test
 
 The shared schemes are:
 
-- `yaprflow`: macOS, bundle ID `com.tmoreton.yaprflow`, version 5.1.0 (6).
+- `yaprflow`: macOS, bundle ID `com.tmoreton.yaprflow`, version 5.1.3 (9).
 - `yaprflow-iOS`: iPhone/iPad, bundle ID `com.tmoreton.yaprflow.ios`, version
   1.0.0 (2).
 
@@ -240,10 +242,13 @@ by `scripts/native-asr-checksums.sha256`.
 
 ## Distribution and releases
 
-The Mac distribution path is a Developer ID signed, notarized DMG. The private
-purchase and delivery service lives in [`checkout/`](checkout/README.md); it is
-not linked from the website until Stripe is configured and tested. The release script
-verifies the bundled app,
+The Mac distribution path is a Developer ID signed, notarized DMG. The redesigned
+website, Stripe checkout, and private download service live together in
+[`checkout/`](checkout/README.md). The test purchase and private file delivery
+have been verified in Vercel Preview. Production is live at the confirmed US
+$7.99 one-time price and points to the verified Yaprflow 5.1.3 installer. The
+original site remains preserved in `docs/`.
+The release script verifies the bundled app,
 entitlements, notices, privacy manifest, and model hashes before it publishes
 anything.
 
@@ -258,7 +263,7 @@ notarization credentials, put the Mac Aptabase app key in the ignored `.env`
 (see `.env.example`), then run:
 
 ```bash
-scripts/release.sh 5.1.0
+scripts/release.sh 5.1.3
 ```
 
 The resulting DMG stays private until the paid checkout is configured.

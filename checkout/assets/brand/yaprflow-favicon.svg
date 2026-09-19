@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <title>Yaprflow</title>
+  <path fill="#11110f" d="M4 4h28v28H4z"/>
+  <path fill="#ff4b2b" stroke="#11110f" stroke-width="2" d="M1 1h26v26H1z"/>
+  <svg x="5.5" y="5.5" width="17" height="17" viewBox="0 0 24 24">
+    <path d="M4 12h3m2-5v10m3-14v18m3-14v10m3-7v4m2-2h1" fill="none" stroke="#11110f" stroke-width="2.4" stroke-linecap="square"/>
+  </svg>
+</svg>

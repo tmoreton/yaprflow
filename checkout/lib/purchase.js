@@ -11,24 +11,40 @@ export function allowedPriceIds(environment = process.env) {
   );
 }
 
-export function isPaidMacPurchase(session, prices) {
-  if (!session || session.mode !== 'payment' || session.status !== 'complete' ||
-      session.payment_status !== 'paid' ||
+export function isMacPurchase(session, prices) {
+  if (!session || session.mode !== 'payment' ||
       session.metadata?.product !== PRODUCT_MARKER ||
       prices.size === 0) {
     return false;
   }
 
   const items = session.line_items?.data;
-  return Array.isArray(items) && items.length === 1 &&
+  return Array.isArray(items) && !session.line_items.has_more && items.length === 1 &&
     items[0].quantity === 1 && prices.has(items[0].price?.id);
 }
 
-export async function loadPaidMacPurchase(stripe, sessionId, prices) {
+export function isPaidMacPurchase(session, prices) {
+  return isMacPurchase(session, prices) && session.status === 'complete' &&
+    session.payment_status === 'paid';
+}
+
+export async function loadMacPurchase(stripe, sessionId, prices, mode) {
   if (typeof sessionId !== 'string' || !SESSION_ID.test(sessionId)) return null;
-  const session = await stripe.checkout.sessions.retrieve(sessionId, {
-    expand: ['line_items'],
-  });
+  if (prices.size === 0 || (mode && !sessionId.startsWith(`cs_${mode}_`))) return null;
+  try {
+    const session = await stripe.checkout.sessions.retrieve(sessionId, {
+      expand: ['line_items'],
+    });
+    if (mode && session.livemode !== (mode === 'live')) return null;
+    return isMacPurchase(session, prices) ? session : null;
+  } catch (error) {
+    if (error?.code === 'resource_missing') return null;
+    throw error;
+  }
+}
+
+export async function loadPaidMacPurchase(stripe, sessionId, prices, mode) {
+  const session = await loadMacPurchase(stripe, sessionId, prices, mode);
   return isPaidMacPurchase(session, prices) ? session : null;
 }
 

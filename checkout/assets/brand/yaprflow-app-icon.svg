@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>Yaprflow app icon candidate</title>
+  <desc>The Yaprflow waveform in black on an orange rounded square with a solid offset shadow and transparent outer margin.</desc>
+  <rect x="144" y="144" width="784" height="784" rx="176" fill="#11110f"/>
+  <rect x="96" y="96" width="784" height="784" rx="176" fill="#ff4b2b" stroke="#11110f" stroke-width="24"/>
+  <path transform="translate(188 200) scale(24)" d="M4 12h3m2-5v10m3-14v18m3-14v10m3-7v4m2-2h1" fill="none" stroke="#11110f" stroke-width="2.4" stroke-linecap="square"/>
+</svg>

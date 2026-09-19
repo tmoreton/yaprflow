@@ -256,18 +256,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         )
         menu.addItem(historyItem)
 
-        let feedbackItem = NSMenuItem(
-            title: "Send Feedback…",
-            action: #selector(showFeedback),
-            keyEquivalent: ""
-        )
-        feedbackItem.target = self
-        feedbackItem.image = NSImage(
-            systemSymbolName: "bubble.left",
-            accessibilityDescription: "Send Feedback"
-        )
-        menu.addItem(feedbackItem)
-
         menu.addItem(NSMenuItem.separator())
 
         let footerItem = NSMenuItem()
@@ -296,10 +284,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func showSettings() {
         AppPanelWindowController.show(.settings)
-    }
-
-    @objc private func showFeedback() {
-        AppPanelWindowController.show(.feedback)
     }
 
     private func registerHotkey() -> Bool {

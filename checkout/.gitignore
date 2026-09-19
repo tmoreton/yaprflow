@@ -1,5 +1,5 @@
 node_modules/
 .vercel/
-.env.local
-.vercel
 .env*
+!.env.example
+public/

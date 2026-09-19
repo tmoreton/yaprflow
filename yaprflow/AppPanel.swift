@@ -6,7 +6,6 @@ enum AppPanelTab: Hashable {
     case aiSummary
     case history
     case settings
-    case feedback
 }
 
 @MainActor
@@ -37,12 +36,6 @@ private struct AppPanelView: View {
                     Label("Settings", systemImage: "gearshape")
                 }
                 .tag(AppPanelTab.settings)
-
-            FeedbackView()
-                .tabItem {
-                    Label("Feedback", systemImage: "bubble.left")
-                }
-                .tag(AppPanelTab.feedback)
         }
         .frame(minWidth: 620, minHeight: 600)
         .onAppear {
@@ -62,7 +55,6 @@ private struct AppPanelView: View {
         case .aiSummary: .aiSummary
         case .history: .history
         case .settings: .settings
-        case .feedback: .feedback
         }
     }
 }
