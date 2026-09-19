@@ -20,6 +20,7 @@ Last updated: September 19, 2026
 - The private Blob upload was downloaded through a short-lived private URL and matched the local file's full size and SHA-256. Anonymous download access remains denied.
 - The App Store archive/export verifier passed. Its signed package uses the Mac App Store distribution profile and excludes Sparkle code, feed metadata, updater UI, and Sparkle installer entitlements.
 - The App Store provisioning profile expires September 16, 2027.
+- Apple validated and uploaded the package without errors. Delivery `e9c33f54-cbab-4313-9b0f-1458b6aa6a44` reached import status `VALID`, quality-control state `VALID_BINARY`, and audience `APP_STORE_ELIGIBLE` in App Store Connect.
 - All 33 shared Swift tests passed.
 
 ## Sparkle checks
@@ -47,7 +48,7 @@ Last updated: September 19, 2026
 - Complete one real live purchase in a normal browser, confirm the returned download opens, then refund the charge in Stripe. This validates receipts, tax, payment settlement, the paid cookie, and the complete delivery path with live funds.
 - Confirm the purchase and conversion events arrive in Google Analytics and Meta Events Manager. Deployed scripts and server-side guards have been tested, but dashboard receipt has not.
 - Confirm Stripe payout, tax-registration, receipt-email, statement-descriptor, support, and dispute settings in the live account before increasing ad spend.
-- Complete App Store Connect agreements, banking, tax, Digital Services Act status, metadata, screenshots, review contact, TestFlight checks, and review submission.
+- Select build 10 in the intended TestFlight group, then complete App Store Connect agreements, banking, tax, Digital Services Act status, metadata, screenshots, review contact, TestFlight checks, and review submission.
 - Have qualified counsel review the customer EULA, refund language, privacy disclosure, PolyForm source-license boundaries, and regional consumer-law requirements before broad international sales.
 
 No secret keys, checkout session links, or signed private download URLs are stored in this report.
