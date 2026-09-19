@@ -361,7 +361,7 @@ verify_bundled_app() {
     local app_path="$1"
     local resources_path="$app_path/Contents/Resources"
     local info_plist="$app_path/Contents/Info.plist"
-    local embedded_version embedded_build embedded_bundle_id distribution sparkle_feed sparkle_public_key installer_service_enabled
+    local embedded_version embedded_build embedded_bundle_id distribution sparkle_feed sparkle_public_key installer_service_enabled signed_feed_enabled verify_before_extraction
     local executable_name executable_path bundled_link
 
     if [[ ! -f "$MODEL_CHECKSUMS" || ! -f "$ACKNOWLEDGEMENTS_SOURCE" \
@@ -408,10 +408,14 @@ verify_bundled_app() {
     sparkle_feed="$(/usr/libexec/PlistBuddy -c 'Print :SUFeedURL' "$info_plist" 2>/dev/null || true)"
     sparkle_public_key="$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$info_plist" 2>/dev/null || true)"
     installer_service_enabled="$(/usr/libexec/PlistBuddy -c 'Print :SUEnableInstallerLauncherService' "$info_plist" 2>/dev/null || true)"
+    signed_feed_enabled="$(/usr/libexec/PlistBuddy -c 'Print :SURequireSignedFeed' "$info_plist" 2>/dev/null || true)"
+    verify_before_extraction="$(/usr/libexec/PlistBuddy -c 'Print :SUVerifyUpdateBeforeExtraction' "$info_plist" 2>/dev/null || true)"
     if [[ "$sparkle_feed" != "$EXPECTED_SPARKLE_FEED" \
        || "$sparkle_public_key" != "$EXPECTED_SPARKLE_PUBLIC_KEY" \
-       || "$installer_service_enabled" != "true" ]]; then
-        echo "error: bundled Sparkle feed, public key, or installer service setting is invalid" >&2
+       || "$installer_service_enabled" != "true" \
+       || "$signed_feed_enabled" != "true" \
+       || "$verify_before_extraction" != "true" ]]; then
+        echo "error: bundled Sparkle feed, key, signed-feed validation, or installer service setting is invalid" >&2
         return 1
     fi
     if [[ ! -d "$app_path/Contents/Frameworks/Sparkle.framework" \

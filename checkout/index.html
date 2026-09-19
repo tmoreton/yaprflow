@@ -24,7 +24,7 @@
   <link rel="apple-touch-icon" href="/assets/brand/yaprflow-app-icon-1024.png">
   <link rel="canonical" href="https://yaprflow.com/">
   <script type="application/ld+json">
-    {"@context":"https://schema.org","@type":"SoftwareApplication","name":"Yaprflow","url":"https://yaprflow.com/","applicationCategory":"ProductivityApplication","operatingSystem":"macOS 14 or later","softwareVersion":"5.1.3","description":"Local voice dictation, private transcript history, and optional AI summaries and rewrites with your choice of provider.","creator":{"@type":"Person","name":"Tim Moreton"}}
+    {"@context":"https://schema.org","@type":"SoftwareApplication","name":"Yaprflow","url":"https://yaprflow.com/","applicationCategory":"ProductivityApplication","operatingSystem":"macOS 14 or later","softwareVersion":"5.1.4","description":"Local voice dictation, private transcript history, and optional AI summaries and rewrites with your choice of provider.","creator":{"@type":"Person","name":"Tim Moreton"}}
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -966,6 +966,9 @@
       text-transform: uppercase;
     }
     .offer-fine { margin: 14px 0 0; font-size: 12px; text-align: center; color: var(--ink-soft); }
+    .purchase-consent { display:flex; align-items:flex-start; gap:10px; margin:0 0 14px; font-size:13px; line-height:1.4; }
+    .purchase-consent input { width:18px; height:18px; margin:1px 0 0; flex:0 0 auto; accent-color:var(--orange); }
+    .purchase-consent a { font-weight:700; }
 
     .faq-layout { display: grid; grid-template-columns: minmax(240px, .6fr) minmax(0, 1.4fr); gap: 80px; align-items: start; }
     .faq-layout .section-heading { position: sticky; top: 110px; margin-top: 10px; font-size: clamp(46px, 4vw, 58px); }
@@ -1465,12 +1468,13 @@
             <li>No word caps or Yaprflow usage charges</li>
           </ul>
           <form id="checkout-form" action="/api/checkout" method="post">
+            <label class="purchase-consent"><input id="purchase-terms" name="terms" value="accepted" type="checkbox" required disabled><span>I agree to the <a href="/policies/#license">purchase and license terms</a>, including the 14-day refund policy.</span></label>
             <button id="checkout-button" class="button checkout-button" type="submit" disabled>Checking availability…</button>
           </form>
           <p id="checkout-status" class="offer-status" role="status" aria-live="polite">Checking secure checkout availability…</p>
           <button id="checkout-retry" class="checkout-retry" type="button" hidden>Check again</button>
           <noscript><p class="offer-status">Turn on JavaScript to check availability and continue to secure checkout.</p></noscript>
-          <p class="offer-fine">US <span data-price>$7.99</span> one-time, plus applicable tax shown before payment. Pay securely with Stripe, then download the Mac app on your confirmation page. No Yaprflow account required.</p>
+          <p class="offer-fine">US <span data-price>$7.99</span> one-time, plus applicable tax shown before payment. Pay securely with Stripe, then download the Mac app on your confirmation page. Refund requests are accepted within 14 days. No Yaprflow account required.</p>
           <p class="offer-fine">For macOS 14 or later, on Intel or Apple silicon. Local dictation works after installation and microphone permission. Apple Intelligence needs macOS 26 and a supported Mac. Optional cloud AI providers may charge separately. <a href="/policies/#offer">Offer terms</a>.</p>
         </aside>
       </div>

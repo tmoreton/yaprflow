@@ -14,7 +14,7 @@ archive. Long-form dictation can be turned into summaries, structured notes,
 or other useful text with Apple's on-device model, your own OpenAI or
 OpenRouter key, or Ollama running on your Mac.
 
-The Mac app is prepared for signed, notarized downloads from yaprflow.com.
+The Mac app is distributed as signed, notarized downloads from yaprflow.com.
 There is no in-app sign-in, advertising, cross-app tracking, or cloud
 transcription service. The source remains available for inspection and
 licensed noncommercial builds.
@@ -61,6 +61,7 @@ for the verified deployment status. No App Store account is required to run it.
 
 Developers may also clone and build the source for uses permitted by its
 applicable license. Commercial source use requires a separate written license.
+Official compiled purchases use the separate [customer license](EULA.md).
 
 The Mac app requires macOS 14 Sonoma or later. The repository also contains an
 iPhone/iPad source target requiring iOS 17 or later; it is separate from the
@@ -237,7 +238,7 @@ swift test
 The shared schemes are:
 
 - `yaprflow`: direct-download macOS build with Sparkle, bundle ID
-  `com.tmoreton.yaprflow`, version 5.1.3 (9).
+  `com.tmoreton.yaprflow`, version 5.1.4 (10).
 - `yaprflow-AppStore`: Mac App Store build without Sparkle, using the same app
   identity and version so both editions are produced from the same source.
 - `yaprflow-iOS`: iPhone/iPad, bundle ID `com.tmoreton.yaprflow.ios`, version
@@ -277,7 +278,7 @@ notarization credentials, put the Mac Aptabase app key in the ignored `.env`
 (see `.env.example`), then run:
 
 ```bash
-scripts/release.sh 5.1.3
+scripts/release.sh 5.1.4
 ```
 
 The resulting DMG stays private until the paid checkout is configured.
@@ -292,24 +293,39 @@ the appcast's `sparkle:version` with the app's increasing `CFBundleVersion`;
 every release must therefore increment `CURRENT_PROJECT_VERSION` as well as the
 marketing version.
 
-The stable feed is `https://yaprflow.com/appcast.xml`. It is intentionally empty
-until an updater-enabled release archive is uploaded. To stage a signed feed
-entry while producing a notarized release, run:
+The stable feed is `https://yaprflow.com/appcast.xml`. The 5.1.4 bridge release
+uses a signed empty feed because there is no newer update yet. To stage a signed
+feed entry while producing a later notarized release, run:
 
 ```bash
-DIRECT_BUILD_NUMBER=10 \
-  SPARKLE_DOWNLOAD_URL_PREFIX=https://your-update-host/releases/ \
-  scripts/release.sh 5.1.4 --prepare-update
+DIRECT_BUILD_NUMBER=11 \
+  SPARKLE_DOWNLOAD_URL_PREFIX=https://github.com/tmoreton/yaprflow/releases/download/v5.1.5/ \
+  scripts/release.sh 5.1.5 --prepare-update
 ```
 
 This writes the signed archive and appcast to `build/sparkle-update/`. Upload the
 archive first, verify its HTTPS URL, then replace `checkout/appcast.xml` with the
 generated feed and deploy the website. The private Sparkle EdDSA key is stored
-in the macOS login Keychain under account `com.tmoreton.yaprflow`; only its
-public key is committed. Never export or commit the private key.
+in the macOS login Keychain under account `com.tmoreton.yaprflow`. The matching
+key is also stored as the environment-scoped GitHub Actions secret
+`SPARKLE_PRIVATE_KEY` in `sparkle-release`; only its public key is committed.
+The workflow passes the secret to Sparkle through standard input and never
+writes it into the repository or logs. Run
+`scripts/configure-sparkle-github-secret.sh` to replace the secret from the
+existing Keychain key.
 
-The first updater-enabled Yaprflow release requires a manual website download
-because 5.1.3 does not contain Sparkle. Later releases can update automatically.
+For a later release, upload the signed and notarized DMG to an existing public
+GitHub release, then run **Publish Sparkle update** in GitHub Actions with the
+release tag and exact DMG asset name. The workflow downloads that fixed asset,
+generates and verifies the archive and feed signatures, runs the website tests,
+and commits the new appcast to `main`. Vercel then deploys the feed from the
+Git-connected repository. The `sparkle-release` environment limits secret
+access to this manual workflow.
+
+The first updater-enabled Yaprflow release is 5.1.4 and requires a manual
+website download because 5.1.3 does not contain Sparkle. Later releases can
+update automatically. Sparkle validates the update archive before extraction
+and requires the appcast itself to carry a valid EdDSA signature.
 Yaprflow currently has no in-app license entitlement, so an update archive URL
 that Sparkle can download without authentication is also downloadable outside
 the app. Keep the feed empty until update hosting is deliberately made public

@@ -30,7 +30,7 @@ test('an analytics loading failure cannot interrupt checkout or a verified downl
 function node(dataset = {}) {
   const listeners = new Map();
   return {
-    dataset, hidden: true, disabled: false, textContent: '', href: '',
+    dataset, hidden: true, disabled: false, checked: false, textContent: '', href: '',
     addEventListener(type, callback) { listeners.set(type, callback); },
     dispatch(type, extra = {}) {
       const event = { ...extra, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
@@ -42,10 +42,11 @@ function node(dataset = {}) {
 
 function page(search = '') {
   const ids = new Map([
-    'checkout-form', 'checkout-button', 'checkout-status', 'checkout-notice', 'checkout-retry',
+    'checkout-form', 'checkout-button', 'checkout-status', 'checkout-notice', 'checkout-retry', 'purchase-terms',
     'price-comparison', 'status', 'ready', 'help', 'download', 'retry', 'test-badge',
     'live-transcriber', 'live-transcribe-button', 'live-transcribe-status', 'live-transcript',
   ].map((id) => [id, node()]));
+  ids.get('purchase-terms').checked = true;
   const prices = {
     '[data-price]': [node(), node()],
     '[data-price-currency]': [node()],
@@ -196,6 +197,20 @@ test('checkout blocks submission until configuration arrives and then permits on
   assert.equal(ui.ids.get('checkout-button').disabled, true);
   assert.equal(ui.ids.get('checkout-form').dispatch('submit').defaultPrevented, true);
   assert.equal(calls.length, 1, 'native submission must not call fetch across the Stripe redirect');
+});
+
+test('checkout requires explicit purchase-term acceptance', async () => {
+  const ui = page();
+  ui.ids.get('purchase-terms').checked = false;
+  const mounted = mountCheckout(ui.document, ui.window, async () => json(config));
+  await mounted.ready;
+  assert.equal(ui.ids.get('purchase-terms').disabled, false);
+  assert.equal(ui.ids.get('checkout-button').disabled, true);
+  assert.equal(ui.ids.get('checkout-form').dispatch('submit').defaultPrevented, true);
+  ui.ids.get('purchase-terms').checked = true;
+  ui.ids.get('purchase-terms').dispatch('change');
+  assert.equal(ui.ids.get('checkout-button').disabled, false);
+  assert.equal(ui.ids.get('checkout-form').dispatch('submit').defaultPrevented, false);
 });
 
 test('checkout errors stay closed and a retry can recover without reloading the page', async () => {

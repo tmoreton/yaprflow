@@ -7,6 +7,7 @@ import { checkoutSettings } from '../lib/settings.js';
 const sessionId = 'cs_test_1234567890abcdef';
 const privateUrl = 'https://example.private.blob.vercel-storage.com/releases/yaprflow.dmg?signature=private';
 const environment = {
+  NODE_ENV: 'test',
   STRIPE_SECRET_KEY: 'sk_test_notARealSecret',
   STRIPE_PRICE_ID: 'price_current123',
   CHECKOUT_ENABLED: 'true',
@@ -169,10 +170,30 @@ test('checkout redirects only to Stripe and uses the configured one-time price a
     customer_creation: 'always',
     success_url: 'https://checkout.example.com/api/complete?session_id={CHECKOUT_SESSION_ID}',
     cancel_url: 'https://checkout.example.com/?checkout=cancelled',
-    metadata: { product: 'yaprflow-mac' },
+    metadata: {
+      product: 'yaprflow-mac',
+      terms_version: '2026-09-19',
+      terms_acceptance: 'website-checkbox',
+    },
   });
   assert.equal('payment_method_types' in api.calls.creates[0], false, 'Stripe controls payment methods, including Managed Payments');
   assert.equal('managed_payments' in api.calls.creates[0], false, 'preserve the account default');
+});
+
+test('production checkout requires same-origin acceptance of the published terms', async () => {
+  const api = fixture({ env: { NODE_ENV: 'production' } });
+  assert.equal((await api.checkout()).status, 400);
+  assert.equal((await api.checkout(new Request('https://checkout.example.com/api/checkout', {
+    method: 'POST',
+    headers: { Origin: 'https://evil.example', 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'terms=accepted',
+  }))).status, 400);
+  assert.equal((await api.checkout(new Request('https://checkout.example.com/api/checkout', {
+    method: 'POST',
+    headers: { Origin: 'https://checkout.example.com', 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'terms=accepted',
+  }))).status, 303);
+  assert.equal(api.calls.creates.length, 1);
 });
 
 test('checkout rejects unsafe redirect targets', async () => {

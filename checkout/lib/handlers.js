@@ -21,6 +21,22 @@ export function createHandlers({
 } = {}) {
   const report = (message, error) => logger.error(message, error?.type || error?.name || 'unknown');
 
+  async function acceptedPurchaseTerms(request, settings, env) {
+    if (!request && env.NODE_ENV === 'test') return true;
+    if (!request || request.method !== 'POST') return false;
+    const origin = request.headers.get('Origin');
+    if (origin !== settings.baseUrl?.origin) return false;
+    const contentType = request.headers.get('Content-Type') || '';
+    if (!contentType.toLowerCase().startsWith('application/x-www-form-urlencoded')) return false;
+    try {
+      const form = await request.formData();
+      const values = form.getAll('terms');
+      return values.length === 1 && values[0] === 'accepted';
+    } catch {
+      return false;
+    }
+  }
+
   return {
     async config() {
       const env = environment();
@@ -41,10 +57,13 @@ export function createHandlers({
       }
     },
 
-    async checkout() {
+    async checkout(request) {
       const env = environment();
       const settings = checkoutSettings(env);
       if (!settings.enabled) return privateResponse('Checkout is not ready.', { status: 503 });
+      if (!await acceptedPurchaseTerms(request, settings, env)) {
+        return privateResponse('Accept the purchase terms before continuing.', { status: 400 });
+      }
       try {
         const stripe = stripeFactory(env);
         if (!await loadCheckoutPrice(stripe, settings)) {
@@ -56,7 +75,11 @@ export function createHandlers({
           customer_creation: 'always',
           success_url: new URL('/api/complete?session_id={CHECKOUT_SESSION_ID}', settings.baseUrl).href,
           cancel_url: new URL('/?checkout=cancelled', settings.baseUrl).href,
-          metadata: { product: checkoutProductMarker() },
+          metadata: {
+            product: checkoutProductMarker(),
+            terms_version: '2026-09-19',
+            terms_acceptance: 'website-checkbox',
+          },
         });
         const url = new URL(session.url);
         if (url.protocol !== 'https:' || url.hostname !== 'checkout.stripe.com' ||

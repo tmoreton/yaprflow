@@ -77,7 +77,7 @@ fi
 
 KEY_ARGUMENTS=(--account "$KEY_ACCOUNT")
 if [[ -n "$ED_KEY_FILE" ]]; then
-    if [[ ! -f "$ED_KEY_FILE" ]]; then
+    if [[ "$ED_KEY_FILE" != "-" && ! -f "$ED_KEY_FILE" ]]; then
         echo "error: SPARKLE_ED_KEY_FILE does not exist" >&2
         exit 1
     fi
@@ -94,6 +94,10 @@ fi
 
 if ! grep -q 'sparkle:edSignature=' "$OUTPUT_DIR/appcast.xml"; then
     echo "error: generated appcast does not contain an EdDSA signature" >&2
+    exit 1
+fi
+if ! grep -q '<!-- sparkle-signatures:' "$OUTPUT_DIR/appcast.xml"; then
+    echo "error: generated appcast does not contain a signed-feed signature" >&2
     exit 1
 fi
 if ! grep -q "${DOWNLOAD_URL_PREFIX}${ARCHIVE_NAME}" "$OUTPUT_DIR/appcast.xml"; then

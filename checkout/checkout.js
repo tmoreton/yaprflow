@@ -73,7 +73,8 @@ export function mountCheckout(document, window, request = window.fetch.bind(wind
   const status = document.getElementById('checkout-status');
   const notice = document.getElementById('checkout-notice');
   const retry = document.getElementById('checkout-retry');
-  if (!form || !button || !status || !notice || !retry) return;
+  const terms = document.getElementById('purchase-terms');
+  if (!form || !button || !status || !notice || !retry || !terms) return;
   const cancelled = new URLSearchParams(window.location.search).get('checkout') === 'cancelled';
   let current = checkoutPresentation(null);
   let submitting = false;
@@ -110,7 +111,8 @@ export function mountCheckout(document, window, request = window.fetch.bind(wind
     }
     updateVoiceDemoAvailability(document, voiceDemoAvailable);
     updateDisplayedPrices(document, current.price);
-    button.disabled = !current.enabled;
+    terms.disabled = !current.enabled;
+    button.disabled = !current.enabled || !terms.checked;
     button.textContent = current.button;
     status.textContent = current.status;
     retry.hidden = current.enabled;
@@ -119,7 +121,7 @@ export function mountCheckout(document, window, request = window.fetch.bind(wind
   }
 
   form.addEventListener('submit', (event) => {
-    if (!current.enabled || submitting) {
+    if (!current.enabled || !terms.checked || submitting) {
       event.preventDefault();
       return;
     }
@@ -131,6 +133,9 @@ export function mountCheckout(document, window, request = window.fetch.bind(wind
     status.textContent = current.mode === 'test'
       ? 'Opening Stripe test checkout. No real charge will be made.'
       : 'Opening your secure Stripe checkout…';
+  });
+  terms.addEventListener('change', () => {
+    if (!submitting && !loading) button.disabled = !current.enabled || !terms.checked;
   });
   retry.addEventListener('click', loadAvailability);
   window.addEventListener('pageshow', (event) => {

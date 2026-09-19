@@ -1,0 +1,104 @@
+name: Publish Sparkle update
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing GitHub release tag containing the notarized DMG (for example, v5.1.5)
+        required: true
+        type: string
+      asset_name:
+        description: Exact DMG asset name (for example, yaprflow-5.1.5.dmg)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sparkle-production-feed
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Sign and publish the stable feed
+    runs-on: macos-15
+    environment: sparkle-release
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      ASSET_NAME: ${{ inputs.asset_name }}
+      SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+    steps:
+      - name: Check out the stable branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Validate release inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$ASSET_NAME" =~ ^yaprflow-[0-9]+\.[0-9]+\.[0-9]+\.dmg$ ]]
+          [[ "$ASSET_NAME" == "yaprflow-${RELEASE_TAG#v}.dmg" ]]
+          [[ -n "$SPARKLE_PRIVATE_KEY" ]]
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
+
+      - name: Download the signed and notarized release
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/sparkle-release
+          gh release download "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "$ASSET_NAME" \
+            --dir build/sparkle-release
+          [[ -f "build/sparkle-release/$ASSET_NAME" ]]
+
+      - name: Resolve the pinned Sparkle tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -resolvePackageDependencies \
+            -project yaprflow.xcodeproj \
+            -scheme yaprflow \
+            -clonedSourcePackagesDirPath build/SourcePackages
+          test -x build/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_appcast
+          test -x build/SourcePackages/artifacts/sparkle/Sparkle/bin/sign_update
+
+      - name: Generate and verify the signed feed
+        shell: bash
+        run: |
+          set -euo pipefail
+          update_prefix="https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/"
+          printf '%s' "$SPARKLE_PRIVATE_KEY" | \
+            SPARKLE_ED_KEY_FILE=- \
+            SPARKLE_BIN_DIR=build/SourcePackages/artifacts/sparkle/Sparkle/bin \
+            SPARKLE_OUTPUT_DIR=build/sparkle-publish \
+            SPARKLE_DOWNLOAD_URL_PREFIX="$update_prefix" \
+            scripts/prepare-sparkle-update.sh "build/sparkle-release/$ASSET_NAME"
+          printf '%s' "$SPARKLE_PRIVATE_KEY" | \
+            build/SourcePackages/artifacts/sparkle/Sparkle/bin/sign_update \
+              --ed-key-file - --verify build/sparkle-publish/appcast.xml
+          cp build/sparkle-publish/appcast.xml checkout/appcast.xml
+
+      - name: Verify the website
+        working-directory: checkout
+        run: |
+          npm ci
+          npm test
+          npm run build
+
+      - name: Publish the feed source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add checkout/appcast.xml
+          git diff --cached --quiet && { echo "The feed did not change." >&2; exit 1; }
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Publish Sparkle update ${RELEASE_TAG}"
+          git push origin HEAD:main

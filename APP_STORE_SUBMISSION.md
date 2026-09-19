@@ -1,30 +1,30 @@
 # App Store submission
 
-> Historical planning record. The current Mac distribution plan is a signed,
-> notarized download from yaprflow.com, not a Mac App Store submission.
+> Current plan: distribute the direct edition through paid checkout at
+> yaprflow.com and the separate App Store edition through Apple. The App Store
+> build excludes Sparkle and receives updates only through Apple.
 
 This is the working App Store Connect copy and release checklist for Yaprflow's
 commercial generation. It also preserves the state of the historical free
 4.0.14 submission so that the transition is not mistaken for a retroactive
 change.
 
-Last reviewed: September 16, 2026
+Last reviewed: September 19, 2026
 
 ## Intended release records
 
 | Platform | Bundle ID | Version | Build | App Store record |
 | --- | --- | --- | --- | --- |
-| macOS | `com.tmoreton.yaprflow` | 5.0.1 | 5 | Apple ID `6810892725` |
+| macOS | `com.tmoreton.yaprflow` | 5.1.4 | 10 | Apple ID `6810892725` |
 | iPhone/iPad | `com.tmoreton.yaprflow.ios` | 1.0.0 | 2 | Not yet documented |
 
 Keep both bundle identifiers stable. In particular, changing the macOS bundle
 ID would break continuity with the existing sandbox container and App Store
 record.
 
-The uploaded macOS 5.0.0 build 4 predates the persisted speech-language
-selector and uses Automatic detection for every recording. Version 5.0.1 build
-5 is the next intended build and includes the selector and background-residency
-fixes.
+The historical uploaded macOS 5.0.0 build 4 predates the current product.
+Version 5.1.4 build 10 is the next intended App Store upload and matches the
+direct edition's features except for its update channel.
 
 ## macOS product page
 
@@ -36,21 +36,18 @@ fixes.
 - **Price:** US $29.00, paid once; no subscription or in-app purchase
 - **Marketing URL:** https://yaprflow.com/
 - **Support URL:** https://yaprflow.com/support.html
-- **Privacy policy URL:** https://yaprflow.com/privacy.html
+- **Privacy policy URL:** https://yaprflow.com/policies/#privacy
 - **Keywords:** dictation,voice,text,transcription,offline,private,speech,productivity
 
-### Draft What's New in Version 5.0.1
+### Draft What's New in Version 5.1.4
 
-Yaprflow 5 adds on-device streaming dictation across 32 production-ready locales
-with a saved speech-language selector. English (United States) is the default,
-and Automatic detection remains available. It remembers the selected dictation
-mode, improves recognition of very short recordings, makes empty recordings
-and clipboard failures clearer, promptly releases raw microphone buffers after
-transcription, and expands privacy and third-party licensing information. Mac
-users can now choose Apple Intelligence, their own OpenAI or OpenRouter key, or
-Ollama for AI Summary; external-provider archive titles require opt-in.
+Yaprflow 5.1.4 adds on-device streaming dictation across 32 production-ready
+locales, in-app feedback, optional AI Summary using Apple Intelligence, OpenAI,
+OpenRouter, or Ollama, refreshed artwork, and privacy-preserving usage and
+failure telemetry with a Settings off switch. It also improves recognition of
+short recordings, transcript history, vocabulary, and provider error handling.
 
-Use this text when 5.0.1 is submitted as an update to a version that reached
+Use this text when 5.1.4 is submitted as an update to a version that reached
 Ready for Distribution. App Store Connect may not show or require the field if
 the pending 4.0.14 version is withdrawn before its first release.
 
@@ -63,7 +60,10 @@ into any app.
 Speech recognition runs locally through sherpa-onnx and ONNX Runtime, with
 Core ML used for voice activity detection. The complete speech model is
 included with Yaprflow, so audio and transcripts do not need to leave the Mac.
-There is no Yaprflow account, subscription, advertising, analytics, or tracking.
+There is no Yaprflow account, subscription, advertising, or cross-app tracking.
+Limited usage and fixed-category error telemetry is enabled by default and can
+be turned off in Settings. It never includes audio, transcripts, prompts,
+vocabulary, feedback messages, or a persistent device identifier.
 
 Features:
 

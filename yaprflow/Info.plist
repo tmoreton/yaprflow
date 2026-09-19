@@ -51,10 +51,14 @@
 	<false/>
 	<key>SUFeedURL</key>
 	<string>https://yaprflow.com/appcast.xml</string>
+	<key>SURequireSignedFeed</key>
+	<true/>
 	<key>SUPublicEDKey</key>
 	<string>+pDUc2ivfnr9FJrMcu8LIS+S19ek19DfS3XT209PmKE=</string>
 	<key>SUScheduledCheckInterval</key>
 	<integer>86400</integer>
+	<key>SUVerifyUpdateBeforeExtraction</key>
+	<true/>
 	<key>YaprflowDistribution</key>
 	<string>direct</string>
 </dict>

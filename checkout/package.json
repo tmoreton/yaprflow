@@ -5,6 +5,7 @@
   "scripts": {
     "start": "node --env-file-if-exists=.env.local scripts/dev.mjs",
     "build": "node scripts/build.mjs",
+    "upload:release": "node scripts/upload-private-release.mjs",
     "test": "node --test"
   },
   "dependencies": {
