@@ -23,19 +23,19 @@ ID would break continuity with the existing sandbox container and App Store
 record.
 
 The historical uploaded macOS 5.0.0 build 4 predates the current product.
-Version 5.1.4 build 11 is the next intended App Store upload. It is a clean
-rebuild using the flat red website icon and otherwise matches build 10.
+Version 5.1.4 build 11 is the current App Store upload. It is a clean rebuild
+using the flat red website icon and otherwise matches build 10.
 
 The verified package at
-`build/app-store/5.1.4-10/export/yaprflow.pkg` with SHA-256
-`da792dd155510ba2bd39fadbb5c14e45843e6266f80e4b409567dcb2890b50c2`
+`build/app-store/5.1.4-11/export/yaprflow.pkg` with SHA-256
+`08de62f591e86f8ed506da199a8b97d4a6a18f80dcc21f908aace5832006af99`
 was uploaded to App Store Connect on September 19, 2026. Apple reports import
 status `VALID`, quality-control state `VALID_BINARY`, and audience
 `APP_STORE_ELIGIBLE` for delivery
-`e9c33f54-cbab-4313-9b0f-1458b6aa6a44`.
+`b44274ca-af16-4b26-b801-e11703e66eb8`.
 The App Store archive/export verifier passed all signing, provisioning,
 entitlement, privacy-manifest, model, notice, universal-binary, and Sparkle
-exclusion checks. Select build 10 in the intended TestFlight group and complete
+exclusion checks. Select build 11 in the intended TestFlight group and complete
 the App Store Connect metadata, agreements, compliance, and review steps below.
 
 ## macOS product page
