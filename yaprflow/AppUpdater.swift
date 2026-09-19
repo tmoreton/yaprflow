@@ -1,3 +1,4 @@
+#if DIRECT_DISTRIBUTION
 import Combine
 import Sparkle
 
@@ -55,3 +56,4 @@ final class AppUpdater: ObservableObject {
         automaticallyDownloadsUpdates = updaterController.updater.automaticallyDownloadsUpdates
     }
 }
+#endif

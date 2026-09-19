@@ -186,7 +186,7 @@ scripts/fetch-models.sh         fetches and verifies pinned build-time models
 scripts/copy-models.sh          verifies and stages the exact Xcode model payload
 scripts/build-sherpa-onnx-asr.sh builds pinned Apple native ASR-only frameworks
 scripts/publish-models.sh       maintains the public source-build model mirror
-scripts/app-store-release.sh    historical Mac App Store packaging tool
+scripts/app-store-release.sh    creates and verifies Mac App Store packages
 scripts/ios-app-store-release.sh historical iOS App Store packaging tool
 scripts/release.sh              creates signed DMGs and direct-download releases
 LICENSES/                       preserved historical and third-party license text
@@ -231,7 +231,10 @@ swift test
 
 The shared schemes are:
 
-- `yaprflow`: macOS, bundle ID `com.tmoreton.yaprflow`, version 5.1.3 (9).
+- `yaprflow`: direct-download macOS build with Sparkle, bundle ID
+  `com.tmoreton.yaprflow`, version 5.1.3 (9).
+- `yaprflow-AppStore`: Mac App Store build without Sparkle, using the same app
+  identity and version so both editions are produced from the same source.
 - `yaprflow-iOS`: iPhone/iPad, bundle ID `com.tmoreton.yaprflow.ios`, version
   1.0.0 (2).
 
@@ -242,8 +245,14 @@ by `scripts/native-asr-checksums.sha256`.
 
 ## Distribution and releases
 
-The Mac distribution path is a Developer ID signed, notarized DMG. The redesigned
-website, Stripe checkout, and private download service live together in
+The Mac app has two isolated distribution paths. The `yaprflow` scheme produces
+a Developer ID signed and notarized DMG for paid website downloads. The
+`yaprflow-AppStore` scheme produces an App Store signed package with no Sparkle
+framework, feed settings, updater UI, or Sparkle installer entitlements. Apple
+delivers updates for that edition. Both editions use the same marketing version
+and build number for each release.
+
+The website, Stripe checkout, and private download service live together in
 [`checkout/`](checkout/README.md). The test purchase and private file delivery
 have been verified in Vercel Preview. Production is live at the confirmed US
 $7.99 one-time price and points to the verified Yaprflow 5.1.3 installer. The
@@ -283,7 +292,8 @@ until an updater-enabled release archive is uploaded. To stage a signed feed
 entry while producing a notarized release, run:
 
 ```bash
-SPARKLE_DOWNLOAD_URL_PREFIX=https://your-update-host/releases/ \
+DIRECT_BUILD_NUMBER=10 \
+  SPARKLE_DOWNLOAD_URL_PREFIX=https://your-update-host/releases/ \
   scripts/release.sh 5.1.4 --prepare-update
 ```
 
@@ -300,9 +310,30 @@ that Sparkle can download without authentication is also downloadable outside
 the app. Keep the feed empty until update hosting is deliberately made public
 or a purchase-linked app entitlement is implemented.
 The `--publish` option rejects public binary publication. A source-only release
-is still available with `--publish-source`. The historical
-App Store scripts remain in the repository for reference and are no longer the
-distribution path.
+is still available with `--publish-source`.
+
+### Mac App Store updates
+
+Build the matching Mac App Store release with the same public version and build
+number used for the direct edition:
+
+```bash
+APP_STORE_VERSION=5.1.4 \
+  APP_STORE_BUILD_NUMBER=10 \
+  scripts/app-store-release.sh
+```
+
+The script archives the `yaprflow-AppStore` scheme, exports an App Store signed
+installer to `build/app-store/5.1.4-10/`, and verifies its identity, receipt
+profile, entitlements, models, notices, privacy manifest, and universal binary.
+It also rejects any Sparkle setting, framework, file, or binary linkage. The
+script does not upload the package; upload the verified package with Transporter
+or App Store Connect. Once Apple approves and releases it, the Mac App Store
+handles automatic updates for customers who installed that edition.
+
+Website and App Store purchases are separate. Each installed edition remains on
+its own update channel. Installing one edition over the other intentionally
+switches the installed copy to the newly installed channel.
 
 ## License and branding
 

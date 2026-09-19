@@ -19,7 +19,7 @@ cd "$ROOT"
 source "$ROOT/scripts/lib/model-release.sh"
 
 APP_NAME="yaprflow"
-SCHEME="yaprflow"
+SCHEME="yaprflow-AppStore"
 PROJECT="yaprflow.xcodeproj"
 CONFIGURATION="Release"
 EXPORT_OPTIONS="$ROOT/AppStore/ExportOptions.plist"
@@ -39,6 +39,7 @@ EXPECTED_TEAM_ID="GVXC5FQ2RP"
 EXPECTED_CATEGORY="public.app-category.productivity"
 EXPECTED_MINIMUM_MACOS="14.0"
 EXPECTED_APPLICATION_ID="$EXPECTED_TEAM_ID.$EXPECTED_BUNDLE_ID"
+EXPECTED_DISTRIBUTION="app-store"
 
 usage() {
     sed -n '2,14p' "$0"
@@ -86,7 +87,7 @@ fi
 
 for command_name in \
     awk cmp codesign comm date diff dirname find git grep head lipo mkdir mktemp nm \
-    pkgutil plutil readlink security sed shasum sort tr xcodebuild; do
+    otool pkgutil plutil readlink security sed shasum sort tr xcodebuild; do
     command -v "$command_name" >/dev/null 2>&1 \
         || fail "required command is unavailable: $command_name"
 done
@@ -160,6 +161,15 @@ BUILD_NUMBER="${APP_STORE_BUILD_NUMBER:-$PROJECT_BUILD_NUMBER}"
     || fail "the Xcode Release target does not enable dead-code stripping"
 [[ "$(project_setting VALIDATE_PRODUCT)" == "YES" ]] \
     || fail "the Xcode Release target does not enable product validation"
+[[ "$(project_setting INFOPLIST_FILE)" == "yaprflow/Info-AppStore.plist" ]] \
+    || fail "the App Store scheme is not using Info-AppStore.plist"
+[[ "$(project_setting CODE_SIGN_ENTITLEMENTS)" == "yaprflow/yaprflow-AppStore.entitlements" ]] \
+    || fail "the App Store scheme is not using its restricted entitlement file"
+APP_STORE_CONDITIONS="$(project_setting SWIFT_ACTIVE_COMPILATION_CONDITIONS)"
+[[ " $APP_STORE_CONDITIONS " == *" APP_STORE_DISTRIBUTION "* ]] \
+    || fail "the App Store scheme is missing APP_STORE_DISTRIBUTION"
+[[ " $APP_STORE_CONDITIONS " != *" DIRECT_DISTRIBUTION "* ]] \
+    || fail "the App Store scheme must not compile the direct updater path"
 
 plist_raw() {
     local plist_path="$1"
@@ -225,6 +235,24 @@ verify_app_payload() {
     require_plist_value "$info_plist" ITSAppUsesNonExemptEncryption "false"
     require_plist_value "$info_plist" CFBundleIconFile "AppIcon"
     require_plist_value "$info_plist" CFBundleIconName "AppIcon"
+    require_plist_value "$info_plist" YaprflowDistribution "$EXPECTED_DISTRIBUTION"
+
+    for sparkle_key in \
+        SUAllowsAutomaticUpdates \
+        SUAutomaticallyUpdate \
+        SUEnableAutomaticChecks \
+        SUEnableInstallerLauncherService \
+        SUEnableSystemProfiling \
+        SUFeedURL \
+        SUPublicEDKey \
+        SUScheduledCheckInterval; do
+        if plist_value "$info_plist" "$sparkle_key" >/dev/null 2>&1; then
+            fail "the App Store app must not contain Sparkle setting $sparkle_key"
+        fi
+    done
+    if find "$app_path/Contents" -iname '*sparkle*' -print -quit | grep -q .; then
+        fail "the App Store app must not bundle Sparkle files"
+    fi
 
     while IFS= read -r bundled_link; do
         [[ -e "$bundled_link" ]] \
@@ -282,6 +310,9 @@ verify_app_payload() {
     executable_path="$app_path/Contents/MacOS/$executable_name"
     [[ -f "$executable_path" ]] || fail "the main app executable is missing"
     verify_universal_binary "$executable_path"
+    if otool -L "$executable_path" | grep -qi sparkle; then
+        fail "the App Store executable must not link Sparkle"
+    fi
     if nm -gU "$executable_path" 2>/dev/null \
         | grep -Ei '(^|_)espeak(_|$)|espeak-ng|piper[_-]?phonemize' >/dev/null; then
         fail "the app executable contains prohibited optional TTS symbols"

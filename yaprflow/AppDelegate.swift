@@ -34,9 +34,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if !isPreviewSmokeTest {
             TranscriptionController.shared.prepareSpeechRecognizer()
         }
+        #if DIRECT_DISTRIBUTION
         if !isPreviewSmokeTest && !isRecordingSmokeTest {
             AppUpdater.shared.start()
         }
+        #endif
         TranscriptionController.shared.prepareVoiceDetector()
         let hotkeyRegistered = registerHotkey()
 
@@ -261,6 +263,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         )
         menu.addItem(historyItem)
 
+        #if DIRECT_DISTRIBUTION
         let updateItem = NSMenuItem()
         updateItem.view = IconActionMenuItemView(
             symbolName: "arrow.triangle.2.circlepath",
@@ -270,6 +273,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             isEnabled: { AppUpdater.shared.canCheckForUpdates }
         )
         menu.addItem(updateItem)
+        #endif
 
         menu.addItem(NSMenuItem.separator())
 
@@ -297,9 +301,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         AppPanelWindowController.show(.history)
     }
 
+    #if DIRECT_DISTRIBUTION
     @objc private func checkForUpdates() {
         AppUpdater.shared.checkForUpdates()
     }
+    #endif
 
     @objc private func showSettings() {
         AppPanelWindowController.show(.settings)

@@ -6,6 +6,7 @@
 # Usage:
 #   scripts/release.sh                                    # local DMG build (uses MARKETING_VERSION)
 #   scripts/release.sh 5.0.1                              # local DMG build with explicit version
+#   DIRECT_BUILD_NUMBER=10 scripts/release.sh 5.1.4       # override CFBundleVersion
 #   SPARKLE_DOWNLOAD_URL_PREFIX=https://updates.example/ scripts/release.sh 5.1.4 --prepare-update
 #   scripts/release.sh 5.1.0 --publish              # rejected for paid builds
 #   scripts/release.sh 5.1.0 --publish-source             # source-only release
@@ -171,7 +172,7 @@ load_release_env() {
         case "$key" in
             APPLE_ID|APPLE_PASSWORD|APPLE_APP_PASSWORD|APPLE_TEAM_ID|\
             DEVELOPER_ID_APPLICATION|NOTARY_PROFILE|NOTARIZE_MAX_POLLS|\
-            NOTARIZE_APP_ID|NOTARIZE_DMG_ID|SKIP_NOTARIZE|USE_APP|APTABASE_APP_KEY|PUBLIC_DOWNLOAD)
+            NOTARIZE_APP_ID|NOTARIZE_DMG_ID|SKIP_NOTARIZE|USE_APP|APTABASE_APP_KEY|PUBLIC_DOWNLOAD|DIRECT_BUILD_NUMBER)
                 ;;
             *)
                 echo "error: $env_file:$line_number contains unsupported release setting: $key" >&2
@@ -205,17 +206,30 @@ fi
 require_native_asr_artifacts
 require_native_asr_framework_layout
 
-read_marketing_version() {
+read_project_setting() {
+    local setting_name="$1"
     xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration "$CONFIGURATION" \
         -showBuildSettings 2>/dev/null \
-        | awk -F' = ' '/^[[:space:]]*MARKETING_VERSION = /{print $2; exit}'
+        | awk -F' = ' -v wanted="$setting_name" '
+            {
+                name = $1
+                sub(/^[[:space:]]+/, "", name)
+                sub(/[[:space:]]+$/, "", name)
+                if (name == wanted) { print $2; exit }
+            }
+        '
 }
 
 if [[ -z "$VERSION" ]]; then
-    VERSION="$(read_marketing_version)"
+    VERSION="$(read_project_setting MARKETING_VERSION)"
 fi
 if [[ -z "$VERSION" ]]; then
     echo "error: could not determine version (pass it as the first argument)" >&2
+    exit 1
+fi
+BUILD_NUMBER="${DIRECT_BUILD_NUMBER:-$(read_project_setting CURRENT_PROJECT_VERSION)}"
+if [[ ! "$BUILD_NUMBER" =~ ^[1-9][0-9]*([.][0-9]+){0,2}$ ]]; then
+    echo "error: DIRECT_BUILD_NUMBER must contain one to three numeric components" >&2
     exit 1
 fi
 if [[ ! "$VERSION" =~ ^[0-9]+([.][0-9]+){0,2}$ ]]; then
@@ -347,7 +361,7 @@ verify_bundled_app() {
     local app_path="$1"
     local resources_path="$app_path/Contents/Resources"
     local info_plist="$app_path/Contents/Info.plist"
-    local embedded_version embedded_bundle_id sparkle_feed sparkle_public_key installer_service_enabled
+    local embedded_version embedded_build embedded_bundle_id distribution sparkle_feed sparkle_public_key installer_service_enabled
     local executable_name executable_path bundled_link
 
     if [[ ! -f "$MODEL_CHECKSUMS" || ! -f "$ACKNOWLEDGEMENTS_SOURCE" \
@@ -372,13 +386,23 @@ verify_bundled_app() {
     done < <(find "$app_path" -type l -print)
 
     embedded_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$info_plist")"
+    embedded_build="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$info_plist")"
     embedded_bundle_id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$info_plist")"
+    distribution="$(/usr/libexec/PlistBuddy -c 'Print :YaprflowDistribution' "$info_plist" 2>/dev/null || true)"
     if [[ "$embedded_version" != "$VERSION" ]]; then
         echo "error: requested version $VERSION does not match bundled version $embedded_version" >&2
         return 1
     fi
     if [[ "$embedded_bundle_id" != "$EXPECTED_BUNDLE_ID" ]]; then
         echo "error: unexpected bundle id: $embedded_bundle_id" >&2
+        return 1
+    fi
+    if [[ "$embedded_build" != "$BUILD_NUMBER" ]]; then
+        echo "error: requested build $BUILD_NUMBER does not match bundled build $embedded_build" >&2
+        return 1
+    fi
+    if [[ "$distribution" != "direct" ]]; then
+        echo "error: expected the direct distribution build, found ${distribution:-unknown}" >&2
         return 1
     fi
     sparkle_feed="$(/usr/libexec/PlistBuddy -c 'Print :SUFeedURL' "$info_plist" 2>/dev/null || true)"
@@ -559,6 +583,7 @@ else
         -archivePath "$ARCHIVE_PATH" \
         -destination "generic/platform=macOS" \
         MARKETING_VERSION="$VERSION" \
+        CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
         APTABASE_APP_KEY="${APTABASE_APP_KEY:-}" \
         archive
 

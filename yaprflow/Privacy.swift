@@ -5,7 +5,9 @@ struct SettingsView: View {
     @ObservedObject private var appState = AppState.shared
     @ObservedObject private var aiSettings = AIProviderSettings.shared
     @ObservedObject private var telemetry = Telemetry.shared
+    #if DIRECT_DISTRIBUTION
     @ObservedObject private var updater = AppUpdater.shared
+    #endif
     @State private var isShowingFeedback = false
 
     var body: some View {
@@ -203,13 +205,16 @@ struct SettingsView: View {
                                 .font(.caption.weight(.medium))
                                 .foregroundStyle(.secondary)
 
+                            #if DIRECT_DISTRIBUTION
                             Button("Check Now") {
                                 updater.checkForUpdates()
                             }
                             .buttonStyle(.bordered)
+                            #endif
                         }
                         .padding(.vertical, 10)
 
+                        #if DIRECT_DISTRIBUTION
                         Divider().padding(.leading, 38)
 
                         HStack(spacing: 12) {
@@ -232,7 +237,32 @@ struct SettingsView: View {
                                 .toggleStyle(.switch)
                         }
                         .padding(.vertical, 10)
+                        #else
+                        Divider().padding(.leading, 38)
 
+                        HStack(spacing: 12) {
+                            Image(systemName: "storefront")
+                                .foregroundStyle(.secondary)
+                                .frame(width: 26)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("App updates")
+                                    .font(.callout.weight(.medium))
+                                Text("Updates for this edition are delivered automatically by the Mac App Store.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+
+                            Text("Mac App Store")
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 10)
+                        #endif
+
+                        #if DIRECT_DISTRIBUTION
                         Divider().padding(.leading, 38)
 
                         HStack(spacing: 12) {
@@ -256,6 +286,7 @@ struct SettingsView: View {
                                 .disabled(!updater.automaticallyChecksForUpdates)
                         }
                         .padding(.vertical, 10)
+                        #endif
 
                         Divider().padding(.leading, 38)
 
@@ -297,6 +328,7 @@ struct SettingsView: View {
         return build.map { "\(version) (\($0))" } ?? version
     }
 
+    #if DIRECT_DISTRIBUTION
     private var automaticUpdateChecksBinding: Binding<Bool> {
         Binding(
             get: { updater.automaticallyChecksForUpdates },
@@ -310,6 +342,7 @@ struct SettingsView: View {
             set: { updater.setAutomaticallyDownloadsUpdates($0) }
         )
     }
+    #endif
 
     private var aiPrivacyDetail: String {
         switch aiSettings.provider {
