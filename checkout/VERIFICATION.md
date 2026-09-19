@@ -5,7 +5,7 @@ Last updated: September 19, 2026
 ## Active release
 
 - Public site: `https://yaprflow.com/`
-- Vercel deployment: `dpl_BR4FGoVzmaYiybtFVHQR8GcGj8g2`
+- Vercel deployment: `dpl_8TV5MrexMYcR138bPv8edKTrRepN`
 - Direct app: Yaprflow 5.1.4, build 10, universal Intel and Apple silicon
 - Private installer: `releases/yaprflow-5.1.4.dmg`
 - Installer size: 491,696,385 bytes
@@ -33,12 +33,13 @@ Last updated: September 19, 2026
 
 ## Website and checkout checks
 
-- The full website suite passed: 79 tests, zero failures. The production build completed with the project's Node.js 24 runtime.
+- The full website suite passed: 80 tests, zero failures. The production build completed with the project's Node.js 24 runtime.
 - Public `/api/config` reports live mode, the US $7.99 one-time price, `downloadReady: true`, and `voiceDemoAvailable: true`.
 - The public page reports software version 5.1.4.
 - The published policies contain the customer license, separate source-license terms, direct/App Store update disclosures, and the 14-day direct-purchase refund policy.
-- The checkout form requires explicit acceptance. The server rejects missing or cross-origin acceptance and records the terms version in Stripe Checkout metadata.
-- A production checkout request with same-origin acceptance returned HTTP 303 to `checkout.stripe.com`.
+- Checkout-specific terms open in an accessible modal without leaving the offer. The accepted value is submitted through a dedicated successful form control, including after browser page restoration.
+- The server rejects missing and cross-origin acceptance, accepts a browser-verified same-site fallback when Safari omits `Origin`, and records the terms version in Stripe Checkout metadata.
+- The exact production flow passed: open the terms modal, return to checkout, select the checkbox, and buy. It navigated to live Stripe Checkout instead of the terms error page; no payment was submitted.
 - `/api/download` returned HTTP 403 without a verified purchase.
 - `https://yaprflow.com/appcast.xml` serves the signed empty production feed.
 - The active production environment uses `BLOB_PATHNAME=releases/yaprflow-5.1.4.dmg`.
