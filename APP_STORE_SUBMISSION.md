@@ -26,6 +26,14 @@ The historical uploaded macOS 5.0.0 build 4 predates the current product.
 Version 5.1.4 build 10 is the next intended App Store upload and matches the
 direct edition's features except for its update channel.
 
+The verified package is ready at
+`build/app-store/5.1.4-10/export/yaprflow.pkg` with SHA-256
+`da792dd155510ba2bd39fadbb5c14e45843e6266f80e4b409567dcb2890b50c2`.
+The App Store archive/export verifier passed all signing, provisioning,
+entitlement, privacy-manifest, model, notice, universal-binary, and Sparkle
+exclusion checks. Upload and TestFlight processing still need to complete in
+App Store Connect.
+
 ## macOS product page
 
 - **Name:** Yaprflow

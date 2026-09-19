@@ -261,7 +261,7 @@ and build number for each release.
 The website, Stripe checkout, and private download service live together in
 [`checkout/`](checkout/README.md). The test purchase and private file delivery
 have been verified in Vercel Preview. Production is live at the confirmed US
-$7.99 one-time price and points to the verified Yaprflow 5.1.3 installer. The
+$7.99 one-time price and points to the verified Yaprflow 5.1.4 installer. The
 original site remains preserved in `docs/`.
 The release script verifies the bundled app,
 entitlements, notices, privacy manifest, and model hashes before it publishes
