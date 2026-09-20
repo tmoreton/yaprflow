@@ -1,6 +1,6 @@
 import AppKit
 import Combine
-import SwiftUI
+import Foundation
 
 struct TranscriptHistoryItem: Identifiable, Hashable {
     let url: URL
@@ -83,12 +83,6 @@ final class TranscriptHistoryModel: ObservableObject {
         copyToClipboard(selectedItem.transcript)
     }
 
-    func selectAndCopy(_ item: TranscriptHistoryItem) {
-        selection = item.id
-        guard !item.transcript.isEmpty else { return }
-        copyToClipboard(item.transcript)
-    }
-
     private func copyToClipboard(_ transcript: String) {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
@@ -114,168 +108,5 @@ final class TranscriptHistoryModel: ObservableObject {
             selection = change.newURL
         }
         refresh()
-    }
-}
-
-struct HistoryView: View {
-    @StateObject private var model = TranscriptHistoryModel()
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            FeatureWindowHeader(
-                symbolName: "clock.arrow.circlepath",
-                title: "History",
-                subtitle: "Browse and copy transcripts saved on this Mac.",
-                accent: .orange,
-                badge: "Local",
-                badgeSymbol: "internaldrive"
-            )
-
-            FeatureCard {
-                VStack(spacing: 12) {
-                    HStack {
-                        statusText
-                        Spacer()
-
-                        Button {
-                            model.refresh()
-                        } label: {
-                            Image(systemName: "arrow.clockwise")
-                        }
-                        .buttonStyle(.plain)
-                        .foregroundStyle(.secondary)
-                        .help("Refresh")
-                    }
-
-                    Divider()
-
-                    if model.items.isEmpty {
-                        emptyState
-                    } else {
-                        transcriptList
-                    }
-
-                    Divider()
-
-                    HStack(spacing: 8) {
-                        Spacer()
-
-                        Button("Folder", systemImage: "folder") {
-                            model.revealSelection()
-                        }
-
-                        Button("Open") {
-                            model.openSelected()
-                        }
-                        .disabled(model.selectedItem == nil)
-
-                        Button("Copy", systemImage: "doc.on.clipboard") {
-                            model.copySelected()
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(model.selectedItem?.transcript.isEmpty != false)
-                    }
-                }
-                .frame(maxHeight: .infinity)
-            }
-            .frame(maxHeight: .infinity)
-        }
-        .padding(22)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .windowBackgroundColor))
-        .onAppear {
-            model.refresh()
-            TranscriptMetadataEnricher.shared.enqueueMissingTranscripts()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .yaprflowTranscriptArchiveChanged)) {
-            model.handleArchiveChange($0)
-        }
-    }
-
-    private var transcriptList: some View {
-        ScrollView {
-            LazyVStack(spacing: 2) {
-                ForEach(model.items) { item in
-                    Button {
-                        model.selectAndCopy(item)
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: "doc.text")
-                                .foregroundStyle(.secondary)
-
-                            VStack(alignment: .leading, spacing: 3) {
-                                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                                    Text(item.title)
-                                        .font(.callout.weight(.medium))
-                                        .lineLimit(1)
-
-                                    Spacer(minLength: 8)
-
-                                    Text(item.dateDescription)
-                                        .font(.caption2)
-                                        .foregroundStyle(.tertiary)
-                                        .lineLimit(1)
-                                }
-
-                                if let topic = item.topic {
-                                    Text(topic)
-                                        .font(.caption.weight(.medium))
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(1)
-                                }
-
-                                Text(item.preview)
-                                    .font(.caption)
-                                    .foregroundStyle(item.topic == nil ? .secondary : .tertiary)
-                                    .lineLimit(2)
-                            }
-
-                            Spacer(minLength: 8)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 8)
-                        .background(
-                            model.selection == item.id ? Color.accentColor.opacity(0.12) : .clear,
-                            in: RoundedRectangle(cornerRadius: 8)
-                        )
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .frame(maxWidth: .infinity)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private var emptyState: some View {
-        VStack(spacing: 8) {
-            Spacer()
-            Image(systemName: "waveform")
-                .font(.title2)
-                .foregroundStyle(.tertiary)
-            Text("No transcripts yet")
-                .font(.callout.weight(.medium))
-            Text("Completed transcripts will appear here.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private var statusText: some View {
-        Group {
-            if let errorMessage = model.errorMessage {
-                Text(errorMessage)
-                    .foregroundStyle(.red)
-                    .lineLimit(1)
-            } else {
-                Text("\(model.items.count) \(model.items.count == 1 ? "item" : "items")")
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .font(.caption)
     }
 }

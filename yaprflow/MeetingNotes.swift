@@ -2,44 +2,9 @@ import AppKit
 import Combine
 import SwiftUI
 
-@MainActor
-private final class MeetingMemoryModel: ObservableObject {
-    @Published var question = ""
-    @Published private(set) var answer = ""
-    @Published private(set) var isRunning = false
-    @Published private(set) var progressMessage: String?
-    @Published var errorMessage: String?
-    @Published private(set) var evidenceHits: [MeetingSearchHit] = []
-
-    func ask(meetings: [MeetingRecord]) {
-        let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, !isRunning else { return }
-        isRunning = true
-        answer = ""
-        errorMessage = nil
-        evidenceHits = MeetingSearchIndex.search(trimmed, in: meetings, limit: 10)
-        Task { [weak self] in
-            guard let self else { return }
-            defer {
-                isRunning = false
-                progressMessage = nil
-            }
-            do {
-                answer = try await MeetingAIService.answer(
-                    question: trimmed,
-                    meetings: meetings,
-                    progress: { message in self.progressMessage = message }
-                )
-            } catch {
-                errorMessage = error.localizedDescription
-            }
-        }
-    }
-}
-
 enum MeetingNotesDestination: String, CaseIterable {
     case meetings = "Meetings"
-    case dictations = "Dictations"
+    case library = "Library"
     case settings = "Settings"
 }
 
@@ -53,12 +18,10 @@ struct MeetingNotesView: View {
     @ObservedObject private var store = MeetingStore.shared
     @ObservedObject private var session = MeetingSessionController.shared
     @ObservedObject private var navigation = MeetingNotesNavigation.shared
-    @StateObject private var memory = MeetingMemoryModel()
     @State private var search = ""
     @State private var selectedMeetingID: UUID?
     @State private var selectedEvidenceID: UUID?
     @State private var showsLiveWorkspace = true
-    @State private var showsMeetingMemory = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -67,25 +30,23 @@ struct MeetingNotesView: View {
 
             switch navigation.destination {
             case .meetings:
-                if showsMeetingMemory {
-                    MeetingMemoryView(model: memory, meetings: store.meetings) { meetingID, segmentID in
+                HSplitView {
+                    sidebar
+                        .frame(minWidth: 220, idealWidth: 250, maxWidth: 290)
+                    detail
+                        .frame(minWidth: 560, maxWidth: .infinity, maxHeight: .infinity)
+                }
+            case .library:
+                LibraryView(
+                    meetings: store.meetings,
+                    onOpenEvidence: { meetingID, segmentID in
                         selectedMeetingID = meetingID
                         selectedEvidenceID = segmentID
                         showsLiveWorkspace = false
-                        showsMeetingMemory = false
-                    }
-                } else {
-                    HSplitView {
-                        sidebar
-                            .frame(minWidth: 220, idealWidth: 250, maxWidth: 290)
-                        detail
-                            .frame(minWidth: 560, maxWidth: .infinity, maxHeight: .infinity)
-                    }
-                }
-            case .dictations:
-                TranscriptAIView {
-                    navigation.destination = .settings
-                }
+                        navigation.destination = .meetings
+                    },
+                    onOpenSettings: { navigation.destination = .settings }
+                )
             case .settings:
                 SettingsView()
             }
@@ -126,15 +87,9 @@ struct MeetingNotesView: View {
             }
 
             if navigation.destination == .meetings {
-                Button(showsMeetingMemory ? "Meetings" : "Ask Meetings", systemImage: showsMeetingMemory ? "person.2" : "sparkles") {
-                    showsMeetingMemory.toggle()
-                }
-                .help(showsMeetingMemory ? "Return to meetings" : "Ask a question across saved meetings")
-
                 Button("New", systemImage: "plus") {
                     session.prepare()
                     showsLiveWorkspace = true
-                    showsMeetingMemory = false
                     selectedMeetingID = nil
                     selectedEvidenceID = nil
                     navigation.destination = .meetings
@@ -203,7 +158,6 @@ struct MeetingNotesView: View {
                                 selectedMeetingID = meeting.id
                                 selectedEvidenceID = nil
                                 showsLiveWorkspace = false
-                                showsMeetingMemory = false
                             } label: {
                                 SavedMeetingRow(
                                     meeting: meeting,
@@ -247,7 +201,7 @@ struct MeetingNotesView: View {
     private func telemetryFeature(for destination: MeetingNotesDestination) -> TelemetryFeature {
         switch destination {
         case .meetings: .meetingNotes
-        case .dictations: .history
+        case .library: .history
         case .settings: .settings
         }
     }
@@ -1003,100 +957,10 @@ private struct TranscriptSegmentRow: View {
     }
 }
 
-private struct MeetingMemoryView: View {
-    @ObservedObject var model: MeetingMemoryModel
-    let meetings: [MeetingRecord]
-    let onOpenEvidence: (UUID, UUID?) -> Void
-
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                TextField("Ask about your meetings", text: $model.question)
-                    .textFieldStyle(.roundedBorder)
-                    .onSubmit { model.ask(meetings: meetings) }
-                    .accessibilityLabel("Ask your meetings")
-
-                if model.isRunning {
-                    ProgressView()
-                        .controlSize(.small)
-                }
-
-                Button("Ask") {
-                    model.ask(meetings: meetings)
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(
-                    meetings.isEmpty
-                        || model.question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                        || model.isRunning
-                )
-            }
-            .padding(16)
-
-            Divider()
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    if let error = model.errorMessage {
-                        Label(error, systemImage: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.red)
-                    } else if model.answer.isEmpty {
-                        ContentUnavailableView(
-                            meetings.isEmpty ? "No saved meetings" : "Ask anything",
-                            systemImage: meetings.isEmpty ? "person.2.slash" : "text.bubble",
-                            description: Text(
-                                meetings.isEmpty
-                                    ? "Record a meeting to get started."
-                                    : "Search decisions, action items, or anything discussed."
-                            )
-                        )
-                        .frame(maxWidth: .infinity, minHeight: 300)
-                    } else {
-                        Text(model.answer)
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-
-                        if !model.evidenceHits.isEmpty {
-                            Divider()
-                            Text("Sources")
-                                .font(.headline)
-
-                            LazyVStack(alignment: .leading, spacing: 6) {
-                                ForEach(model.evidenceHits) { hit in
-                                    Button {
-                                        onOpenEvidence(hit.meetingID, hit.segmentID)
-                                    } label: {
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(hit.title)
-                                                .font(.callout.weight(.medium))
-                                            Text(hit.excerpt)
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                                .lineLimit(2)
-                                        }
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .padding(.vertical, 5)
-                                    }
-                                    .buttonStyle(.plain)
-                                    .accessibilityLabel("Open evidence from \(hit.title)")
-                                }
-                            }
-                        }
-                    }
-                }
-                .frame(maxWidth: 760, alignment: .leading)
-                .padding(20)
-            }
-            .frame(maxHeight: .infinity)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-}
-
 @MainActor
 enum MeetingNotesWindowController {
     private static let window = FeatureWindowController(
-        title: "Yaprflow Meeting Notes",
+        title: "Yaprflow",
         contentSize: NSSize(width: 980, height: 680),
         minimumSize: NSSize(width: 820, height: 580)
     ) {

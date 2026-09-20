@@ -64,18 +64,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             Task { @MainActor in
                 try? await Task.sleep(for: .milliseconds(350))
                 let windowPassed = MeetingNotesWindowController.isVisibleForSmokeTest
-                MeetingNotesWindowController.show(.dictations)
+                MeetingNotesWindowController.show(.library)
                 try? await Task.sleep(for: .milliseconds(200))
-                let dictationsPassed = MeetingNotesWindowController.isVisibleForSmokeTest
-                    && MeetingNotesWindowController.destinationForSmokeTest == .dictations
+                let libraryPassed = MeetingNotesWindowController.isVisibleForSmokeTest
+                    && MeetingNotesWindowController.destinationForSmokeTest == .library
                 MeetingNotesWindowController.show(.settings)
                 try? await Task.sleep(for: .milliseconds(200))
                 let settingsPassed = MeetingNotesWindowController.isVisibleForSmokeTest
                     && MeetingNotesWindowController.destinationForSmokeTest == .settings
                 MeetingNotesWindowController.show(.meetings)
                 let persistencePassed = MeetingStore.runPersistenceSmokeTest()
-                let passed = windowPassed && dictationsPassed && settingsPassed && persistencePassed
-                let output = "YAPRFLOW_MEETING_NOTES_SMOKE_TEST=\(passed ? "PASS" : "FAIL") window=\(windowPassed) dictations=\(dictationsPassed) settings=\(settingsPassed) persistence=\(persistencePassed)\n"
+                let passed = windowPassed && libraryPassed && settingsPassed && persistencePassed
+                let output = "YAPRFLOW_MEETING_NOTES_SMOKE_TEST=\(passed ? "PASS" : "FAIL") window=\(windowPassed) library=\(libraryPassed) settings=\(settingsPassed) persistence=\(persistencePassed)\n"
                 FileHandle.standardOutput.write(Data(output.utf8))
                 NSApp.terminate(nil)
             }
@@ -340,10 +340,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         let historyItem = NSMenuItem()
         historyItem.view = IconActionMenuItemView(
-            symbolName: "clock.arrow.circlepath",
-            title: "History",
+            symbolName: "books.vertical",
+            title: "Library",
             target: self,
-            action: #selector(showHistory),
+            action: #selector(showLibrary),
             isEnabled: { true }
         )
         menu.addItem(historyItem)
@@ -370,8 +370,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         MeetingNotesWindowController.show()
     }
 
-    @objc private func showHistory() {
-        MeetingNotesWindowController.show(.dictations)
+    @objc private func showLibrary() {
+        MeetingNotesWindowController.show(.library)
     }
 
     @objc private func showSettings() {
