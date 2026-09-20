@@ -45,30 +45,29 @@ wrapper always attempts and verifies both the macOS package and iOS/iPadOS IPA,
 and only succeeds when both platform builds pass. Upload both resulting
 artifacts together; the wrapper deliberately does not upload them.
 
-On September 20, 2026, the direct Mac 5.2.0 (12) build completed the full
+On September 20, 2026, the direct Mac 5.2.0 (13) build completed the full
 Developer ID release path. Apple accepted and stapled the app under notary
-submission `f474e830-0263-4227-9c00-8ed7ae42d1ae`, then accepted and stapled
-the DMG under submission `e067b84b-9f7f-4484-81fb-65c0cefcb688`. Gatekeeper
+submission `8307defc-77e9-4847-9d82-9033ffe05356`, then accepted and stapled
+the DMG under submission `c36097ec-8965-4b0f-8ae2-e485d3d32b5d`. Gatekeeper
 accepted `build/yaprflow-5.2.0.dmg`; its SHA-256 is
-`f082f07153d5b5d863fee5c6701b9863c73db493d74b829c457d706c1e178cb7`.
+`d07a46538f1d55462d7bf7d574c9d1df3099a3030b862e2cacec3220196a3a0f`.
 The signed app uses the final edge-to-edge flat-red icon and also passed the
 Meeting Notes persistence and Quick Dictation capture-engine runtime smoke
 tests. Nothing was uploaded to a customer-facing download location.
 
-The 5.2.0 (12) Mac App Store archive at
-`build/app-store/5.2.0-12/yaprflow.xcarchive` passed the release script's
-source, model, archive, resource, architecture, privacy, entitlement, and
-Sparkle-exclusion checks. Installer export is blocked only because this Mac is
-missing a `Mac Installer Distribution` certificate for team `GVXC5FQ2RP`; no
-5.2.0 package was produced or uploaded.
+The macOS 5.2.0 (13) TestFlight package at
+`build/app-store/5.2.0-13-verified/export/yaprflow.pkg` passed source, model,
+archive, resource, universal-architecture, privacy, signed-entitlement,
+provisioning-profile, installer-signature, and Sparkle-exclusion checks. Its
+SHA-256 is
+`e34d4cd06a933c641110a66bb72619528d6b9c4b90e753dcdcc08045e6a9705d`.
 
-The iOS 1.0.0 (3) archives at `build/ios-app-store/1.0.0-3/` and
-`build/ios-app-store/1.0.0-3-managed/` passed the signed-archive payload,
-framework, entitlement, privacy, model, notice, and provisioning checks. IPA
-export is blocked because the installed App Store profile does not include the
-current Apple Distribution certificate and Xcode has no authenticated
-Developer account from which to regenerate it. No IPA was produced or
-uploaded.
+The iOS/iPadOS 1.0.0 (4) TestFlight IPA at
+`build/ios-app-store/1.0.0-4-final/export/yaprflow-iOS.ipa` passed the signed
+archive and exported-app payload, framework, entitlement, privacy, model,
+notice, provisioning-profile, and shared modern-icon checks. Its SHA-256 is
+`f9f1885cfc6e3de15fe2498d1b79afddc92323404a43b1e642158c9002bf7df1`.
+Neither TestFlight artifact was uploaded.
 
 ## macOS product page
 
@@ -403,12 +402,11 @@ been deployed by this repository change.
   selector; build 4 remains the earlier Automatic-only implementation.
 - [ ] Install the incremented selector build through TestFlight and perform the
   release smoke test before App Review submission.
-- [x] Run `scripts/ios-app-store-release.sh` for iOS 1.0.0 (3) and verify the
-  signed archive. The archive passed on September 20, 2026.
-- [ ] Sign in to the `GVXC5FQ2RP` Apple Developer account in Xcode, regenerate
-  the iOS App Store profile so it includes the installed Apple Distribution
-  certificate, rerun the script to verify the exported `.ipa`, and upload only
-  after the App Store relationship and metadata decisions below are complete.
+- [x] Run the paired release gate for macOS 5.2.0 (13) and iOS/iPadOS 1.0.0
+  (4). Both signed archives and exported artifacts passed their platform
+  verifiers on September 20, 2026; neither artifact was uploaded.
+- [ ] Upload both verified build candidates together only after the App Store
+  relationship and metadata decisions below are complete.
 - [ ] Run the signed existing-user migration test described below.
 
 ## iPhone and iPad readiness
