@@ -22,6 +22,7 @@ struct MeetingNotesView: View {
     @State private var selectedMeetingID: UUID?
     @State private var selectedEvidenceID: UUID?
     @State private var showsLiveWorkspace = true
+    @State private var meetingPendingDeletion: MeetingRecord?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -62,6 +63,35 @@ struct MeetingNotesView: View {
         }
         .onChange(of: navigation.destination) { _, destination in
             Telemetry.shared.track(.featureOpened(telemetryFeature(for: destination)))
+        }
+        .confirmationDialog(
+            "Delete this meeting?",
+            isPresented: Binding(
+                get: { meetingPendingDeletion != nil },
+                set: { if !$0 { meetingPendingDeletion = nil } }
+            )
+        ) {
+            Button("Delete Meeting", role: .destructive) {
+                if let meetingPendingDeletion {
+                    delete(meetingPendingDeletion)
+                }
+            }
+            Button("Cancel", role: .cancel) {
+                meetingPendingDeletion = nil
+            }
+        } message: {
+            Text("The transcript, notes, and summary will be moved to the Trash.")
+        }
+        .alert(
+            "Couldn’t delete meeting",
+            isPresented: Binding(
+                get: { store.errorMessage != nil },
+                set: { if !$0 { store.clearError() } }
+            )
+        ) {
+            Button("OK") { store.clearError() }
+        } message: {
+            Text(store.errorMessage ?? "Please try again.")
         }
     }
 
@@ -166,6 +196,11 @@ struct MeetingNotesView: View {
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel("Open \(meeting.title)")
+                            .contextMenu {
+                                Button("Delete Meeting", systemImage: "trash", role: .destructive) {
+                                    meetingPendingDeletion = meeting
+                                }
+                            }
                         }
                     }
                 }
@@ -180,7 +215,11 @@ struct MeetingNotesView: View {
         if showsLiveWorkspace {
             LiveMeetingWorkspace(session: session)
         } else if let id = selectedMeetingID, let meeting = store.meeting(id: id) {
-            SavedMeetingView(initialMeeting: meeting, initialEvidenceID: selectedEvidenceID)
+            SavedMeetingView(
+                initialMeeting: meeting,
+                initialEvidenceID: selectedEvidenceID,
+                onDelete: { meetingPendingDeletion = $0 }
+            )
                 .id("\(meeting.id.uuidString)-\(selectedEvidenceID?.uuidString ?? "none")")
         } else {
             ContentUnavailableView(
@@ -203,6 +242,16 @@ struct MeetingNotesView: View {
         case .meetings: .meetingNotes
         case .library: .history
         case .settings: .settings
+        }
+    }
+
+    private func delete(_ meeting: MeetingRecord) {
+        meetingPendingDeletion = nil
+        guard store.delete(meeting) else { return }
+        if selectedMeetingID == meeting.id {
+            selectedMeetingID = nil
+            selectedEvidenceID = nil
+            showsLiveWorkspace = false
         }
     }
 }
@@ -369,16 +418,18 @@ private struct LiveMeetingWorkspace: View {
             Label("Transcript and meeting notes saved locally", systemImage: "checkmark.circle.fill")
                 .foregroundStyle(.green)
         case let .failed(message):
-            HStack(spacing: 10) {
-                Label(message, systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.red)
-                    .textSelection(.enabled)
-                Spacer(minLength: 8)
-                if message.contains("Screen & System Audio") {
-                    Button("Open Settings") {
-                        openScreenCaptureSettings()
+            if generationError == nil {
+                HStack(spacing: 10) {
+                    Label(message, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
+                        .textSelection(.enabled)
+                    Spacer(minLength: 8)
+                    if message.contains("Screen & System Audio") {
+                        Button("Open Settings") {
+                            openScreenCaptureSettings()
+                        }
+                        .controlSize(.small)
                     }
-                    .controlSize(.small)
                 }
             }
         }
@@ -481,7 +532,9 @@ private struct LiveMeetingWorkspace: View {
 
     private var generationError: String? {
         guard case let .failed(message) = session.phase, session.meeting.endedAt != nil else { return nil }
-        return message
+        let prefix = "Transcript saved, but notes could not be generated: "
+        guard message.hasPrefix(prefix) else { return nil }
+        return String(message.dropFirst(prefix.count))
     }
 
     private var duration: String {
@@ -505,10 +558,16 @@ private struct SavedMeetingView: View {
     @State private var isGenerating = false
     @State private var generationMessage: String?
     @State private var generationError: String?
+    let onDelete: (MeetingRecord) -> Void
 
-    init(initialMeeting: MeetingRecord, initialEvidenceID: UUID? = nil) {
+    init(
+        initialMeeting: MeetingRecord,
+        initialEvidenceID: UUID? = nil,
+        onDelete: @escaping (MeetingRecord) -> Void
+    ) {
         _meeting = State(initialValue: initialMeeting)
         _selectedEvidenceID = State(initialValue: initialEvidenceID)
+        self.onDelete = onDelete
     }
 
     var body: some View {
@@ -540,6 +599,13 @@ private struct SavedMeetingView: View {
                 }
                 .help("Reveal in Finder")
                 .accessibilityLabel("Reveal meeting in Finder")
+                Button(role: .destructive) {
+                    onDelete(meeting)
+                } label: {
+                    Image(systemName: "trash")
+                }
+                .help("Delete meeting")
+                .accessibilityLabel("Delete meeting")
             }
             .padding(16)
 
@@ -800,7 +866,7 @@ private struct MeetingDocumentView: View {
                 Text("Transcript")
                     .font(.headline)
                 Spacer()
-                Text("\(meeting.transcript.count) segments")
+                Text(meeting.transcript.count == 1 ? "1 segment" : "\(meeting.transcript.count) segments")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

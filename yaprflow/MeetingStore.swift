@@ -90,6 +90,39 @@ final class MeetingStore: ObservableObject {
         return url
     }
 
+    /// Removes both durable representations of a meeting. Production files are
+    /// moved to the Trash so an accidental deletion remains recoverable.
+    @discardableResult
+    func delete(_ meeting: MeetingRecord) -> Bool {
+        do {
+            let directory = try meetingsDirectory()
+            let markdownURL = directory
+                .appendingPathComponent(meeting.id.uuidString)
+                .appendingPathExtension("md")
+            let jsonURL = directory
+                .appendingPathComponent(meeting.id.uuidString)
+                .appendingPathExtension("json")
+
+            // Delete the indexable JSON last. If moving the Markdown export
+            // fails, the meeting remains visible and can be retried safely.
+            try discardFileIfPresent(at: markdownURL)
+            try discardFileIfPresent(at: jsonURL)
+            meetings.removeAll { $0.id == meeting.id }
+            errorMessage = nil
+            NotificationCenter.default.post(name: .yaprflowMeetingsChanged, object: meeting.id)
+            return true
+        } catch {
+            let message = error.localizedDescription
+            refresh()
+            errorMessage = message
+            return false
+        }
+    }
+
+    func clearError() {
+        errorMessage = nil
+    }
+
     func meetingsDirectory() throws -> URL {
         let root: URL
         if let rootOverride {
@@ -119,11 +152,25 @@ final class MeetingStore: ObservableObject {
             let markdownURL = try store.save(meeting)
             store.refresh()
             let jsonURL = directory.appendingPathComponent(meeting.id.uuidString).appendingPathExtension("json")
-            return store.meeting(id: meeting.id)?.transcript.first == segment
+            let persisted = store.meeting(id: meeting.id)?.transcript.first == segment
                 && FileManager.default.fileExists(atPath: jsonURL.path)
                 && FileManager.default.fileExists(atPath: markdownURL.path)
+            guard persisted, store.delete(meeting) else { return false }
+            return store.meeting(id: meeting.id) == nil
+                && !FileManager.default.fileExists(atPath: jsonURL.path)
+                && !FileManager.default.fileExists(atPath: markdownURL.path)
         } catch {
             return false
+        }
+    }
+
+    private func discardFileIfPresent(at url: URL) throws {
+        guard fileManager.fileExists(atPath: url.path) else { return }
+        if rootOverride != nil {
+            try fileManager.removeItem(at: url)
+        } else {
+            var resultingURL: NSURL?
+            try fileManager.trashItem(at: url, resultingItemURL: &resultingURL)
         }
     }
 }

@@ -643,6 +643,10 @@ public enum MeetingPromptBuilder {
 }
 
 public enum MeetingGeneratedNotesParser {
+    private enum ParseError: Error {
+        case emptyResponse
+    }
+
     private struct Payload: Decodable {
         struct Insight: Decodable {
             let kind: MeetingInsightKind
@@ -658,22 +662,25 @@ public enum MeetingGeneratedNotesParser {
     }
 
     public static func parse(_ response: String, validSegmentIDs: Set<UUID>) throws -> MeetingGeneratedNotes {
-        let json = extractedJSONObject(from: response)
-        let payload = try JSONDecoder().decode(Payload.self, from: Data(json.utf8))
-        let insights = payload.insights.map { item in
-            MeetingInsight(
-                kind: item.kind,
-                text: item.text,
-                owner: item.owner,
-                dueDate: item.dueDate,
-                citationSegmentIDs: item.citationSegmentIDs.filter(validSegmentIDs.contains)
-            )
+        let trimmed = response.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { throw ParseError.emptyResponse }
+
+        let json = extractedJSONObject(from: trimmed)
+        for candidate in jsonCandidates(from: json) {
+            if let payload = try? JSONDecoder().decode(Payload.self, from: Data(candidate.utf8)) {
+                return notes(from: payload, validSegmentIDs: validSegmentIDs)
+            }
+            if let object = try? JSONSerialization.jsonObject(with: Data(candidate.utf8)),
+               let dictionary = notesDictionary(from: object),
+               let notes = flexibleNotes(from: dictionary, validSegmentIDs: validSegmentIDs) {
+                return notes
+            }
         }
-        return MeetingGeneratedNotes(
-            overview: payload.overview,
-            insights: insights,
-            followUpEmail: payload.followUpEmail
-        )
+
+        // Some local and smaller models honor the requested sections but return
+        // Markdown instead of JSON. The content is still useful, so retain it as
+        // readable notes rather than discarding a successfully saved transcript.
+        return plainTextNotes(from: trimmed, validSegmentIDs: validSegmentIDs)
     }
 
     private static func extractedJSONObject(from response: String) -> String {
@@ -682,6 +689,286 @@ public enum MeetingGeneratedNotesParser {
               let last = trimmed.lastIndex(of: "}"),
               first <= last else { return trimmed }
         return String(trimmed[first...last])
+    }
+
+    private static func jsonCandidates(from json: String) -> [String] {
+        let normalizedQuotes = json
+            .replacingOccurrences(of: "“", with: "\"")
+            .replacingOccurrences(of: "”", with: "\"")
+            .replacingOccurrences(of: "‘", with: "'")
+            .replacingOccurrences(of: "’", with: "'")
+        let withoutTrailingCommas = normalizedQuotes.replacingOccurrences(
+            of: #",\s*([}\]])"#,
+            with: "$1",
+            options: .regularExpression
+        )
+        return withoutTrailingCommas == json ? [json] : [json, withoutTrailingCommas]
+    }
+
+    private static func notes(from payload: Payload, validSegmentIDs: Set<UUID>) -> MeetingGeneratedNotes {
+        MeetingGeneratedNotes(
+            overview: payload.overview,
+            insights: payload.insights.map { item in
+                MeetingInsight(
+                    kind: item.kind,
+                    text: item.text,
+                    owner: item.owner,
+                    dueDate: item.dueDate,
+                    citationSegmentIDs: item.citationSegmentIDs.filter(validSegmentIDs.contains)
+                )
+            },
+            followUpEmail: payload.followUpEmail
+        )
+    }
+
+    private static func notesDictionary(from object: Any) -> [String: Any]? {
+        if let array = object as? [Any], array.count == 1 {
+            return notesDictionary(from: array[0])
+        }
+        guard let dictionary = object as? [String: Any] else { return nil }
+        let normalized = normalizedDictionary(dictionary)
+        for key in ["meetingnotes", "generatednotes", "notes", "result"] {
+            if let nested = normalized[key] as? [String: Any] {
+                return nested
+            }
+        }
+        return dictionary
+    }
+
+    private static func flexibleNotes(
+        from dictionary: [String: Any],
+        validSegmentIDs: Set<UUID>
+    ) -> MeetingGeneratedNotes? {
+        let values = normalizedDictionary(dictionary)
+        var insights: [MeetingInsight] = []
+
+        if let items = values["insights"] as? [Any] {
+            insights.append(contentsOf: items.compactMap {
+                insight(from: $0, defaultKind: .keyDetail, validSegmentIDs: validSegmentIDs)
+            })
+        }
+
+        let groupedKinds: [(keys: [String], kind: MeetingInsightKind)] = [
+            (["keypoints", "highlights", "summarypoints"], .summary),
+            (["decisions"], .decision),
+            (["actionitems", "actions", "nextsteps", "todos", "tasks"], .actionItem),
+            (["openquestions", "questions", "unresolvedquestions"], .openQuestion),
+            (["keydetails", "details", "facts"], .keyDetail),
+        ]
+        for group in groupedKinds {
+            for key in group.keys {
+                guard let value = values[key] else { continue }
+                let items = value as? [Any] ?? [value]
+                insights.append(contentsOf: items.compactMap {
+                    insight(from: $0, defaultKind: group.kind, validSegmentIDs: validSegmentIDs)
+                })
+                break
+            }
+        }
+
+        var overview = stringValue(in: values, keys: [
+            "overview", "meetingsummary", "executivesummary", "summary",
+        ]) ?? ""
+        if overview.isEmpty {
+            overview = insights
+                .filter { $0.kind == .summary }
+                .prefix(3)
+                .map(\.text)
+                .joined(separator: " ")
+        }
+        let followUpEmail = stringValue(in: values, keys: [
+            "followupemail", "followup", "emaildraft", "email",
+        ]) ?? ""
+
+        let notes = MeetingGeneratedNotes(
+            overview: overview,
+            insights: deduplicated(insights),
+            followUpEmail: followUpEmail
+        )
+        guard !notes.overview.isEmpty || !notes.insights.isEmpty || !notes.followUpEmail.isEmpty else {
+            return nil
+        }
+        return notes
+    }
+
+    private static func insight(
+        from value: Any,
+        defaultKind: MeetingInsightKind,
+        validSegmentIDs: Set<UUID>
+    ) -> MeetingInsight? {
+        if let text = value as? String {
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return nil }
+            return MeetingInsight(
+                kind: defaultKind,
+                text: trimmed,
+                citationSegmentIDs: citationIDs(in: trimmed, validSegmentIDs: validSegmentIDs)
+            )
+        }
+        guard let dictionary = value as? [String: Any] else { return nil }
+        let values = normalizedDictionary(dictionary)
+        guard let text = stringValue(in: values, keys: [
+            "text", "content", "description", "summary", "action", "item", "decision", "question", "detail",
+        ]), !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return nil
+        }
+        let kind = stringValue(in: values, keys: ["kind", "type", "category"])
+            .flatMap(insightKind(from:)) ?? defaultKind
+        let citationsValue = firstValue(in: values, keys: [
+            "citationsegmentids", "segmentids", "citations", "evidence",
+        ])
+        return MeetingInsight(
+            kind: kind,
+            text: text,
+            owner: stringValue(in: values, keys: ["owner", "assignee"]),
+            dueDate: stringValue(in: values, keys: ["duedate", "deadline", "due"]),
+            citationSegmentIDs: citationIDs(
+                in: citationsValue ?? text,
+                validSegmentIDs: validSegmentIDs
+            )
+        )
+    }
+
+    private static func insightKind(from value: String) -> MeetingInsightKind? {
+        switch normalizedKey(value) {
+        case "summary", "keypoint", "keypoints", "point", "highlight", "highlights": .summary
+        case "decision", "decisions", "decided": .decision
+        case "actionitem", "actionitems", "action", "actions", "nextstep", "nextsteps", "todo", "todos", "task", "tasks": .actionItem
+        case "openquestion", "openquestions", "question", "questions", "unresolved": .openQuestion
+        case "keydetail", "keydetails", "detail", "details", "fact", "facts": .keyDetail
+        default: nil
+        }
+    }
+
+    private static func citationIDs(in value: Any, validSegmentIDs: Set<UUID>) -> [UUID] {
+        let strings: [String]
+        if let values = value as? [Any] {
+            strings = values.compactMap {
+                if let string = $0 as? String { return string }
+                return ($0 as? UUID)?.uuidString
+            }
+        } else if let string = value as? String {
+            strings = [string]
+        } else if let uuid = value as? UUID {
+            strings = [uuid.uuidString]
+        } else {
+            return []
+        }
+
+        var result: [UUID] = []
+        for string in strings {
+            let components = string.components(separatedBy: CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-")).inverted)
+            for component in components {
+                guard let id = UUID(uuidString: component),
+                      validSegmentIDs.contains(id),
+                      !result.contains(id) else { continue }
+                result.append(id)
+            }
+        }
+        return result
+    }
+
+    private static func plainTextNotes(
+        from response: String,
+        validSegmentIDs: Set<UUID>
+    ) -> MeetingGeneratedNotes {
+        let cleaned = response
+            .replacingOccurrences(of: "```json", with: "", options: .caseInsensitive)
+            .replacingOccurrences(of: "```markdown", with: "", options: .caseInsensitive)
+            .replacingOccurrences(of: "```", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleaned.isEmpty else {
+            return MeetingGeneratedNotes()
+        }
+
+        var overviewLines: [String] = []
+        var followUpLines: [String] = []
+        var insights: [MeetingInsight] = []
+        var activeKind: MeetingInsightKind?
+        var isFollowUp = false
+
+        for rawLine in cleaned.components(separatedBy: .newlines) {
+            let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !line.isEmpty else { continue }
+            let heading = normalizedKey(
+                line.trimmingCharacters(in: CharacterSet(charactersIn: "#*: "))
+            )
+            if heading == "summary" || heading == "overview" || heading == "executivesummary" {
+                activeKind = nil
+                isFollowUp = false
+                continue
+            }
+            if let kind = insightKind(from: heading) {
+                activeKind = kind
+                isFollowUp = false
+                continue
+            }
+            if heading == "followupemail" || heading == "followup" || heading == "emaildraft" {
+                activeKind = nil
+                isFollowUp = true
+                continue
+            }
+
+            let content = strippedListMarker(from: line)
+            if isFollowUp {
+                followUpLines.append(content)
+            } else if let activeKind {
+                insights.append(MeetingInsight(
+                    kind: activeKind,
+                    text: content,
+                    citationSegmentIDs: citationIDs(in: content, validSegmentIDs: validSegmentIDs)
+                ))
+            } else {
+                overviewLines.append(content)
+            }
+        }
+
+        let overview = overviewLines.joined(separator: "\n")
+        return MeetingGeneratedNotes(
+            overview: overview.isEmpty && insights.isEmpty ? cleaned : overview,
+            insights: deduplicated(insights),
+            followUpEmail: followUpLines.joined(separator: "\n")
+        )
+    }
+
+    private static func normalizedDictionary(_ dictionary: [String: Any]) -> [String: Any] {
+        Dictionary(uniqueKeysWithValues: dictionary.map { (normalizedKey($0.key), $0.value) })
+    }
+
+    private static func strippedListMarker(from line: String) -> String {
+        for marker in ["- ", "* ", "• "] where line.hasPrefix(marker) {
+            return String(line.dropFirst(marker.count))
+        }
+        return line.replacingOccurrences(
+            of: #"^\d+[.)]\s+"#,
+            with: "",
+            options: .regularExpression
+        )
+    }
+
+    private static func normalizedKey(_ value: String) -> String {
+        value.lowercased().filter(\.isLetter)
+    }
+
+    private static func firstValue(in values: [String: Any], keys: [String]) -> Any? {
+        keys.lazy.compactMap { values[normalizedKey($0)] }.first
+    }
+
+    private static func stringValue(in values: [String: Any], keys: [String]) -> String? {
+        guard let value = firstValue(in: values, keys: keys), !(value is NSNull) else { return nil }
+        if let string = value as? String {
+            let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
+        }
+        return nil
+    }
+
+    private static func deduplicated(_ insights: [MeetingInsight]) -> [MeetingInsight] {
+        var seen: Set<String> = []
+        return insights.filter { insight in
+            let key = "\(insight.kind.rawValue):\(insight.text.lowercased())"
+            return seen.insert(key).inserted
+        }
     }
 }
 

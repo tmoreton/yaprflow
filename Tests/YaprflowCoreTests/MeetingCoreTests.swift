@@ -61,6 +61,66 @@ struct MeetingCoreTests {
         #expect(notes.insights.first?.citationSegmentIDs == [validID])
     }
 
+    @Test("Generated notes tolerate common model JSON variations")
+    func generatedNotesFlexibleJSONParsing() throws {
+        let validID = UUID()
+        let response = """
+        {
+          "summary": "The team aligned on the launch.",
+          "action_items": [
+            {
+              "type": "next_step",
+              "action": "Send the revised plan",
+              "assignee": "Taylor",
+              "deadline": "Friday",
+              "citations": ["\(validID)"]
+            }
+          ],
+        }
+        """
+
+        let notes = try MeetingGeneratedNotesParser.parse(
+            response,
+            validSegmentIDs: [validID]
+        )
+
+        #expect(notes.overview == "The team aligned on the launch.")
+        #expect(notes.insights.first?.kind == .actionItem)
+        #expect(notes.insights.first?.text == "Send the revised plan")
+        #expect(notes.insights.first?.owner == "Taylor")
+        #expect(notes.insights.first?.dueDate == "Friday")
+        #expect(notes.insights.first?.citationSegmentIDs == [validID])
+        #expect(notes.followUpEmail.isEmpty)
+    }
+
+    @Test("Generated notes preserve useful Markdown when a model ignores JSON")
+    func generatedNotesMarkdownFallback() throws {
+        let validID = UUID()
+        let response = """
+        ## Summary
+        The launch plan was reviewed.
+
+        ## Decisions
+        - Ship the smaller scope [\(validID)]
+
+        ## Action items
+        - Send the revised plan by Friday.
+
+        ## Follow-up email
+        Thanks for aligning on the launch plan.
+        """
+
+        let notes = try MeetingGeneratedNotesParser.parse(
+            response,
+            validSegmentIDs: [validID]
+        )
+
+        #expect(notes.overview == "The launch plan was reviewed.")
+        #expect(notes.insights.contains { $0.kind == .decision && $0.citationSegmentIDs == [validID] })
+        #expect(notes.insights.contains { $0.kind == .actionItem && $0.text == "Send the revised plan by Friday." })
+        #expect(notes.followUpEmail == "Thanks for aligning on the launch plan.")
+    }
+
     @Test("Generation prompt includes human notes and stable evidence IDs")
     func prompt() {
         let segment = MeetingTranscriptSegment(

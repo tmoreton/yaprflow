@@ -136,7 +136,8 @@ final class MobileMeetingStore: ObservableObject {
         return markdownURL
     }
 
-    func delete(_ meeting: MeetingRecord) {
+    @discardableResult
+    func delete(_ meeting: MeetingRecord) -> Bool {
         do {
             let directory = try meetingsDirectory()
             for pathExtension in ["json", "md"] {
@@ -150,8 +151,10 @@ final class MobileMeetingStore: ObservableObject {
             meetings.removeAll { $0.id == meeting.id }
             if lastSavedMeetingID == meeting.id { lastSavedMeetingID = nil }
             errorMessage = nil
+            return true
         } catch {
             errorMessage = error.localizedDescription
+            return false
         }
     }
 
@@ -220,13 +223,21 @@ final class MobileMeetingStore: ObservableObject {
                 duration: 30
             )
             store.refresh()
+            let markdownURL = try store.exportURL(for: meeting)
             let markdown = try String(
-                contentsOf: store.exportURL(for: meeting),
+                contentsOf: markdownURL,
                 encoding: .utf8
             )
-            return store.meetings.first == meeting
+            let persisted = store.meetings.first == meeting
                 && markdown.contains("We agreed to ship on Friday.")
                 && markdown.contains("Confirm the launch owner.")
+            guard persisted, store.delete(meeting) else { return false }
+            let jsonURL = directory
+                .appendingPathComponent(meeting.id.uuidString)
+                .appendingPathExtension("json")
+            return store.meetings.isEmpty
+                && !FileManager.default.fileExists(atPath: jsonURL.path)
+                && !FileManager.default.fileExists(atPath: markdownURL.path)
         } catch {
             return false
         }

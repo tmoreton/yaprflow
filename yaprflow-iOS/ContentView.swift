@@ -451,6 +451,7 @@ struct ContentView: View {
 private struct MeetingLibrarySheet: View {
     @ObservedObject var store: MobileMeetingStore
     @Environment(\.dismiss) private var dismiss
+    @State private var meetingPendingDeletion: MeetingRecord?
 
     var body: some View {
         NavigationStack {
@@ -469,9 +470,9 @@ private struct MeetingLibrarySheet: View {
                             }
                         }
                         .onDelete { offsets in
-                            for offset in offsets {
-                                store.delete(store.meetings[offset])
-                            }
+                            guard let offset = offsets.first,
+                                  store.meetings.indices.contains(offset) else { return }
+                            meetingPendingDeletion = store.meetings[offset]
                         }
                     }
                 }
@@ -500,6 +501,25 @@ private struct MeetingLibrarySheet: View {
             Button("OK") { store.clearError() }
         } message: {
             Text(store.errorMessage ?? "Please try again.")
+        }
+        .confirmationDialog(
+            "Delete this meeting?",
+            isPresented: Binding(
+                get: { meetingPendingDeletion != nil },
+                set: { if !$0 { meetingPendingDeletion = nil } }
+            )
+        ) {
+            Button("Delete Meeting", role: .destructive) {
+                if let meetingPendingDeletion {
+                    store.delete(meetingPendingDeletion)
+                    self.meetingPendingDeletion = nil
+                }
+            }
+            Button("Cancel", role: .cancel) {
+                meetingPendingDeletion = nil
+            }
+        } message: {
+            Text("This removes the transcript and notes from this device.")
         }
     }
 }
@@ -531,8 +551,10 @@ private struct MeetingLibraryRow: View {
 private struct MobileMeetingDetailView: View {
     let meeting: MeetingRecord
     @ObservedObject var store: MobileMeetingStore
+    @Environment(\.dismiss) private var dismiss
     @State private var exportURL: URL?
     @State private var copied = false
+    @State private var confirmsDeletion = false
 
     var body: some View {
         ScrollView {
@@ -583,10 +605,28 @@ private struct MobileMeetingDetailView: View {
                     }
                     .accessibilityLabel("Share meeting")
                 }
+
+                Button(role: .destructive) {
+                    confirmsDeletion = true
+                } label: {
+                    Image(systemName: "trash")
+                }
+                .accessibilityLabel("Delete meeting")
             }
         }
         .onAppear {
             exportURL = try? store.exportURL(for: meeting)
+        }
+        .confirmationDialog(
+            "Delete this meeting?",
+            isPresented: $confirmsDeletion
+        ) {
+            Button("Delete Meeting", role: .destructive) {
+                if store.delete(meeting) { dismiss() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This removes the transcript and notes from this device.")
         }
     }
 
