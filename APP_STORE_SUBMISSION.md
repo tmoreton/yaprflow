@@ -9,14 +9,14 @@ commercial generation. It also preserves the state of the historical free
 4.0.14 submission so that the transition is not mistaken for a retroactive
 change.
 
-Last reviewed: September 19, 2026
+Last reviewed: September 20, 2026
 
 ## Intended release records
 
 | Platform | Bundle ID | Version | Build | App Store record |
 | --- | --- | --- | --- | --- |
-| macOS | `com.tmoreton.yaprflow` | 5.1.4 | 11 | Apple ID `6810892725` |
-| iPhone/iPad | `com.tmoreton.yaprflow.ios` | 1.0.0 | 2 | Not yet documented |
+| macOS | `com.tmoreton.yaprflow` | 5.2.0 | 12 | Apple ID `6810892725` |
+| iPhone/iPad | `com.tmoreton.yaprflow.ios` | 1.0.0 | 3 | Not yet documented |
 
 Keep both bundle identifiers stable. In particular, changing the macOS bundle
 ID would break continuity with the existing sandbox container and App Store
@@ -38,6 +38,33 @@ entitlement, privacy-manifest, model, notice, universal-binary, and Sparkle
 exclusion checks. Select build 11 in the intended TestFlight group and complete
 the App Store Connect metadata, agreements, compliance, and review steps below.
 
+### Local 5.2.0 production evidence
+
+On September 20, 2026, the direct Mac 5.2.0 (12) build completed the full
+Developer ID release path. Apple accepted and stapled the app under notary
+submission `fea9723d-b70f-425d-a9f7-19efcfcdf6e7`, then accepted and stapled
+the DMG under submission `05b54eb7-d400-424c-bb19-00866b87831a`. Gatekeeper
+accepted `build/yaprflow-5.2.0.dmg`; its SHA-256 is
+`3886a45be8247cdb4cabaa70d7456e8ddb4d48c1c8ad5d3d1ca2155776cc5e97`.
+The signed app also passed the Meeting Notes persistence and Quick Dictation
+capture-engine runtime smoke tests. Nothing was uploaded to a customer-facing
+download location.
+
+The 5.2.0 (12) Mac App Store archive at
+`build/app-store/5.2.0-12/yaprflow.xcarchive` passed the release script's
+source, model, archive, resource, architecture, privacy, entitlement, and
+Sparkle-exclusion checks. Installer export is blocked only because this Mac is
+missing a `Mac Installer Distribution` certificate for team `GVXC5FQ2RP`; no
+5.2.0 package was produced or uploaded.
+
+The iOS 1.0.0 (3) archives at `build/ios-app-store/1.0.0-3/` and
+`build/ios-app-store/1.0.0-3-managed/` passed the signed-archive payload,
+framework, entitlement, privacy, model, notice, and provisioning checks. IPA
+export is blocked because the installed App Store profile does not include the
+current Apple Distribution certificate and Xcode has no authenticated
+Developer account from which to regenerate it. No IPA was produced or
+uploaded.
+
 ## macOS product page
 
 - **Name:** Yaprflow
@@ -51,15 +78,16 @@ the App Store Connect metadata, agreements, compliance, and review steps below.
 - **Privacy policy URL:** https://yaprflow.com/policies/#privacy
 - **Keywords:** dictation,voice,text,transcription,offline,private,speech,productivity
 
-### Draft What's New in Version 5.1.4
+### Draft What's New in Version 5.2.0
 
-Yaprflow 5.1.4 adds on-device streaming dictation across 32 production-ready
-locales, in-app feedback, optional AI Summary using Apple Intelligence, OpenAI,
-OpenRouter, or Ollama, refreshed artwork, and privacy-preserving usage and
-failure telemetry with a Settings off switch. It also improves recognition of
-short recordings, transcript history, vocabulary, and provider error handling.
+Yaprflow now separates Quick Dictation from Meeting Notes. Quick Dictation
+turns speech into clipboard text from a global shortcut. Meeting Notes captures
+microphone and Mac audio without a meeting bot, combines the local transcript
+with typed notes and calendar context, and creates editable structured notes
+with evidence links. This release also adds meeting templates, local meeting
+search, cross-meeting questions, and a cleaner mode-first menu.
 
-Use this text when 5.1.4 is submitted as an update to a version that reached
+Use this text when 5.2.0 is submitted as an update to a version that reached
 Ready for Distribution. App Store Connect may not show or require the field if
 the pending 4.0.14 version is withdrawn before its first release.
 
@@ -98,9 +126,69 @@ OpenAI and OpenRouter requests send selected transcript text and prompts to
 the provider. Ollama runs through its local service; Ollama cloud models may
 send requests to Ollama's service.
 
-Do not describe Yaprflow as retaining meeting recordings or capturing system
-audio. The current app captures microphone input for transcription, discards
-raw audio after processing, and stores transcript text.
+Yaprflow never retains raw meeting recordings. On Mac, Meeting Notes can
+capture microphone and system audio after the user explicitly starts a meeting
+and grants both permissions. On iPhone and iPad, In-person Meeting uses only
+the device microphone and cannot capture audio from another app.
+
+## iPhone and iPad product page
+
+- **Name:** Yaprflow
+- **Subtitle:** Private voice & meeting notes
+- **Primary category:** Productivity
+- **Secondary category:** Utilities
+- **Copyright:** 2026 Tim Moreton
+- **Marketing URL:** https://yaprflow.com/
+- **Support URL:** https://yaprflow.com/support.html
+- **Privacy policy URL:** https://yaprflow.com/policies/#privacy
+- **Keywords:** dictation,voice,transcription,meetings,notes,offline,private,speech,clipboard,productivity
+
+### iOS description
+
+Turn speech into useful text without sending your voice to a transcription
+service. Yaprflow includes two focused modes for iPhone and iPad.
+
+Quick Dictation is the fast path from voice to clipboard. Speak, stop, and your
+finished text is ready to paste into any app. Yaprflow keeps up to 50 recent
+results locally so you can recover something you dictated earlier.
+
+In-person Meeting is a clean workspace for conversations happening around your
+device. Add a title, choose a template, type notes, and capture a live local
+transcript. Finished meetings are saved as JSON and Markdown in the app's local
+container and can be copied or shared when you choose.
+
+Features:
+
+- Local speech recognition with the complete model included in the app.
+- Quick voice-to-text capture with automatic clipboard copy.
+- Microphone-only in-person meeting capture with typed notes and templates.
+- Local meeting library with readable Markdown export.
+- 32 production-ready speech locales plus Automatic detection.
+- No account, subscription, advertising, or cross-app tracking.
+
+Audio is used only while you record and is not retained. In-person Meeting
+does not capture audio from calls or other apps. Records do not yet sync with
+the Mac app. Yaprflow requires iOS 17 or later.
+
+### iOS review notes
+
+Yaprflow has no account or login. The bundled speech model can make the first
+capture slower while the local recognizer initializes.
+
+To test Quick Dictation, select Quick, tap the microphone, speak, and tap Stop.
+The transcript is copied to the clipboard and appears under the clock button.
+
+To test In-person Meeting, select Meeting, optionally enter a title and notes,
+tap Start in-person meeting, speak, and tap Stop meeting. The transcript and
+notes are saved locally. Tap the folder button to open the meeting library and
+copy or share its Markdown representation. A title by itself does not create an
+empty meeting.
+
+The app's `audio` background mode supports an uninterrupted meeting that the
+user deliberately started before locking the device or briefly switching apps.
+The recording state is clearly visible when the app is foregrounded. Audio is
+processed for transcription and discarded; no recording file is created. The
+iOS app does not capture other-app audio.
 
 ## App privacy answers
 
@@ -123,6 +211,30 @@ information under Apple's terms; Yaprflow does not receive payment-card data.
 
 Reconfirm these answers in App Store Connect against the final signed binary
 and the published privacy policy before every submission.
+
+For the separate iOS record, use the conservative disclosure below unless the
+final feedback flow or Apple's current questionnaire changes:
+
+- **Audio data:** Not collected. Microphone audio is processed on-device in
+  real time, is not persisted, and is not transmitted off-device.
+- **User content / transcripts / meeting notes:** Not collected. These remain
+  in the app container unless the user explicitly exports them.
+- **Contact info — email address:** Collected only when the user voluntarily
+  sends a support email; used for App Functionality (customer support), linked
+  to the user's identity, and not used for tracking.
+- **User content — customer support / other user content:** Collected only when
+  the user voluntarily sends a support email; used for App Functionality,
+  linked to the user's identity, and not used for tracking.
+- **Tracking:** No.
+
+Apple defines collection as transmitting data off-device in a way that remains
+accessible beyond servicing the request. Its optional-disclosure exception for
+support forms has several conditions, including prominently displaying the
+user's account name with the submitted fields. The current mail-based feedback
+flow should therefore use the disclosure above rather than relying on that
+exception. See Apple's [App privacy details](https://developer.apple.com/app-store/app-privacy-details/)
+and [Manage app privacy](https://developer.apple.com/help/app-store-connect/manage-app-information/manage-app-privacy/)
+references when entering the final answers.
 
 ## Content rights and acknowledgements
 
@@ -284,18 +396,27 @@ been deployed by this repository change.
   selector; build 4 remains the earlier Automatic-only implementation.
 - [ ] Install the incremented selector build through TestFlight and perform the
   release smoke test before App Review submission.
-- [ ] Run `scripts/ios-app-store-release.sh` for iOS 1.0.0 (2), inspect the
-  verified `.ipa`, and upload it only after the iOS App Store relationship and
-  metadata decisions below are complete. Use `IOS_ARCHIVE_ONLY=1` until an App
-  Store Connect record and distribution profile are ready.
+- [x] Run `scripts/ios-app-store-release.sh` for iOS 1.0.0 (3) and verify the
+  signed archive. The archive passed on September 20, 2026.
+- [ ] Sign in to the `GVXC5FQ2RP` Apple Developer account in Xcode, regenerate
+  the iOS App Store profile so it includes the installed Apple Distribution
+  certificate, rerun the script to verify the exported `.ipa`, and upload only
+  after the App Store relationship and metadata decisions below are complete.
 - [ ] Run the signed existing-user migration test described below.
 
 ## iPhone and iPad readiness
 
-The source target is now internally consistent at version 1.0.0 build 2. Its
+The source target is now internally consistent at version 1.0.0 build 3. Its
 Info.plist derives version/build from Xcode settings, includes iPad
 orientations, and declares its microphone purpose. Its app icon is opaque, and
 the target now bundles a privacy manifest plus third-party acknowledgements.
+
+The iOS release exposes two explicit modes. Quick Dictation copies local
+speech-to-text results to the clipboard and retains up to 50 recent results.
+In-person Meeting uses only the device microphone, accepts typed notes and a
+shared template, and saves local JSON plus Markdown using the same
+`MeetingRecord` schema as Mac. It does not capture other-app audio or run Mac AI
+providers, and there is no cross-device sync in 1.0.
 
 Distribution is not yet ready until these external steps are complete:
 
@@ -309,15 +430,19 @@ Distribution is not yet ready until these external steps are complete:
   universal purchase is the chosen model and App Store Connect confirms it is
   still safe to do so.
 - [ ] Confirm or create the App Store Connect record and obtain its Apple ID.
-- [ ] Prepare iPhone and iPad screenshots, product-page copy, review notes,
-  privacy answers, age rating, territories, and a paid price.
+- [x] Prepare local iPhone and iPad screenshots, product-page copy, review
+  notes, and draft privacy answers. Final captures are in
+  `AppStore/Screenshots/iOS/`; review them once more on the release build.
+- [ ] Enter and reconfirm the iOS age rating, privacy answers, territories, and
+  price in App Store Connect after the record/purchase relationship is chosen.
 - [ ] Run `scripts/ios-app-store-release.sh` to create and inspect the signed
   iOS distribution archive and exported `.ipa`, then validate it on a real
   device or through TestFlight, including microphone behavior and the declared
   background-audio behavior. The script performs local verification only and
   never uploads.
-- [ ] Confirm whether the `audio` background mode is actually required for the
-  final product; remove it if it is not used and cannot be justified to review.
+- [x] Retain the `audio` background mode for uninterrupted, explicitly started
+  in-person meetings. Validate its behavior on a physical device and explain
+  the user-facing behavior in the review notes above.
 
 ## Existing-user migration test
 

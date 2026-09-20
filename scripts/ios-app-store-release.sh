@@ -38,7 +38,7 @@ EXPECTED_BUNDLE_ID="com.tmoreton.yaprflow.ios"
 EXPECTED_TEAM_ID="GVXC5FQ2RP"
 EXPECTED_MINIMUM_IOS="17.0"
 EXPECTED_APPLICATION_ID="$EXPECTED_TEAM_ID.$EXPECTED_BUNDLE_ID"
-EXPECTED_MICROPHONE_PURPOSE="Yaprflow uses the microphone to transcribe your speech on-device. Audio never leaves your device."
+EXPECTED_MICROPHONE_PURPOSE="Yaprflow uses the microphone for on-device dictation and in-person meeting transcripts. Audio never leaves your device."
 
 usage() {
     sed -n '2,15p' "$0"
@@ -644,6 +644,9 @@ OUTPUT_DIR="${IOS_APP_STORE_OUTPUT_DIR:-$DEFAULT_OUTPUT_DIR}"
 echo "==> Running shared transcription-policy tests"
 swift test
 
+echo "==> Running iOS meeting-store persistence smoke test"
+"$ROOT/scripts/ios-meeting-store-smoke.sh"
+
 echo "==> Verifying the pinned source model inventory"
 "$ROOT/scripts/fetch-models.sh"
 yaprflow_verify_model_inventory "$ROOT" "$MODEL_CHECKSUMS" \
@@ -665,7 +668,7 @@ xcodebuild \
     -configuration "$CONFIGURATION" \
     -destination "generic/platform=iOS" \
     -archivePath "$ARCHIVE_PATH" \
-    "${PROVISIONING_ARGS[@]}" \
+    ${PROVISIONING_ARGS[@]+"${PROVISIONING_ARGS[@]}"} \
     MARKETING_VERSION="$VERSION" \
     CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
     DEVELOPMENT_TEAM="$EXPECTED_TEAM_ID" \
@@ -725,7 +728,7 @@ xcodebuild \
     -archivePath "$ARCHIVE_PATH" \
     -exportPath "$EXPORT_DIR" \
     -exportOptionsPlist "$EXPORT_OPTIONS" \
-    "${PROVISIONING_ARGS[@]}"
+    ${PROVISIONING_ARGS[@]+"${PROVISIONING_ARGS[@]}"}
 
 IPA_COUNT="$(
     find "$EXPORT_DIR" -maxdepth 2 -type f -name '*.ipa' -print \

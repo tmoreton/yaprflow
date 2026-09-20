@@ -66,13 +66,14 @@ privacy and App Store release checks.
 - On-device multilingual streaming speech recognition in 32 production-ready
   locales, using the 1120 ms chunk-size INT8 export of NVIDIA Nemotron 3.5 ASR
   Streaming 0.6B through an ASR-only sherpa-onnx build and ONNX Runtime.
-  On macOS, English (United States) is the saved default; every
-  production-ready locale is selectable and Automatic detection remains
-  available. The current iOS source target uses Automatic detection.
+  English (United States) is the saved default; every production-ready locale
+  is selectable and Automatic detection remains available on both platforms.
 - On-device Silero voice activity detection.
 - Live transcription preview and automatic clipboard copy.
 - Local Markdown transcript history and vocabulary replacement on macOS.
-- A short, device-local recent-transcript history on iOS.
+- Up to 50 device-local Quick Dictation results on iOS.
+- Microphone-only in-person meetings on iPhone and iPad, with typed notes,
+  shared templates, local meeting history, and Markdown sharing.
 - Optional on-device summaries, rewrites, custom transformations, titles,
   topics, and descriptions through Apple's Foundation Models framework on
   supported Macs.
@@ -86,8 +87,9 @@ privacy and App Store release checks.
 Microphone audio is processed by models bundled with the official application.
 Raw audio is not retained after transcription. On macOS, transcripts,
 vocabulary, preferences, and custom AI prompts remain in the application's
-sandbox container. On iOS, up to three recent transcripts are kept in local app
-preferences. Apple Intelligence processing uses the on-device Foundation
+sandbox container. On iOS, recent Quick Dictation results, preferences, and
+in-person meeting JSON/Markdown records remain in the local app container.
+Apple Intelligence processing uses the on-device Foundation
 Models framework. Selecting OpenAI or OpenRouter sends the selected transcript
 and prompt to that provider when AI Summary is run; automatic titles with a
 selected external provider require a separate opt-in. Ollama requests go to
@@ -186,9 +188,8 @@ English-only Nemotron model have been removed. The current build uses the
 pinned June 11, 2026, 1120 ms chunk-size INT8 sherpa-onnx export of NVIDIA
 Nemotron 3.5 ASR Streaming 0.6B. The source model covers 40 locales across 35
 languages. Nineteen transcription-ready and 13 broad-coverage locales work out
-of the box. On macOS, Yaprflow exposes those 32 production-ready locales as
-explicit choices, defaults to English (United States), and also offers
-Automatic detection; the current iOS source target uses Automatic detection.
+of the box. Both apps expose those 32 production-ready locales as explicit
+choices, default to English (United States), and also offer Automatic detection.
 The remaining 8 adaptation-ready locales require fine-tuning and are not
 advertised as supported. OpenMDW-1.1 permits dealing in
 the model materials subject to its conditions and requires the license plus
@@ -290,32 +291,29 @@ assets remain for compatibility with historical builds.
   its public App Store URL was not live at the last review. Confirm public
   availability and the support, privacy, and marketing URLs before enabling
   customer-facing purchase links.
-- [ ] **Prepare iOS App Store metadata.** Confirm or create the iOS App Store
-  Connect record and Apple ID, then supply its name, subtitle, description,
-  keywords, screenshots, age rating, privacy answers, review notes, pricing,
-  territories, support URL, privacy URL, and marketing URL. Only the macOS
-  submission is currently documented. Universal purchase requires one bundle
-  ID across platforms; the current macOS and iOS IDs differ. If iOS has not
-  shipped or received a record, changing its identity and adding the platform
-  to the macOS record may still be possible. Existing separate records cannot
-  be merged, so otherwise keep separate paid records.
-- [ ] **Recheck target configuration values.** Confirm the intended Release
-  values are macOS 5.0.1 build 5 and iOS 1.0.0 build 2, and make any Debug versus
-  Release differences intentional before archiving.
+- [ ] **Finish iOS App Store metadata.** Product-page copy, review notes, draft
+  privacy answers, and clean iPhone/iPad screenshots are prepared in
+  `APP_STORE_SUBMISSION.md` and `AppStore/Screenshots/iOS/`. Confirm or create
+  the iOS App Store Connect record and Apple ID, then enter the age rating,
+  pricing, territories, and final answers. Universal purchase requires one
+  bundle ID across platforms; the current macOS and iOS IDs differ. Existing
+  separate records cannot be merged, so otherwise keep separate paid records.
+- [x] **Recheck target configuration values.** Release values are macOS 5.2.0
+  build 12 and iOS 1.0.0 build 3, shared across Debug and Release.
 - [ ] **Run a signed upgrade test.** Install the publicly released 4.0.14
   Developer ID build, create transcript history, vocabulary entries, and
   preferences, then install the signed Mac App Store 5.0.0 build. Verify the
   existing sandbox container remains accessible and all local data survives.
   Also verify a normal update from a prior Mac App Store build when one is
   available.
-- [ ] **Verify both signed Release archives.** Build, export, install, and launch
-  the macOS and iOS Release configurations with the exact distribution
-  profiles. Confirm the bundled models, privacy manifests, acknowledgements,
-  permission prompts, and application icons are present in the exported
-  products. Use `scripts/app-store-release.sh` for macOS and
-  `scripts/ios-app-store-release.sh` for iOS; both validate locally and never
-  upload. `IOS_ARCHIVE_ONLY=1 scripts/ios-app-store-release.sh` is available
-  while the iOS App Store record or export profile is not ready.
+- [x] **Verify both signed Release archives.** The macOS 5.2.0 (12) and iOS
+  1.0.0 (3) signed archives passed local payload, model, privacy, notice,
+  entitlement, architecture, and profile checks on September 20, 2026.
+- [ ] **Restore App Store export credentials.** Install a `Mac Installer
+  Distribution` certificate for team `GVXC5FQ2RP`. Sign in to that developer
+  account in Xcode and regenerate the iOS App Store profile so it includes the
+  current Apple Distribution certificate. Then rerun both release scripts and
+  inspect the exported `.pkg` and `.ipa`; neither script uploads.
 - [ ] **Publish and verify support/privacy pages.** Confirm the committed pages
   are live over HTTPS and update the corresponding App Store Connect URLs.
 - [ ] **Configure the Productivity Bundle in App Store Connect.** Do this only

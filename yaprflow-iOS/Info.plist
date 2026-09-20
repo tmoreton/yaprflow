@@ -23,7 +23,7 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Yaprflow uses the microphone to transcribe your speech on-device. Audio never leaves your device.</string>
+	<string>Yaprflow uses the microphone for on-device dictation and in-person meeting transcripts. Audio never leaves your device.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>UIBackgroundModes</key>

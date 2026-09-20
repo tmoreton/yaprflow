@@ -24,12 +24,27 @@ enum TranscriptionError: LocalizedError {
     }
 }
 
+enum MobileCaptureMode: String, CaseIterable, Identifiable {
+    case quick
+    case meeting
+
+    var id: Self { self }
+
+    var displayName: String {
+        switch self {
+        case .quick: "Quick"
+        case .meeting: "Meeting"
+        }
+    }
+}
+
 enum TranscriptionStatus: Equatable {
     case idle
     case preparing(String)
     case listening
     case finishing
     case copied
+    case saved
     case error(String)
 }
 
@@ -247,9 +262,9 @@ private actor StreamingNemotronRecognizer {
         self.recognizer.setOption(key: "language", value: "auto")
     }
 
-    func beginSegment() {
+    func beginSegment(language: SpeechLanguage) {
         recognizer.reset()
-        recognizer.setOption(key: "language", value: "auto")
+        recognizer.setOption(key: "language", value: language.rawValue)
         pendingSamples.removeAll(keepingCapacity: true)
         isAcceptingInput = true
     }
@@ -310,6 +325,12 @@ final class TranscriptionEngine: ObservableObject {
 
     @Published var status: TranscriptionStatus = .idle
     @Published var liveTranscript: String = ""
+    @Published private(set) var activeMode: MobileCaptureMode?
+    @Published var speechLanguage: SpeechLanguage {
+        didSet {
+            UserDefaults.standard.set(speechLanguage.rawValue, forKey: Self.speechLanguageKey)
+        }
+    }
 
     /// Rolling history of recent normalized audio levels (0...1). Updated at
     /// roughly the audio buffer rate while recording, decays toward zero when
@@ -318,6 +339,7 @@ final class TranscriptionEngine: ObservableObject {
     static let levelCount = 80
 
     private let history = HistoryStore.shared
+    private let meetingStore = MobileMeetingStore.shared
     private let capture: AudioCapture
     private let audioFIFO: AudioBufferFIFO
     private let audioConverter = StreamingAudioConverter()
@@ -342,6 +364,9 @@ final class TranscriptionEngine: ObservableObject {
     private var volatileText = ""
     private var volatileSegmentID: Int?
     private var sessionGeneration: UInt = 0
+    private var requestedMode: MobileCaptureMode = .quick
+    private var sessionStartedAt: Date?
+    private var sessionLanguage: SpeechLanguage = .defaultSelection
 
     private var lifecycle: RecordingLifecyclePhase = .idle
     private var startRequested = false
@@ -351,6 +376,7 @@ final class TranscriptionEngine: ObservableObject {
     private var releaseModelAfterSession = false
 
     private static let sampleRate = StreamingNemotronRecognizer.sampleRate
+    private static let speechLanguageKey = "yaprflow.speechLanguage"
     private static let hardSegmentSamples = 30 * sampleRate
     private static let shortRecordingFallbackSamples = hardSegmentSamples
     private static let forcedSegmentOverlapSamples = sampleRate / 2
@@ -363,6 +389,9 @@ final class TranscriptionEngine: ObservableObject {
     private var decayTimer: Timer?
 
     private init() {
+        speechLanguage = SpeechLanguage.selection(
+            fromPersistedValue: UserDefaults.standard.string(forKey: Self.speechLanguageKey)
+        )
         let fifo = AudioBufferFIFO(capacity: 128)
         self.audioFIFO = fifo
 
@@ -400,7 +429,7 @@ final class TranscriptionEngine: ObservableObject {
         }
     }
 
-    func toggle() {
+    func toggle(mode: MobileCaptureMode = .quick) {
         Task { @MainActor in
             switch lifecycle {
             case .recording:
@@ -422,8 +451,11 @@ final class TranscriptionEngine: ObservableObject {
                 // Finalization continues after capture stops. Preserve a new
                 // tap as a queued restart; a second tap cancels that restart.
                 startRequested.toggle()
+                if startRequested { requestedMode = mode }
                 log.info("Queued restart after finalization: \(self.startRequested, privacy: .public)")
             case .idle:
+                requestedMode = mode
+                activeMode = mode
                 startRequested = true
                 await start()
             }
@@ -438,6 +470,23 @@ final class TranscriptionEngine: ObservableObject {
     var isRecordingPending: Bool {
         if case .starting = lifecycle { return startRequested }
         return false
+    }
+
+    var isBusy: Bool {
+        switch lifecycle {
+        case .idle: false
+        case .starting, .recording, .stopping: true
+        }
+    }
+
+    var recordingStartedAt: Date? { sessionStartedAt }
+
+    func resetPresentation() {
+        guard lifecycle == .idle else { return }
+        autoHideTask?.cancel()
+        status = .idle
+        liveTranscript = ""
+        activeMode = nil
     }
 
     func preload() {
@@ -489,6 +538,7 @@ final class TranscriptionEngine: ObservableObject {
         lastFinalizedAudioEnd = 0
         liveTranscript = ""
         audioConverter.reset()
+        sessionLanguage = speechLanguage
 
         do {
             try await ensureMicPermission()
@@ -538,6 +588,7 @@ final class TranscriptionEngine: ObservableObject {
                 return
             }
             lifecycle = .recording(generation)
+            sessionStartedAt = Date()
             status = .listening
         } catch {
             capture.stop()
@@ -551,6 +602,8 @@ final class TranscriptionEngine: ObservableObject {
                 return
             }
             log.error("Start failed: \(error.localizedDescription)")
+            activeMode = nil
+            sessionStartedAt = nil
             status = .error(error.localizedDescription)
             scheduleAutoHide(after: 2.5)
             scheduleModelUnload()
@@ -603,6 +656,10 @@ final class TranscriptionEngine: ObservableObject {
         // The recognizer has finished consuming this session. Release raw
         // microphone samples immediately; only the resulting text persists.
         let capturedSeconds = Double(sessionEnd) / Double(Self.sampleRate)
+        let completedMode = activeMode ?? requestedMode
+        let endedAt = Date()
+        let startedAt = sessionStartedAt
+            ?? endedAt.addingTimeInterval(-capturedSeconds)
         log.info("Finalized \(capturedSeconds, format: .fixed(precision: 2), privacy: .public) seconds of streaming audio")
 
         sessionAudio.reset(keepingCapacity: false)
@@ -617,19 +674,52 @@ final class TranscriptionEngine: ObservableObject {
         liveTranscript = finalText
         audioFIFO.discard(generation: generation)
         lifecycle = .idle
+        activeMode = nil
+        sessionStartedAt = nil
 
-        if !finalText.isEmpty {
-            UIPasteboard.general.string = finalText
-            history.add(finalText)
-            if let reason {
-                status = .error("Partial text copied — \(reason)")
-                scheduleAutoHide(after: 2.5)
+        switch completedMode {
+        case .quick:
+            if !finalText.isEmpty {
+                UIPasteboard.general.string = finalText
+                history.add(finalText)
+                if let reason {
+                    status = .error("Partial text copied — \(reason)")
+                    scheduleAutoHide(after: 2.5)
+                } else {
+                    status = .copied
+                    scheduleAutoHide(after: 1.5)
+                }
             } else {
-                status = .copied
-                scheduleAutoHide(after: 1.5)
+                if let reason {
+                    status = .error(reason)
+                    scheduleAutoHide(after: 2.5)
+                } else {
+                    status = .idle
+                    scheduleAutoHide(after: 1.0)
+                }
             }
-        } else {
-            if let reason {
+
+        case .meeting:
+            if !finalText.isEmpty || meetingStore.hasDraftContent {
+                do {
+                    _ = try meetingStore.saveCapture(
+                        transcript: finalText,
+                        startedAt: startedAt,
+                        endedAt: endedAt,
+                        duration: capturedSeconds
+                    )
+                    if let reason {
+                        status = .error("Partial meeting saved — \(reason)")
+                        scheduleAutoHide(after: 3.0)
+                    } else {
+                        status = .saved
+                        scheduleAutoHide(after: 2.0)
+                    }
+                } catch {
+                    status = .error("Meeting could not be saved — \(error.localizedDescription)")
+                    scheduleAutoHide(after: 3.0)
+                }
+            } else if let reason {
                 status = .error(reason)
                 scheduleAutoHide(after: 2.5)
             } else {
@@ -884,7 +974,7 @@ final class TranscriptionEngine: ObservableObject {
         // interval already captured while speech onset was being confirmed.
         let initialSamples = sessionAudio.samples(from: start, to: initialEnd)
         guard let recognizer = speechRecognizer else { return }
-        await recognizer.beginSegment()
+        await recognizer.beginSegment(language: sessionLanguage)
         let rawText: String
         if initialSamples.isEmpty {
             rawText = ""
@@ -1174,7 +1264,7 @@ final class TranscriptionEngine: ObservableObject {
     }
 
     private static func warmUp(recognizer: StreamingNemotronRecognizer) async {
-        await recognizer.beginSegment()
+        await recognizer.beginSegment(language: .englishUS)
         _ = await recognizer.accept([Float](repeating: 0, count: 16_000))
         _ = await recognizer.finishSegment()
     }

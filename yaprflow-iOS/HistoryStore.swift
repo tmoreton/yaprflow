@@ -1,13 +1,13 @@
 import Foundation
 import Combine
 
-/// FIFO of the most recent transcripts for quick re-copy inside the iOS app.
+/// FIFO of recent Quick Dictation results for re-copy inside the iOS app.
 @MainActor
 final class HistoryStore: ObservableObject {
     static let shared = HistoryStore()
 
     private static let key = "yaprflow.history"
-    private static let maxItems = 3
+    private static let maxItems = 50
 
     @Published private(set) var items: [String] = []
 

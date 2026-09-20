@@ -19,6 +19,11 @@ audio without a meeting bot, transcribes both locally as Me and Them, combines
 the live transcript with the user's typed notes, and saves evidence-linked
 meeting notes on the Mac. Raw meeting audio is never retained.
 
+On iPhone and iPad, Quick Dictation copies short-form speech to the clipboard,
+while In-person Meeting mode captures the device microphone alongside typed
+notes and saves a local meeting record and Markdown export. Mobile does not
+claim to capture audio from other apps.
+
 The Mac app is distributed as signed, notarized downloads from yaprflow.com.
 There is no in-app sign-in, advertising, cross-app tracking, or cloud
 transcription service. The source remains available for inspection and
@@ -37,6 +42,8 @@ licensed noncommercial builds.
 - **Private Meeting Notes**: capture microphone and Mac audio, type guiding
   notes, use calendar context and meeting templates, and generate decisions,
   action items, follow-up email text, and transcript-linked evidence.
+- **Two mobile capture modes**: use Quick Dictation for clipboard text or an
+  explicitly microphone-only In-person Meeting workflow on iPhone and iPad.
 - **Meeting memory**: search saved meetings locally with full-text and on-device
   semantic retrieval, or ask questions across relevant meeting excerpts with
   citations back to the underlying transcript.
@@ -152,8 +159,10 @@ transcription. Calendar access is optional and is used to show upcoming
 meetings, attendees, join links, and reminders; selected event context is saved
 with the local meeting record.
 
-On iOS, up to three recent transcript strings and preferences are stored in the
-app's separate local container. There is currently no Mac/iOS sync.
+On iOS, up to 50 recent Quick Dictation results, speech-language and mode
+preferences, and in-person meetings are stored in the app's separate local
+container. Meeting JSON and Markdown files use the same schema as Mac, but
+there is currently no Mac/iOS sync.
 
 The iPhone and iPad app also has a feedback button in its top bar. Feedback is
 sent only when you choose to send the email draft. For a recommendation on
@@ -192,10 +201,9 @@ usage telemetry.
 
 The upstream Nemotron 3.5 model covers 40 language-locales across 35 languages.
 NVIDIA classifies 19 locales as transcription-ready, 13 as broad-coverage, and
-8 as adaptation-ready. The Mac app makes the 32 out-of-box locales selectable
-and also offers Automatic detection. The current iOS source target uses
-Automatic detection. The 8 adaptation-ready locales require fine-tuning and
-are not advertised as production-ready.
+8 as adaptation-ready. Both apps make the 32 out-of-box locales selectable and
+also offer Automatic detection. The 8 adaptation-ready locales require
+fine-tuning and are not advertised as production-ready.
 
 ## Repository layout
 
@@ -210,7 +218,7 @@ scripts/copy-models.sh          verifies and stages the exact Xcode model payloa
 scripts/build-sherpa-onnx-asr.sh builds pinned Apple native ASR-only frameworks
 scripts/publish-models.sh       maintains the public source-build model mirror
 scripts/app-store-release.sh    creates and verifies Mac App Store packages
-scripts/ios-app-store-release.sh historical iOS App Store packaging tool
+scripts/ios-app-store-release.sh creates and verifies iOS App Store archives
 scripts/release.sh              creates signed DMGs and direct-download releases
 LICENSE                         current source license and historical boundaries
 COMMERCIAL-LICENSING.md         separate commercial source-license inquiries
@@ -255,14 +263,21 @@ Run the shared transcription-policy unit tests without building an app target:
 swift test
 ```
 
+Exercise iOS meeting JSON/Markdown persistence, reload, export, empty-capture
+protection, and deletion on macOS:
+
+```bash
+scripts/ios-meeting-store-smoke.sh
+```
+
 The shared schemes are:
 
 - `yaprflow`: direct-download macOS build with Sparkle, bundle ID
-  `com.tmoreton.yaprflow`, version 5.1.4 (11).
+  `com.tmoreton.yaprflow`, version 5.2.0 (12).
 - `yaprflow-AppStore`: Mac App Store build without Sparkle, using the same app
   identity and version so both editions are produced from the same source.
 - `yaprflow-iOS`: iPhone/iPad, bundle ID `com.tmoreton.yaprflow.ios`, version
-  1.0.0 (2).
+  1.0.0 (3).
 
 The fetch script pins exact Hugging Face revisions and validates every bundled
 model file with `scripts/model-checksums.sha256`.
@@ -298,7 +313,7 @@ notarization credentials, put the Mac Aptabase app key in the ignored `.env`
 (see `.env.example`), then run:
 
 ```bash
-scripts/release.sh 5.1.4
+scripts/release.sh 5.2.0
 ```
 
 The resulting DMG stays private until the paid checkout is configured.

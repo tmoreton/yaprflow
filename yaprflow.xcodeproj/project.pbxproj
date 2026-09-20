@@ -51,6 +51,7 @@
 		8C7A18FCDA66C92FA3E0F8F4 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEE8B6ADF5ACFBCED341D24E /* ContentView.swift */; };
 		8FADA1EF707898B72E315E15 /* AudioCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6843916C14C177A41165D16 /* AudioCapture.swift */; };
 		B21E4D0C5A51E7F58BD5FFB8 /* HistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8DB5A205EACDB4ACD590805 /* HistoryStore.swift */; };
+		B21E4D0C5A51E7F58BD5FFC0 /* MobileMeetingStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8DB5A205EACDB4ACD590806 /* MobileMeetingStore.swift */; };
 		E3FFA860792C84B288FB9E2B /* TranscriptionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DF35452BDB52F57619F70A5 /* TranscriptionEngine.swift */; };
 		E8B1666ED700EDFBA5C576D3 /* YaprflowApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ACE08087D0D03B45508ADEF /* YaprflowApp.swift */; };
 /* End PBXBuildFile section */
@@ -79,6 +80,7 @@
 		AFA2BC972F97E6F00048D99B /* yaprflow.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = yaprflow.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B6843916C14C177A41165D16 /* AudioCapture.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AudioCapture.swift; sourceTree = "<group>"; };
 		C8DB5A205EACDB4ACD590805 /* HistoryStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HistoryStore.swift; sourceTree = "<group>"; };
+		C8DB5A205EACDB4ACD590806 /* MobileMeetingStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileMeetingStore.swift; sourceTree = "<group>"; };
 		DE6C15A83BCAB236AB4D31C3 /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -182,6 +184,7 @@
 				0DF35452BDB52F57619F70A5 /* TranscriptionEngine.swift */,
 				B6843916C14C177A41165D16 /* AudioCapture.swift */,
 				C8DB5A205EACDB4ACD590805 /* HistoryStore.swift */,
+				C8DB5A205EACDB4ACD590806 /* MobileMeetingStore.swift */,
 				DE6C15A83BCAB236AB4D31C3 /* Assets.xcassets */,
 				2A2FDF2B31C00B9800A00001 /* PrivacyInfo.xcprivacy */,
 				01B9F3CA97F12303F51C3977 /* Info.plist */,
@@ -449,6 +452,7 @@
 				E3FFA860792C84B288FB9E2B /* TranscriptionEngine.swift in Sources */,
 				8FADA1EF707898B72E315E15 /* AudioCapture.swift in Sources */,
 				B21E4D0C5A51E7F58BD5FFB8 /* HistoryStore.swift in Sources */,
+				B21E4D0C5A51E7F58BD5FFC0 /* MobileMeetingStore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -475,7 +479,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_OBJC_WEAK = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = GVXC5FQ2RP;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -507,7 +511,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_OBJC_WEAK = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = GVXC5FQ2RP;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -662,7 +666,7 @@
 				CODE_SIGN_ENTITLEMENTS = yaprflow/yaprflow.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 11;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_TEAM = GVXC5FQ2RP;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -673,7 +677,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 5.1.4;
+				MARKETING_VERSION = 5.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tmoreton.yaprflow;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -695,7 +699,7 @@
 				CODE_SIGN_ENTITLEMENTS = yaprflow/yaprflow.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 11;
+				CURRENT_PROJECT_VERSION = 12;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = GVXC5FQ2RP;
 				ENABLE_APP_SANDBOX = YES;
@@ -707,7 +711,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 5.1.4;
+				MARKETING_VERSION = 5.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tmoreton.yaprflow;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -730,7 +734,7 @@
 				CODE_SIGN_ENTITLEMENTS = "yaprflow/yaprflow-AppStore.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 11;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_TEAM = GVXC5FQ2RP;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -741,7 +745,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 5.1.4;
+				MARKETING_VERSION = 5.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tmoreton.yaprflow;
 				PRODUCT_NAME = yaprflow;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -763,7 +767,7 @@
 				CODE_SIGN_ENTITLEMENTS = "yaprflow/yaprflow-AppStore.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 11;
+				CURRENT_PROJECT_VERSION = 12;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = GVXC5FQ2RP;
 				ENABLE_APP_SANDBOX = YES;
@@ -775,7 +779,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 5.1.4;
+				MARKETING_VERSION = 5.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tmoreton.yaprflow;
 				PRODUCT_NAME = yaprflow;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;

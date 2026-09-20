@@ -294,7 +294,7 @@ if [[ "$PUBLISH_BINARY" == true && "$NOTARIZE" != true ]]; then
     exit 2
 fi
 
-CODESIGN_IDENTITY="${DEVELOPER_ID_APPLICATION:-Developer ID Application: Tim Moreton (GVXC5FQ2RP)}"
+CODESIGN_IDENTITY="${DEVELOPER_ID_APPLICATION:-}"
 NOTARIZE_MAX_POLLS="${NOTARIZE_MAX_POLLS:-90}"
 if ! [[ "$NOTARIZE_MAX_POLLS" =~ ^[1-9][0-9]*$ ]]; then
     echo "error: NOTARIZE_MAX_POLLS must be a positive integer" >&2
@@ -535,6 +535,29 @@ verify_distribution_signature() {
     fi
 }
 
+codesign_identity_for_app() {
+    local app_path="$1"
+    local app_parent app_absolute certificate_root certificate_identity
+    app_parent="$(cd "$(dirname "$app_path")" && pwd)"
+    app_absolute="$app_parent/$(basename "$app_path")"
+    certificate_root="$(mktemp -d "${TMPDIR:-/tmp}/yaprflow-signing-cert.XXXXXX")"
+
+    if ! (cd "$certificate_root" && codesign -d --extract-certificates "$app_absolute" >/dev/null 2>&1) \
+       || [[ ! -s "$certificate_root/codesign0" ]]; then
+        find "$certificate_root" -depth -delete
+        echo "error: could not extract the signed app's Developer ID certificate" >&2
+        return 1
+    fi
+
+    certificate_identity="$(
+        shasum -a 1 "$certificate_root/codesign0" \
+            | awk '{ print toupper($1) }'
+    )"
+    find "$certificate_root" -depth -delete
+    [[ "$certificate_identity" =~ ^[A-F0-9]{40}$ ]] || return 1
+    printf '%s\n' "$certificate_identity"
+}
+
 # ---- Pre-publish guards ------------------------------------------------------
 
 if [[ "$PUBLISH_SOURCE" == true || "$PUBLISH_BINARY" == true ]]; then
@@ -663,6 +686,11 @@ if [[ "$NOTARIZE" == true ]]; then
         xcrun stapler validate "$APP_PATH"
         spctl --assess --type execute --verbose=2 "$APP_PATH"
     fi
+fi
+
+if [[ "$NOTARIZE" == true && -z "$CODESIGN_IDENTITY" ]]; then
+    CODESIGN_IDENTITY="$(codesign_identity_for_app "$APP_PATH")"
+    echo "==> Reusing the app's exact Developer ID certificate for the DMG"
 fi
 
 # ---- Build DMG ---------------------------------------------------------------
