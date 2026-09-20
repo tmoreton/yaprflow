@@ -64,18 +64,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             Task { @MainActor in
                 try? await Task.sleep(for: .milliseconds(350))
                 let windowPassed = MeetingNotesWindowController.isVisibleForSmokeTest
-                MeetingNotesWindowController.show(.transcripts)
+                MeetingNotesWindowController.show(.dictations)
                 try? await Task.sleep(for: .milliseconds(200))
-                let transcriptsPassed = MeetingNotesWindowController.isVisibleForSmokeTest
-                    && MeetingNotesWindowController.destinationForSmokeTest == .transcripts
+                let dictationsPassed = MeetingNotesWindowController.isVisibleForSmokeTest
+                    && MeetingNotesWindowController.destinationForSmokeTest == .dictations
                 MeetingNotesWindowController.show(.settings)
                 try? await Task.sleep(for: .milliseconds(200))
                 let settingsPassed = MeetingNotesWindowController.isVisibleForSmokeTest
                     && MeetingNotesWindowController.destinationForSmokeTest == .settings
                 MeetingNotesWindowController.show(.meetings)
                 let persistencePassed = MeetingStore.runPersistenceSmokeTest()
-                let passed = windowPassed && transcriptsPassed && settingsPassed && persistencePassed
-                let output = "YAPRFLOW_MEETING_NOTES_SMOKE_TEST=\(passed ? "PASS" : "FAIL") window=\(windowPassed) transcripts=\(transcriptsPassed) settings=\(settingsPassed) persistence=\(persistencePassed)\n"
+                let passed = windowPassed && dictationsPassed && settingsPassed && persistencePassed
+                let output = "YAPRFLOW_MEETING_NOTES_SMOKE_TEST=\(passed ? "PASS" : "FAIL") window=\(windowPassed) dictations=\(dictationsPassed) settings=\(settingsPassed) persistence=\(persistencePassed)\n"
                 FileHandle.standardOutput.write(Data(output.utf8))
                 NSApp.terminate(nil)
             }
@@ -371,7 +371,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func showHistory() {
-        MeetingNotesWindowController.show(.transcripts)
+        MeetingNotesWindowController.show(.dictations)
     }
 
     @objc private func showSettings() {

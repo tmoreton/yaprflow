@@ -14,7 +14,7 @@ events on disk.
 | --- | --- |
 | `app_opened` | None |
 | `previous_run_interrupted` | None; may be a crash, forced quit, or power loss |
-| `feature_opened` | Fixed feature name: Meeting Notes, Transcripts/History, Settings, Feedback |
+| `feature_opened` | Fixed feature name: Meeting Notes, Dictations/History, Settings, Feedback |
 | `dictation_started` | None |
 | `dictation_completed` | Recording duration range |
 | `dictation_failed` | Fixed reason category |

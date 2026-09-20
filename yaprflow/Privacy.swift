@@ -3,7 +3,6 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject private var appState = AppState.shared
-    @ObservedObject private var aiSettings = AIProviderSettings.shared
     @ObservedObject private var telemetry = Telemetry.shared
     #if DIRECT_DISTRIBUTION
     @ObservedObject private var updater = AppUpdater.shared
@@ -12,33 +11,20 @@ struct SettingsView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                FeatureWindowHeader(
-                    symbolName: "gearshape.fill",
-                    title: "Settings",
-                    subtitle: "Control Yaprflow and review how your data is handled.",
-                    accent: .blue,
-                    badge: "Your choice",
-                    badgeSymbol: "slider.horizontal.3"
-                )
+            VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Settings")
+                        .font(.title2.weight(.semibold))
+                    Text("The essentials for dictation, meetings, and AI.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
 
-                FeatureCard {
+                settingsGroup("General") {
                     VStack(spacing: 0) {
                         HStack(spacing: 12) {
-                            Image(systemName: "globe")
-                                .foregroundStyle(.secondary)
-                                .frame(width: 26)
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Speech language")
-                                    .font(.callout.weight(.medium))
-                                Text(speechLanguageDetail)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            Spacer(minLength: 12)
-
+                            settingLabel("Speech language", detail: speechLanguageDetail)
+                            Spacer(minLength: 16)
                             Picker("Speech language", selection: speechLanguageBinding) {
                                 ForEach(SpeechLanguage.allCases) { language in
                                     Text(language.displayName).tag(language)
@@ -49,297 +35,97 @@ struct SettingsView: View {
                             .frame(width: 190)
                             .accessibilityLabel("Speech language")
                         }
-                        .padding(.vertical, 10)
+                        .padding(.vertical, 9)
 
-                        Divider().padding(.leading, 38)
+                        Divider()
 
                         HStack(spacing: 12) {
-                            Image(systemName: appState.isDesktopPreviewEnabled ? "eye" : "eye.slash")
-                                .foregroundStyle(.secondary)
-                                .frame(width: 26)
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Desktop preview")
-                                    .font(.callout.weight(.medium))
-                                Text("Show the floating transcript while recording.")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            Spacer()
-
+                            settingLabel("Desktop preview", detail: "Show live text while dictating.")
+                            Spacer(minLength: 16)
                             Toggle("Desktop preview", isOn: desktopPreviewBinding)
                                 .labelsHidden()
                                 .toggleStyle(.switch)
                         }
-                        .padding(.vertical, 10)
-                    }
-                }
+                        .padding(.vertical, 9)
 
-                FeatureCard {
-                    VStack(spacing: 0) {
+                        Divider()
+
                         HStack(spacing: 12) {
-                            Image(systemName: "mic")
-                                .foregroundStyle(.secondary)
-                                .frame(width: 26)
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Quick Dictation")
-                                    .font(.callout.weight(.medium))
-                                Text("Start or stop dictation from any app.")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            Spacer()
-
+                            settingLabel("Quick Dictation", detail: "Start or stop from any app.")
+                            Spacer(minLength: 16)
                             HotkeyRecorder(hotkey: appState.hotkey)
                                 .frame(width: 118, height: 28)
                         }
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 9)
 
-                        Divider().padding(.leading, 38)
+                        Divider()
 
                         HStack(spacing: 12) {
-                            Image(systemName: "person.2.wave.2")
-                                .foregroundStyle(.secondary)
-                                .frame(width: 26)
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Meeting Notes")
-                                    .font(.callout.weight(.medium))
-                                Text("Open Meeting Notes from any app.")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            Spacer()
-
+                            settingLabel("Meetings", detail: "Open the meeting workspace.")
+                            Spacer(minLength: 16)
                             Text(HotkeyConfig.meetingNotesHotkey.displayString)
                                 .font(.callout.monospaced())
                                 .padding(.horizontal, 10)
                                 .frame(height: 28)
                                 .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
-                                .accessibilityLabel("Meeting Notes shortcut Command M")
+                                .accessibilityLabel("Meetings shortcut Command M")
                         }
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 9)
                     }
                 }
 
-                FeatureCard {
+                settingsGroup("AI") {
                     AIProviderSettingsView()
                 }
 
-                FeatureCard {
-                    VStack(alignment: .leading, spacing: 8) {
+                settingsGroup("Privacy") {
+                    VStack(alignment: .leading, spacing: 7) {
                         HStack(spacing: 12) {
-                            Image(systemName: "chart.bar.xaxis")
-                                .foregroundStyle(.secondary)
-                                .frame(width: 26)
-                            Text("Share anonymous usage and error counts")
+                            Text("Share anonymous usage counts")
                                 .font(.callout.weight(.medium))
-                            Spacer()
-                            Toggle("Share anonymous usage and error counts", isOn: $telemetry.isEnabled)
+                            Spacer(minLength: 16)
+                            Toggle("Share anonymous usage counts", isOn: $telemetry.isEnabled)
                                 .labelsHidden()
                                 .toggleStyle(.switch)
                                 .disabled(!telemetry.isConfigured && !telemetry.isEnabled)
                         }
+
                         Text(telemetry.isConfigured
-                             ? "On by default. Helps us see app launches, feature use, and broad failure categories by app and macOS version. No audio, transcript text, prompts, feedback messages, or app names are included. Turn this off at any time."
-                             : "Telemetry is not configured in this build.")
+                             ? "Includes feature and broad error counts—never audio, transcript text, prompts, or app names."
+                             : "Telemetry is not included in this build.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                            .padding(.leading, 38)
                     }
+                    .padding(.vertical, 5)
                 }
 
-                FeatureCard {
-                    HStack(spacing: 12) {
-                        Image(systemName: "bubble.left.and.text.bubble.right")
-                            .foregroundStyle(.secondary)
-                            .frame(width: 26)
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Send feedback")
-                                .font(.callout.weight(.medium))
-                            Text("Report a problem, ask a question, or suggest an improvement.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Spacer(minLength: 12)
-
-                        Button("Send Feedback…") {
-                            Telemetry.shared.track(.featureOpened(.feedback))
-                            isShowingFeedback = true
-                        }
-                        .buttonStyle(.bordered)
-                    }
+                settingsGroup("Updates") {
+                    updateSettings
                 }
 
-                FeatureCard {
-                    VStack(spacing: 0) {
-                        PrivacyRow(
-                            symbol: "waveform",
-                            title: "Speech recognition",
-                            detail: "Processed locally with Nemotron and sherpa-onnx",
-                            status: "On-device"
-                        )
-                        Divider().padding(.leading, 38)
-                        PrivacyRow(
-                            symbol: "sparkles",
-                            title: "AI features",
-                            detail: aiPrivacyDetail,
-                            status: aiSettings.provider == .ollama
-                                ? "Ollama"
-                                : (aiSettings.provider.sendsTranscriptOffDevice ? "Cloud" : "Local")
-                        )
-                        Divider().padding(.leading, 38)
-                        PrivacyRow(
-                            symbol: "person.crop.circle.badge.xmark",
-                            title: "Accounts",
-                            detail: "No Yaprflow account or sign-in required",
-                            status: "None"
-                        )
-                        Divider().padding(.leading, 38)
-                        PrivacyRow(
-                            symbol: "chart.bar.xaxis",
-                            title: "Telemetry",
-                            detail: "Anonymous usage and error counts only",
-                            status: telemetry.isConfigured
-                                ? (telemetry.isEnabled ? "On" : "Off")
-                                : "Unavailable"
-                        )
+                HStack(spacing: 18) {
+                    Button("Send feedback") {
+                        Telemetry.shared.track(.featureOpened(.feedback))
+                        isShowingFeedback = true
                     }
-                }
+                    .buttonStyle(.link)
 
-                FeatureCard {
-                    VStack(spacing: 0) {
-                        HStack(spacing: 12) {
-                            Image(systemName: "info.circle")
-                                .foregroundStyle(.secondary)
-                                .frame(width: 26)
+                    Link("Privacy", destination: URL(string: "https://yaprflow.com/privacy.html")!)
 
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Version")
-                                    .font(.callout.weight(.medium))
-                                Text("Your installed Yaprflow version.")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            Spacer()
-
-                            Text(appVersion)
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(.secondary)
-
-                            #if DIRECT_DISTRIBUTION
-                            Button("Check Now") {
-                                updater.checkForUpdates()
-                            }
-                            .buttonStyle(.bordered)
-                            #endif
-                        }
-                        .padding(.vertical, 10)
-
-                        #if DIRECT_DISTRIBUTION
-                        Divider().padding(.leading, 38)
-
-                        HStack(spacing: 12) {
-                            Image(systemName: "arrow.triangle.2.circlepath")
-                                .foregroundStyle(.secondary)
-                                .frame(width: 26)
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Automatically check for updates")
-                                    .font(.callout.weight(.medium))
-                                Text("Check the signed Yaprflow release feed once a day.")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            Spacer()
-
-                            Toggle("Automatically check for updates", isOn: automaticUpdateChecksBinding)
-                                .labelsHidden()
-                                .toggleStyle(.switch)
-                        }
-                        .padding(.vertical, 10)
-                        #else
-                        Divider().padding(.leading, 38)
-
-                        HStack(spacing: 12) {
-                            Image(systemName: "storefront")
-                                .foregroundStyle(.secondary)
-                                .frame(width: 26)
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("App updates")
-                                    .font(.callout.weight(.medium))
-                                Text("Updates for this edition are delivered automatically by the Mac App Store.")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            Spacer()
-
-                            Text("Mac App Store")
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.vertical, 10)
-                        #endif
-
-                        #if DIRECT_DISTRIBUTION
-                        Divider().padding(.leading, 38)
-
-                        HStack(spacing: 12) {
-                            Image(systemName: "arrow.down.app")
-                                .foregroundStyle(.secondary)
-                                .frame(width: 26)
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Automatically download updates")
-                                    .font(.callout.weight(.medium))
-                                Text("Install verified updates when Yaprflow is ready to relaunch.")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            Spacer()
-
-                            Toggle("Automatically download updates", isOn: automaticUpdateDownloadsBinding)
-                                .labelsHidden()
-                                .toggleStyle(.switch)
-                                .disabled(!updater.automaticallyChecksForUpdates)
-                        }
-                        .padding(.vertical, 10)
-                        #endif
-
-                        Divider().padding(.leading, 38)
-
-                        HStack(spacing: 20) {
-                            Link(destination: URL(string: "https://yaprflow.com/privacy.html")!) {
-                                Label("Privacy Policy", systemImage: "hand.raised")
-                            }
-
-                            Button {
-                                AcknowledgementsWindowController.show()
-                            } label: {
-                                Label("Acknowledgements", systemImage: "doc.text")
-                            }
-                            .buttonStyle(.link)
-
-                            Spacer()
-                        }
-                        .font(.caption.weight(.medium))
-                        .padding(.top, 12)
+                    Button("Acknowledgements") {
+                        AcknowledgementsWindowController.show()
                     }
-                }
+                    .buttonStyle(.link)
 
+                    Spacer()
+
+                    Text("Version \(appVersion)")
+                        .foregroundStyle(.secondary)
+                }
+                .font(.caption)
             }
             .padding(22)
+            .frame(maxWidth: 760)
             .frame(maxWidth: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -348,6 +134,68 @@ struct SettingsView: View {
             FeedbackView()
                 .frame(minWidth: 620, minHeight: 600)
         }
+    }
+
+    private func settingsGroup<Content: View>(
+        _ title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.headline)
+            FeatureCard {
+                content()
+            }
+        }
+    }
+
+    private func settingLabel(_ title: String, detail: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.callout.weight(.medium))
+            Text(detail)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder
+    private var updateSettings: some View {
+        #if DIRECT_DISTRIBUTION
+        VStack(spacing: 0) {
+            HStack {
+                Text("Check for updates")
+                    .font(.callout.weight(.medium))
+                Spacer()
+                Button("Check Now") {
+                    updater.checkForUpdates()
+                }
+            }
+            .padding(.vertical, 7)
+
+            Divider()
+
+            Toggle("Check automatically", isOn: automaticUpdateChecksBinding)
+                .padding(.vertical, 9)
+
+            Divider()
+
+            Toggle("Download automatically", isOn: automaticUpdateDownloadsBinding)
+                .padding(.vertical, 9)
+                .disabled(!updater.automaticallyChecksForUpdates)
+        }
+        #else
+        HStack {
+            Text("Updates are installed automatically through the Mac App Store.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text("Mac App Store")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 7)
+        #endif
     }
 
     private var appVersion: String {
@@ -373,17 +221,6 @@ struct SettingsView: View {
     }
     #endif
 
-    private var aiPrivacyDetail: String {
-        switch aiSettings.provider {
-        case .appleIntelligence:
-            "Uses Apple's on-device model"
-        case .openAI, .openRouter:
-            "Sends AI requests to \(aiSettings.provider.displayName) when you run them"
-        case .ollama:
-            "Uses Ollama at localhost:11434"
-        }
-    }
-
     private var desktopPreviewBinding: Binding<Bool> {
         Binding(
             get: { appState.isDesktopPreviewEnabled },
@@ -401,11 +238,11 @@ struct SettingsView: View {
     private var speechLanguageDetail: String {
         switch appState.speechLanguage {
         case .automatic:
-            return "Detect a language for each speech segment."
+            "Detect each speech segment."
         case .englishUS, .englishUK:
-            return "Keep recognition in English for more reliable short dictation."
+            "Keep recognition in English."
         default:
-            return "Keep recognition in the selected language for better accuracy."
+            "Keep recognition in the selected language."
         }
     }
 }
@@ -465,35 +302,5 @@ private struct AcknowledgementsView: View {
         .padding(22)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .windowBackgroundColor))
-    }
-}
-
-private struct PrivacyRow: View {
-    let symbol: String
-    let title: String
-    let detail: String
-    let status: String
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: symbol)
-                .foregroundStyle(.secondary)
-                .frame(width: 26)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.callout.weight(.medium))
-                Text(detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            Text(status)
-                .font(.caption.weight(.medium))
-                .foregroundStyle(.secondary)
-        }
-        .padding(.vertical, 10)
     }
 }

@@ -56,7 +56,7 @@ licensed noncommercial builds.
   with key points, decisions, action items, personal notes, evidence links, and
   a collapsed transcript. Use Apple Intelligence on a supported Mac, your own
   OpenAI or OpenRouter key, or local Ollama.
-- **Transcript tools**: select any saved dictation from searchable history, then
+- **Dictation tools**: select any saved dictation from searchable history, then
   summarize it, extract action items, rewrite it, or run a custom reusable prompt
   with the same selectable AI providers.
 - **Smart Markdown archive**: each completed Mac transcript is saved locally;
@@ -105,9 +105,10 @@ Yaprflow runs as a menu-bar app. Click the waveform icon to open the menu.
 - **Choose speech language**: Settings defaults to English (United States) for
   more consistent English dictation. Choose any other supported locale, or
   Automatic when a recording may use different languages.
-- **Yaprflow workspace** keeps Meetings, Ask, Transcripts, and Settings in one
-  window. The Transcripts section combines searchable history with presets,
-  custom prompts, editable AI output, and provider controls.
+- **Yaprflow workspace** keeps Meetings, Dictations, and Settings in one window.
+  Ask Meetings lives inside Meetings for cross-meeting questions, while
+  Dictations combines searchable history with presets, custom prompts, editable
+  AI output, and provider controls.
 - **Meeting Notes** is the calendar-aware section of that workspace. It supports
   one-click join and record, typed notes, live Me/Them transcription, seven
   templates, editable generated notes, evidence jumps, local search, and
@@ -140,7 +141,7 @@ with `#` are ignored.
 
 At runtime, Yaprflow does not contact a Yaprflow-operated service, download
 speech models, upload audio, or require a login. Mac meeting summaries and
-transcript tools use Apple's on-device model by default. If you select OpenAI
+dictation tools use Apple's on-device model by default. If you select OpenAI
 or OpenRouter, only the text and instructions for the AI action you run go
 directly to that provider using your own key. Ollama uses its service on your
 Mac; Ollama cloud models may contact Ollama's cloud. Automatic titles with

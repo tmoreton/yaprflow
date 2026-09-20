@@ -242,8 +242,8 @@ struct TranscriptAIView: View {
         HStack(spacing: 14) {
             FeatureWindowHeader(
                 symbolName: "sparkles",
-                title: "Transcript tools",
-                subtitle: "Browse saved dictations and run reusable AI prompts.",
+                title: "Dictation tools",
+                subtitle: "Select a saved dictation and run a reusable AI prompt.",
                 accent: .purple,
                 badge: providerBadge,
                 badgeSymbol: providerBadgeSymbol
@@ -263,7 +263,7 @@ struct TranscriptAIView: View {
             HStack(spacing: 7) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
-                TextField("Search transcripts", text: $search)
+                TextField("Search dictations", text: $search)
                     .textFieldStyle(.plain)
                 if !search.isEmpty {
                     Button {
@@ -285,7 +285,7 @@ struct TranscriptAIView: View {
             }
 
             HStack {
-                Text("History")
+                Text("Saved")
                     .font(.headline)
                 Spacer()
                 Text(search.isEmpty ? "\(history.items.count)" : "\(filteredItems.count) found")
@@ -393,7 +393,7 @@ struct TranscriptAIView: View {
             Image(systemName: search.isEmpty ? "waveform" : "magnifyingglass")
                 .font(.title3)
                 .foregroundStyle(.tertiary)
-            Text(search.isEmpty ? "No transcripts yet" : "No matching transcripts")
+            Text(search.isEmpty ? "No dictations yet" : "No matching dictations")
                 .font(.callout.weight(.medium))
             Text(search.isEmpty ? "Quick dictations will appear here." : "Try a different search.")
                 .font(.caption)
@@ -407,9 +407,9 @@ struct TranscriptAIView: View {
     private var workspace: some View {
         if selectedTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             ContentUnavailableView(
-                "Choose a transcript",
+                "Choose a dictation",
                 systemImage: "text.document",
-                description: Text("Record a quick dictation or select one from history to use transcript tools.")
+                description: Text("Record a quick dictation or select one from the list to use AI tools.")
             )
         } else {
             VStack(alignment: .leading, spacing: 14) {

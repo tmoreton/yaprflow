@@ -39,8 +39,7 @@ private final class MeetingMemoryModel: ObservableObject {
 
 enum MeetingNotesDestination: String, CaseIterable {
     case meetings = "Meetings"
-    case ask = "Ask"
-    case transcripts = "Transcripts"
+    case dictations = "Dictations"
     case settings = "Settings"
 }
 
@@ -59,6 +58,7 @@ struct MeetingNotesView: View {
     @State private var selectedMeetingID: UUID?
     @State private var selectedEvidenceID: UUID?
     @State private var showsLiveWorkspace = true
+    @State private var showsMeetingMemory = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -67,20 +67,22 @@ struct MeetingNotesView: View {
 
             switch navigation.destination {
             case .meetings:
-                HSplitView {
-                    sidebar
-                        .frame(minWidth: 220, idealWidth: 250, maxWidth: 290)
-                    detail
-                        .frame(minWidth: 560, maxWidth: .infinity, maxHeight: .infinity)
+                if showsMeetingMemory {
+                    MeetingMemoryView(model: memory, meetings: store.meetings) { meetingID, segmentID in
+                        selectedMeetingID = meetingID
+                        selectedEvidenceID = segmentID
+                        showsLiveWorkspace = false
+                        showsMeetingMemory = false
+                    }
+                } else {
+                    HSplitView {
+                        sidebar
+                            .frame(minWidth: 220, idealWidth: 250, maxWidth: 290)
+                        detail
+                            .frame(minWidth: 560, maxWidth: .infinity, maxHeight: .infinity)
+                    }
                 }
-            case .ask:
-                MeetingMemoryView(model: memory, meetings: store.meetings) { meetingID, segmentID in
-                    selectedMeetingID = meetingID
-                    selectedEvidenceID = segmentID
-                    showsLiveWorkspace = false
-                    navigation.destination = .meetings
-                }
-            case .transcripts:
+            case .dictations:
                 TranscriptAIView {
                     navigation.destination = .settings
                 }
@@ -112,7 +114,7 @@ struct MeetingNotesView: View {
             }
             .labelsHidden()
             .pickerStyle(.segmented)
-            .frame(width: 370)
+            .frame(width: 300)
 
             Spacer()
 
@@ -124,9 +126,15 @@ struct MeetingNotesView: View {
             }
 
             if navigation.destination == .meetings {
+                Button(showsMeetingMemory ? "Meetings" : "Ask Meetings", systemImage: showsMeetingMemory ? "person.2" : "sparkles") {
+                    showsMeetingMemory.toggle()
+                }
+                .help(showsMeetingMemory ? "Return to meetings" : "Ask a question across saved meetings")
+
                 Button("New", systemImage: "plus") {
                     session.prepare()
                     showsLiveWorkspace = true
+                    showsMeetingMemory = false
                     selectedMeetingID = nil
                     selectedEvidenceID = nil
                     navigation.destination = .meetings
@@ -195,6 +203,7 @@ struct MeetingNotesView: View {
                                 selectedMeetingID = meeting.id
                                 selectedEvidenceID = nil
                                 showsLiveWorkspace = false
+                                showsMeetingMemory = false
                             } label: {
                                 SavedMeetingRow(
                                     meeting: meeting,
@@ -237,8 +246,8 @@ struct MeetingNotesView: View {
 
     private func telemetryFeature(for destination: MeetingNotesDestination) -> TelemetryFeature {
         switch destination {
-        case .meetings, .ask: .meetingNotes
-        case .transcripts: .history
+        case .meetings: .meetingNotes
+        case .dictations: .history
         case .settings: .settings
         }
     }

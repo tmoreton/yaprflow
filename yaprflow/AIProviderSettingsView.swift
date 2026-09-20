@@ -11,16 +11,8 @@ struct AIProviderSettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
-                Image(systemName: "sparkles")
-                    .foregroundStyle(.secondary)
-                    .frame(width: 26)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("AI provider")
-                        .font(.callout.weight(.medium))
-                    Text("Choose what runs meeting summaries, transcript tools, and automatic titles.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                Text("Provider")
+                    .font(.callout.weight(.medium))
                 Spacer()
                 Picker("AI provider", selection: $settings.provider) {
                     ForEach(AIProviderKind.allCases) { provider in
@@ -32,11 +24,9 @@ struct AIProviderSettingsView: View {
                 .frame(width: 190)
             }
 
-            Divider()
-
             switch settings.provider {
             case .appleIntelligence:
-                Text("Runs on supported Macs with Apple Intelligence enabled. Meeting and dictation transcripts stay on this device when using AI features.")
+                Text("Runs on this Mac. Requires Apple Intelligence and macOS 26 or later.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             case .openAI, .openRouter:
@@ -48,12 +38,12 @@ struct AIProviderSettingsView: View {
             if settings.provider != .appleIntelligence {
                 Divider()
 
-                Toggle("Generate archive titles automatically", isOn: $settings.automaticRemoteMetadata)
+                Toggle("Automatically title saved dictations", isOn: $settings.automaticRemoteMetadata)
                     .font(.callout)
 
                 Text(settings.provider.sendsTranscriptOffDevice
-                     ? "Off by default. When enabled, each new transcript is sent to \(settings.provider.displayName) to create its title, topic, and description."
-                     : "Off by default. When enabled, Ollama creates titles for new transcripts on this Mac.")
+                     ? "Sends each new dictation to \(settings.provider.displayName) when enabled."
+                     : "Uses Ollama to title each new dictation when enabled.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -119,7 +109,7 @@ struct AIProviderSettingsView: View {
             .font(.caption)
             .foregroundStyle(.secondary)
 
-            Text("Using meeting summaries or transcript tools sends the selected text and instructions to \(settings.provider.displayName). Your provider may charge for requests. Yaprflow does not receive your key or transcript.")
+            Text("AI actions send the selected text directly to \(settings.provider.displayName). Yaprflow never receives it.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -151,7 +141,7 @@ struct AIProviderSettingsView: View {
                 Spacer()
             }
 
-            Text("Uses Ollama at localhost:11434 on this Mac. Start Ollama and install a model first. Local models stay on this Mac; Ollama cloud models may send requests to Ollama's service.")
+            Text("Uses Ollama at localhost:11434. Local models stay on this Mac; cloud models follow Ollama's policy.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
