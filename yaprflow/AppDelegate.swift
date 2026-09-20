@@ -337,16 +337,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         meetingItem.isEnabled = !quickDictationIsActive && !meetingIsBusy
         menu.addItem(meetingItem)
 
-        let historyItem = NSMenuItem()
-        historyItem.view = IconActionMenuItemView(
-            symbolName: "books.vertical",
-            title: "Notes & Dictations",
-            target: self,
-            action: #selector(showNotesAndDictations),
-            isEnabled: { true }
-        )
-        menu.addItem(historyItem)
-
         menu.addItem(NSMenuItem.separator())
 
         let footerItem = NSMenuItem()
@@ -367,10 +357,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func showMeetingNotes() {
         MeetingNotesWindowController.show(.workspace, selection: .liveMeeting)
-    }
-
-    @objc private func showNotesAndDictations() {
-        MeetingNotesWindowController.show(.workspace)
     }
 
     @objc private func showSettings() {

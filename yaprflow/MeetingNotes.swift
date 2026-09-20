@@ -312,7 +312,10 @@ struct MeetingNotesView: View {
     private var detail: some View {
         switch navigation.selection {
         case .liveMeeting:
-            LiveMeetingWorkspace(session: session)
+            LiveMeetingWorkspace(
+                session: session,
+                onOpenSettings: { navigation.destination = .settings }
+            )
         case let .meeting(id):
             if let meeting = store.meeting(id: id) {
                 SavedMeetingView(
@@ -516,6 +519,7 @@ private struct SavedMeetingRow: View {
 
 private struct LiveMeetingWorkspace: View {
     @ObservedObject var session: MeetingSessionController
+    let onOpenSettings: () -> Void
     @State private var selectedEvidenceID: UUID?
 
     var body: some View {
@@ -533,9 +537,18 @@ private struct LiveMeetingWorkspace: View {
                     selectedEvidenceID: $selectedEvidenceID,
                     isGenerating: isGenerating,
                     generationMessage: generationMessage,
-                    generationError: generationError,
-                    onGenerate: session.regenerateNotes
+                    generationError: generationError
                 )
+
+                if !isGenerating {
+                    Divider()
+                    MeetingAskPanel(
+                        meeting: session.meeting,
+                        onOpenEvidence: { selectedEvidenceID = $0 },
+                        onSummaryGenerated: session.saveGeneratedNotes,
+                        onOpenSettings: onOpenSettings
+                    )
+                }
             } else {
                 captureWorkspace
             }
@@ -773,9 +786,6 @@ private struct SavedMeetingView: View {
     @State private var selectedEvidenceID: UUID?
     @State private var isEditing = false
     @State private var didCopy = false
-    @State private var isGenerating = false
-    @State private var generationMessage: String?
-    @State private var generationError: String?
     let onDelete: (MeetingRecord) -> Void
     let onOpenSettings: () -> Void
 
@@ -834,11 +844,7 @@ private struct SavedMeetingView: View {
 
             MeetingDocumentView(
                 meeting: meeting,
-                selectedEvidenceID: $selectedEvidenceID,
-                isGenerating: isGenerating,
-                generationMessage: generationMessage,
-                generationError: generationError,
-                onGenerate: regenerate
+                selectedEvidenceID: $selectedEvidenceID
             )
 
             Divider()
@@ -848,6 +854,7 @@ private struct SavedMeetingView: View {
                 onOpenEvidence: { segmentID in
                     selectedEvidenceID = segmentID
                 },
+                onSummaryGenerated: saveGeneratedSummary,
                 onOpenSettings: onOpenSettings
             )
         }
@@ -859,27 +866,12 @@ private struct SavedMeetingView: View {
         }
     }
 
-    private func regenerate() {
-        guard !isGenerating, !meeting.transcript.isEmpty else { return }
-        isGenerating = true
-        generationMessage = "Preparing meeting summary…"
-        generationError = nil
-        Task {
-            defer {
-                isGenerating = false
-                generationMessage = nil
-            }
-            do {
-                let notes = try await MeetingAIService.generateNotes(
-                    for: meeting,
-                    progress: { generationMessage = $0 }
-                )
-                meeting.generatedNotes = notes
-                try MeetingStore.shared.save(meeting)
-            } catch {
-                generationError = error.localizedDescription
-            }
+    private func saveGeneratedSummary(_ notes: MeetingGeneratedNotes) {
+        meeting.generatedNotes = notes
+        if meeting.needsGeneratedTitle, let suggestedTitle = notes.suggestedTitle {
+            meeting.title = suggestedTitle
         }
+        _ = try? MeetingStore.shared.save(meeting)
     }
 
     private func copyMarkdown() {
@@ -966,7 +958,6 @@ private struct MeetingDocumentView: View {
     let isGenerating: Bool
     let generationMessage: String?
     let generationError: String?
-    let onGenerate: () -> Void
     @State private var isTranscriptExpanded: Bool
 
     init(
@@ -975,8 +966,7 @@ private struct MeetingDocumentView: View {
         selectedEvidenceID: Binding<UUID?>,
         isGenerating: Bool = false,
         generationMessage: String? = nil,
-        generationError: String? = nil,
-        onGenerate: @escaping () -> Void
+        generationError: String? = nil
     ) {
         self.meeting = meeting
         self.notes = notes
@@ -984,7 +974,6 @@ private struct MeetingDocumentView: View {
         self.isGenerating = isGenerating
         self.generationMessage = generationMessage
         self.generationError = generationError
-        self.onGenerate = onGenerate
         _isTranscriptExpanded = State(initialValue: selectedEvidenceID.wrappedValue != nil)
     }
 
@@ -997,7 +986,6 @@ private struct MeetingDocumentView: View {
                         isGenerating: isGenerating,
                         progressMessage: generationMessage,
                         errorMessage: generationError,
-                        onRegenerate: onGenerate,
                         onEvidence: { evidenceID in
                             isTranscriptExpanded = true
                             selectedEvidenceID = evidenceID
@@ -1119,7 +1107,6 @@ private struct GeneratedNotesView: View {
     var isGenerating = false
     var progressMessage: String?
     var errorMessage: String?
-    let onRegenerate: () -> Void
     var onEvidence: (UUID) -> Void = { _ in }
 
     var body: some View {
@@ -1133,13 +1120,6 @@ private struct GeneratedNotesView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button(
-                    isGenerating ? "Generating…" : (meeting.generatedNotes == nil ? "Generate" : "Regenerate"),
-                    systemImage: meeting.generatedNotes == nil ? "sparkles" : "arrow.clockwise",
-                    action: onRegenerate
-                )
-                .controlSize(.small)
-                .disabled(meeting.transcript.isEmpty || isGenerating)
             }
 
             if isGenerating {
@@ -1211,7 +1191,7 @@ private struct GeneratedNotesView: View {
                         .font(.callout.weight(.medium))
                     Text(meeting.transcript.isEmpty
                         ? "Yaprflow uses the transcript and your notes to create a concise meeting summary."
-                        : "Generate key points, decisions, and action items from this meeting.")
+                        : "Choose a preset below to generate a summary or another useful output.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)

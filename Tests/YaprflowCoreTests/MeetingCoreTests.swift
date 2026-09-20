@@ -48,7 +48,7 @@ struct MeetingCoreTests {
         let invalidID = UUID()
         let response = """
         ```json
-        {"overview":"A useful call","insights":[{"kind":"decision","text":"Ship Friday","owner":null,"dueDate":"Friday","citationSegmentIDs":["\(validID)","\(invalidID)"]}],"followUpEmail":"Thanks"}
+        {"title":"Friday Launch Decision","overview":"A useful call","insights":[{"kind":"decision","text":"Ship Friday","owner":null,"dueDate":"Friday","citationSegmentIDs":["\(validID)","\(invalidID)"]}],"followUpEmail":"Thanks"}
         ```
         """
 
@@ -57,8 +57,16 @@ struct MeetingCoreTests {
             validSegmentIDs: [validID]
         )
 
+        #expect(notes.suggestedTitle == "Friday Launch Decision")
         #expect(notes.overview == "A useful call")
         #expect(notes.insights.first?.citationSegmentIDs == [validID])
+    }
+
+    @Test("Only generic meeting names are replaced by generated titles")
+    func generatedTitleEligibility() {
+        #expect(MeetingRecord(title: "New meeting").needsGeneratedTitle)
+        #expect(MeetingRecord(title: "  ").needsGeneratedTitle)
+        #expect(!MeetingRecord(title: "Weekly product review").needsGeneratedTitle)
     }
 
     @Test("Generated notes tolerate common model JSON variations")

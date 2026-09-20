@@ -101,17 +101,24 @@ public struct MeetingInsight: Codable, Identifiable, Hashable, Sendable {
 }
 
 public struct MeetingGeneratedNotes: Codable, Hashable, Sendable {
+    public var suggestedTitle: String?
     public var overview: String
     public var insights: [MeetingInsight]
     public var followUpEmail: String
     public var generatedAt: Date
 
     public init(
+        suggestedTitle: String? = nil,
         overview: String = "",
         insights: [MeetingInsight] = [],
         followUpEmail: String = "",
         generatedAt: Date = Date()
     ) {
+        let normalizedTitle = suggestedTitle?
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
+            .trimmingCharacters(in: CharacterSet(charactersIn: "\"'`*_# "))
+        self.suggestedTitle = normalizedTitle.flatMap { $0.isEmpty ? nil : String($0.prefix(80)) }
         self.overview = overview.trimmingCharacters(in: .whitespacesAndNewlines)
         self.insights = insights.filter { !$0.text.isEmpty }
         self.followUpEmail = followUpEmail.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -173,6 +180,13 @@ public struct MeetingRecord: Codable, Identifiable, Hashable, Sendable {
         transcript.map { segment in
             "[\(Self.timestamp(segment.startTime))] \(segment.displaySpeaker): \(segment.text)"
         }.joined(separator: "\n")
+    }
+
+    public var needsGeneratedTitle: Bool {
+        let normalized = title
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        return normalized.isEmpty || normalized == "new meeting" || normalized == "untitled meeting"
     }
 
     private static func timestamp(_ interval: TimeInterval) -> String {
@@ -605,7 +619,7 @@ public enum MeetingPromptBuilder {
     public static func generationInstructions(for meeting: MeetingRecord, template: MeetingTemplate) -> String {
         let attendeeList = meeting.attendees.map(\.name).joined(separator: ", ")
         return """
-        Create trustworthy meeting notes using the template guidance below.
+        Create trustworthy meeting notes and a specific, natural title of 3 to 8 words using the template guidance below.
         Never invent a fact, owner, date, or decision. Prefer the user's raw notes when they emphasize a topic.
         Every insight must cite one or more exact transcript segment UUIDs.
 
@@ -619,7 +633,7 @@ public enum MeetingPromptBuilder {
         </raw-notes>
 
         Return only JSON with this shape:
-        {"overview":"...","insights":[{"kind":"summary|decision|actionItem|openQuestion|keyDetail","text":"...","owner":null,"dueDate":null,"citationSegmentIDs":["UUID"]}],"followUpEmail":"..."}
+        {"title":"Specific meeting title","overview":"...","insights":[{"kind":"summary|decision|actionItem|openQuestion|keyDetail","text":"...","owner":null,"dueDate":null,"citationSegmentIDs":["UUID"]}],"followUpEmail":"..."}
         """
     }
 
@@ -656,6 +670,7 @@ public enum MeetingGeneratedNotesParser {
             let citationSegmentIDs: [UUID]
         }
 
+        let title: String?
         let overview: String
         let insights: [Insight]
         let followUpEmail: String
@@ -707,6 +722,7 @@ public enum MeetingGeneratedNotesParser {
 
     private static func notes(from payload: Payload, validSegmentIDs: Set<UUID>) -> MeetingGeneratedNotes {
         MeetingGeneratedNotes(
+            suggestedTitle: payload.title,
             overview: payload.overview,
             insights: payload.insights.map { item in
                 MeetingInsight(
@@ -779,8 +795,12 @@ public enum MeetingGeneratedNotesParser {
         let followUpEmail = stringValue(in: values, keys: [
             "followupemail", "followup", "emaildraft", "email",
         ]) ?? ""
+        let suggestedTitle = stringValue(in: values, keys: [
+            "title", "meetingtitle", "suggestedtitle",
+        ])
 
         let notes = MeetingGeneratedNotes(
+            suggestedTitle: suggestedTitle,
             overview: overview,
             insights: deduplicated(insights),
             followUpEmail: followUpEmail

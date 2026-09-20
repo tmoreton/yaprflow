@@ -211,9 +211,13 @@ final class MeetingSessionController: ObservableObject {
         _ = try? MeetingStore.shared.save(meeting)
     }
 
-    func regenerateNotes() {
-        guard !meeting.transcript.isEmpty else { return }
-        Task { await generateNotes(allowMissingProvider: false) }
+    func saveGeneratedNotes(_ notes: MeetingGeneratedNotes) {
+        applyGeneratedNotes(notes)
+        _ = try? MeetingStore.shared.save(meeting)
+        if case let .failed(message) = phase,
+           message.hasPrefix("Transcript saved, but notes could not be generated:") {
+            phase = .complete
+        }
     }
 
     private func startSession() async {
@@ -350,26 +354,30 @@ final class MeetingSessionController: ObservableObject {
         }
     }
 
-    private func generateNotes(allowMissingProvider: Bool = true) async {
+    private func generateNotes() async {
         phase = .finalizing("Generating trustworthy notes…")
         do {
-            meeting.generatedNotes = try await MeetingAIService.generateNotes(
+            let notes = try await MeetingAIService.generateNotes(
                 for: meeting,
                 progress: { [weak self] message in self?.phase = .finalizing(message) }
             )
+            applyGeneratedNotes(notes)
             try MeetingStore.shared.save(meeting)
             phase = .complete
         } catch MeetingAIError.modelUnavailable {
             _ = try? MeetingStore.shared.save(meeting)
-            if allowMissingProvider {
-                // A transcript without configured AI is still a completed, useful meeting.
-                phase = .complete
-            } else {
-                phase = .failed(MeetingAIError.modelUnavailable.localizedDescription)
-            }
+            // A transcript without configured AI is still a completed, useful meeting.
+            phase = .complete
         } catch {
             _ = try? MeetingStore.shared.save(meeting)
             phase = .failed("Transcript saved, but notes could not be generated: \(error.localizedDescription)")
+        }
+    }
+
+    private func applyGeneratedNotes(_ notes: MeetingGeneratedNotes) {
+        meeting.generatedNotes = notes
+        if meeting.needsGeneratedTitle, let suggestedTitle = notes.suggestedTitle {
+            meeting.title = suggestedTitle
         }
     }
 

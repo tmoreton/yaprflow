@@ -45,9 +45,8 @@ licensed noncommercial builds.
   action items, follow-up email text, and transcript-linked evidence.
 - **Two mobile capture modes**: use Quick Dictation for clipboard text or an
   explicitly microphone-only In-person Meeting workflow on iPhone and iPad.
-- **Meeting memory**: search saved meetings locally with full-text and on-device
-  semantic retrieval, or ask questions across relevant meeting excerpts with
-  citations back to the underlying transcript.
+- **Meeting memory**: search saved meetings locally and generate answers from a
+  selected meeting with citations back to the underlying transcript.
 - **Polished or exact text**: choose a cleaned-up result or retain the model's
   wording more closely.
 - **Local vocabulary**: deterministic phrase replacements for names, acronyms,
@@ -106,12 +105,12 @@ Yaprflow runs as a menu-bar app. Click the waveform icon to open the menu.
   more consistent English dictation. Choose any other supported locale, or
   Automatic when a recording may use different languages.
 - **Yaprflow workspace** keeps live capture, saved meetings, and Quick Dictation
-  history in one searchable sidebar. Choose any item to read, copy, organize,
-  or ask AI about it without switching pages.
+  history in one searchable sidebar. Meetings and dictations share the same AI
+  presets and Generate workflow without switching pages.
 - **Meeting Notes** supports one-click join and record, typed notes, live
-  Me/Them transcription, seven templates, editable generated notes, evidence
-  jumps, and cross-meeting questions. Settings stays one click away without
-  competing with the primary workflow.
+  Me/Them transcription, seven templates, automatic titles and summaries,
+  editable generated output, and evidence jumps. Settings stays one click away
+  without competing with the primary workflow.
 - **Send Feedback** is available in Settings for reporting a problem, making a
   suggestion, or asking a question. Review and send the prepared email in your
   mail app; no transcript or audio is attached.

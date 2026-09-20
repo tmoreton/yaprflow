@@ -4,12 +4,48 @@ import SwiftUI
 
 @MainActor
 private final class MeetingMemoryModel: ObservableObject {
-    @Published private(set) var answer = ""
+    @Published var answer = ""
     @Published private(set) var isRunning = false
     @Published private(set) var progressMessage: String?
     @Published var errorMessage: String?
     @Published private(set) var evidenceHits: [MeetingSearchHit] = []
     private var generationID = UUID()
+
+    func generateSummary(
+        for meeting: MeetingRecord,
+        completion: @escaping (MeetingGeneratedNotes) -> Void
+    ) {
+        guard !meeting.transcript.isEmpty, !isRunning else { return }
+        let requestID = UUID()
+        generationID = requestID
+        isRunning = true
+        answer = ""
+        errorMessage = nil
+        evidenceHits = []
+        Task { [weak self] in
+            guard let self else { return }
+            defer {
+                if self.generationID == requestID {
+                    self.isRunning = false
+                    self.progressMessage = nil
+                }
+            }
+            do {
+                let notes = try await MeetingAIService.generateNotes(
+                    for: meeting,
+                    progress: { message in
+                        guard self.generationID == requestID else { return }
+                        self.progressMessage = message
+                    }
+                )
+                guard self.generationID == requestID else { return }
+                completion(notes)
+            } catch {
+                guard self.generationID == requestID else { return }
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
 
     func ask(question: String, meetings: [MeetingRecord], includeAllSegments: Bool = false) {
         let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -129,7 +165,21 @@ struct MeetingAskPanel: View {
 
     let meeting: MeetingRecord
     let onOpenEvidence: (UUID?) -> Void
+    let onSummaryGenerated: (MeetingGeneratedNotes) -> Void
     let onOpenSettings: () -> Void
+
+    init(
+        meeting: MeetingRecord,
+        onOpenEvidence: @escaping (UUID?) -> Void,
+        onSummaryGenerated: @escaping (MeetingGeneratedNotes) -> Void,
+        onOpenSettings: @escaping () -> Void
+    ) {
+        self.meeting = meeting
+        self.onOpenEvidence = onOpenEvidence
+        self.onSummaryGenerated = onSummaryGenerated
+        self.onOpenSettings = onOpenSettings
+        _isExpanded = State(initialValue: meeting.generatedNotes == nil)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -141,9 +191,9 @@ struct MeetingAskPanel: View {
                 HStack(spacing: 9) {
                     Image(systemName: "sparkles")
                         .foregroundStyle(.purple)
-                    Text("Ask this meeting")
+                    Text("Work with this meeting")
                         .font(.callout.weight(.medium))
-                    Text("Use a preset or ask a question")
+                    Text("Summarize, organize, or draft a follow-up")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Spacer()
@@ -167,6 +217,12 @@ struct MeetingAskPanel: View {
                     showsEmptyResult: false,
                     compact: true,
                     onOpenEvidence: { _, segmentID in onOpenEvidence(segmentID) },
+                    onMeetingSummaryGenerated: { notes in
+                        withAnimation(.easeInOut(duration: 0.16)) {
+                            isExpanded = false
+                        }
+                        onSummaryGenerated(notes)
+                    },
                     onOpenSettings: onOpenSettings
                 )
                 .padding(12)
@@ -222,10 +278,31 @@ struct DictationWorkspace: View {
             Divider()
 
             ScrollView {
-                Text(item.transcript.isEmpty ? "No transcript was saved." : item.transcript)
-                    .font(.body)
-                    .foregroundStyle(item.transcript.isEmpty ? .secondary : .primary)
-                    .textSelection(.enabled)
+                VStack(alignment: .leading, spacing: 18) {
+                    if let summary = item.generatedDescription {
+                        VStack(alignment: .leading, spacing: 7) {
+                            Text("Summary")
+                                .font(.headline)
+                            Text(summary)
+                                .font(.callout)
+                                .textSelection(.enabled)
+                                .padding(10)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8))
+                        }
+
+                        Divider()
+                    }
+
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text("Transcript")
+                            .font(.headline)
+                        Text(item.transcript.isEmpty ? "No transcript was saved." : item.transcript)
+                            .font(.body)
+                            .foregroundStyle(item.transcript.isEmpty ? .secondary : .primary)
+                            .textSelection(.enabled)
+                    }
+                }
                     .frame(maxWidth: 760, alignment: .leading)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(20)
@@ -303,6 +380,7 @@ private struct AIWorkspaceContent: View {
     let showsEmptyResult: Bool
     let compact: Bool
     let onOpenEvidence: (UUID, UUID?) -> Void
+    var onMeetingSummaryGenerated: (MeetingGeneratedNotes) -> Void = { _ in }
     let onOpenSettings: () -> Void
 
     var body: some View {
@@ -438,40 +516,8 @@ private struct AIWorkspaceContent: View {
                     description: Text(emptyResultDescription)
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if source.usesMeetingMemory {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text(memory.answer)
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-
-                        if !memory.evidenceHits.isEmpty {
-                            Divider()
-                            Text("Sources")
-                                .font(.headline)
-
-                            ForEach(memory.evidenceHits) { hit in
-                                Button {
-                                    onOpenEvidence(hit.meetingID, hit.segmentID)
-                                } label: {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(hit.title)
-                                            .font(.callout.weight(.medium))
-                                        Text(hit.excerpt)
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                            .lineLimit(2)
-                                    }
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.vertical, 4)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                    }
-                }
             } else {
-                TextEditor(text: $ai.result)
+                TextEditor(text: resultBinding)
                     .font(.body)
                     .scrollContentBackground(.hidden)
                     .padding(7)
@@ -481,6 +527,30 @@ private struct AIWorkspaceContent: View {
                         RoundedRectangle(cornerRadius: 7)
                             .stroke(.separator, lineWidth: 1)
                     }
+
+                if source.usesMeetingMemory && !memory.evidenceHits.isEmpty {
+                    Divider()
+                    Text("Sources")
+                        .font(.headline)
+
+                    ForEach(memory.evidenceHits) { hit in
+                        Button {
+                            onOpenEvidence(hit.meetingID, hit.segmentID)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(hit.title)
+                                    .font(.callout.weight(.medium))
+                                Text(hit.excerpt)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(2)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 4)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
             }
         }
         .frame(maxHeight: .infinity)
@@ -491,7 +561,11 @@ private struct AIWorkspaceContent: View {
         case let .allMeetings(meetings):
             memory.ask(question: prompt, meetings: meetings)
         case let .meeting(meeting):
-            memory.ask(question: prompt, meetings: [meeting], includeAllSegments: true)
+            if usesStructuredMeetingSummary {
+                memory.generateSummary(for: meeting, completion: onMeetingSummaryGenerated)
+            } else {
+                memory.ask(question: prompt, meetings: [meeting], includeAllSegments: true)
+            }
         case let .dictation(item):
             ai.run(transcript: item.transcript)
         }
@@ -522,7 +596,17 @@ private struct AIWorkspaceContent: View {
     }
 
     private var runButtonTitle: String {
-        source.isAllMeetings ? "Ask" : "Run"
+        source.isAllMeetings ? "Ask" : "Generate"
+    }
+
+    private var usesStructuredMeetingSummary: Bool {
+        guard case .meeting = source else { return false }
+        return prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+            == LibraryPromptCatalog.structuredBrief.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var resultBinding: Binding<String> {
+        source.usesMeetingMemory ? $memory.answer : $ai.result
     }
 
     private var runIsDisabled: Bool {
