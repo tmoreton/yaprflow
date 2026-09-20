@@ -1,14 +1,6 @@
 import AppKit
 import SwiftUI
 
-private enum FeedbackKind: String, CaseIterable, Identifiable {
-    case problem = "Problem"
-    case suggestion = "Suggestion"
-    case question = "Question"
-
-    var id: Self { self }
-}
-
 struct FeedbackView: View {
     @State private var kind: FeedbackKind = .problem
     @State private var subject = ""
@@ -83,47 +75,41 @@ struct FeedbackView: View {
     }
 
     private var canCompose: Bool {
-        !subject.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        draft.canCompose
     }
 
     private var emailSubject: String {
-        "Yaprflow \(kind.rawValue): \(subject.trimmingCharacters(in: .whitespacesAndNewlines))"
+        draft.emailSubject
     }
 
     private var emailBody: String {
+        draft.emailBody
+    }
+
+    private var draft: FeedbackDraft {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Unknown"
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "Unknown"
-        return """
-        Type: \(kind.rawValue)
-        Summary: \(subject.trimmingCharacters(in: .whitespacesAndNewlines))
-
-        \(message.trimmingCharacters(in: .whitespacesAndNewlines))
-
-        ---
-        Yaprflow \(version) (\(build))
-        \(ProcessInfo.processInfo.operatingSystemVersionString)
-        """
+        return FeedbackDraft(
+            kind: kind,
+            summary: subject,
+            details: message,
+            version: version,
+            build: build,
+            operatingSystem: ProcessInfo.processInfo.operatingSystemVersionString
+        )
     }
 
     private func composeEmail() {
         if let service = NSSharingService(named: .composeEmail),
             service.canPerform(withItems: [emailBody]) {
-            service.recipients = ["tim@yaprflow.com"]
+            service.recipients = [FeedbackDraft.recipient]
             service.subject = emailSubject
             service.perform(withItems: [emailBody])
             Telemetry.shared.track(.feedbackDraftOpened)
             return
         }
 
-        var components = URLComponents()
-        components.scheme = "mailto"
-        components.path = "tim@yaprflow.com"
-        components.queryItems = [
-            URLQueryItem(name: "subject", value: emailSubject),
-            URLQueryItem(name: "body", value: emailBody),
-        ]
-        guard let url = components.url, NSWorkspace.shared.open(url) else {
+        guard let url = draft.mailtoURL, NSWorkspace.shared.open(url) else {
             mailUnavailable = true
             return
         }

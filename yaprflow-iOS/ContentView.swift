@@ -38,7 +38,10 @@ struct ContentView: View {
             }
         }
         .preferredColorScheme(.dark)
-        .onAppear { engine.preload() }
+        .onAppear {
+            engine.preload()
+            configureDebugSmokeRoute()
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .background {
                 engine.applicationDidEnterBackground()
@@ -206,12 +209,32 @@ struct ContentView: View {
                         Label("Template", systemImage: "rectangle.3.group")
                             .foregroundStyle(.white.opacity(0.65))
                         Spacer()
-                        Picker("Meeting template", selection: $meetings.draftTemplateID) {
+                        Menu {
                             ForEach(MeetingTemplateCatalog.builtIns) { template in
-                                Text(template.name).tag(template.id)
+                                Button {
+                                    meetings.draftTemplateID = template.id
+                                } label: {
+                                    Label(
+                                        template.name,
+                                        systemImage: template.id == meetings.draftTemplateID
+                                            ? "checkmark"
+                                            : template.systemImage
+                                    )
+                                }
                             }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Text(selectedMeetingTemplate.name)
+                                    .lineLimit(1)
+                                Image(systemName: "chevron.up.chevron.down")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 10, height: 13)
+                            }
+                            .font(.system(size: 14, weight: .medium, design: .rounded))
                         }
                         .tint(.white)
+                        .accessibilityLabel("Meeting template, \(selectedMeetingTemplate.name)")
                     }
                     .font(.system(size: 14, weight: .medium, design: .rounded))
                     .padding(.horizontal, 12)
@@ -391,9 +414,35 @@ struct ContentView: View {
         }
     }
 
+    private var selectedMeetingTemplate: MeetingTemplate {
+        MeetingTemplateCatalog.template(id: meetings.draftTemplateID)
+    }
+
     private static func durationString(_ interval: TimeInterval) -> String {
         let seconds = max(0, Int(interval))
         return String(format: "%02d:%02d", seconds / 60, seconds % 60)
+    }
+
+    private func configureDebugSmokeRoute() {
+        #if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains("--smoke-test-meeting") {
+            selectedModeRaw = MobileCaptureMode.meeting.rawValue
+            meetings.draftTitle = "Production readiness"
+            meetings.draftNotes = "Typed notes stay local and remain available with the transcript."
+        }
+        Task { @MainActor in
+            await Task.yield()
+            if arguments.contains("--smoke-test-feedback") {
+                showFeedback = true
+            } else if arguments.contains("--smoke-test-meeting-library") {
+                selectedModeRaw = MobileCaptureMode.meeting.rawValue
+                showMeetingLibrary = true
+            } else if arguments.contains("--smoke-test-history") {
+                showHistory = true
+            }
+        }
+        #endif
     }
 }
 
@@ -557,14 +606,6 @@ private struct MobileMeetingDetailView: View {
 
 // MARK: - Feedback sheet
 
-private enum FeedbackKind: String, CaseIterable, Identifiable {
-    case problem = "Problem"
-    case suggestion = "Suggestion"
-    case question = "Question"
-
-    var id: Self { self }
-}
-
 private struct FeedbackSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
@@ -625,27 +666,28 @@ private struct FeedbackSheet: View {
     }
 
     private var canCompose: Bool {
-        !subject.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        draft.canCompose
     }
 
     private var emailSubject: String {
-        "Yaprflow \(kind.rawValue): \(subject.trimmingCharacters(in: .whitespacesAndNewlines))"
+        draft.emailSubject
     }
 
     private var emailBody: String {
+        draft.emailBody
+    }
+
+    private var draft: FeedbackDraft {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Unknown"
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "Unknown"
-        return """
-        Type: \(kind.rawValue)
-        Summary: \(subject.trimmingCharacters(in: .whitespacesAndNewlines))
-
-        \(message.trimmingCharacters(in: .whitespacesAndNewlines))
-
-        ---
-        Yaprflow \(version) (\(build))
-        \(UIDevice.current.systemName) \(UIDevice.current.systemVersion)
-        """
+        return FeedbackDraft(
+            kind: kind,
+            summary: subject,
+            details: message,
+            version: version,
+            build: build,
+            operatingSystem: "\(UIDevice.current.systemName) \(UIDevice.current.systemVersion)"
+        )
     }
 
     private func composeEmail() {
@@ -654,14 +696,7 @@ private struct FeedbackSheet: View {
             return
         }
 
-        var components = URLComponents()
-        components.scheme = "mailto"
-        components.path = "tim@yaprflow.com"
-        components.queryItems = [
-            URLQueryItem(name: "subject", value: emailSubject),
-            URLQueryItem(name: "body", value: emailBody),
-        ]
-        guard let url = components.url else {
+        guard let url = draft.mailtoURL else {
             mailUnavailable = true
             return
         }
@@ -679,7 +714,7 @@ private struct FeedbackMailComposer: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> MFMailComposeViewController {
         let composer = MFMailComposeViewController()
         composer.mailComposeDelegate = context.coordinator
-        composer.setToRecipients(["tim@yaprflow.com"])
+        composer.setToRecipients([FeedbackDraft.recipient])
         composer.setSubject(subject)
         composer.setMessageBody(body, isHTML: false)
         return composer
@@ -787,18 +822,31 @@ private struct HistorySheet: View {
                 .padding(.top, 8)
                 .padding(.bottom, 14)
 
-                ScrollView {
-                    LazyVStack(spacing: 8) {
-                        ForEach(history.items, id: \.self) { item in
-                            HistoryRow(
-                                text: item,
-                                isCopied: copiedItem == item,
-                                onCopy: { copy(item) }
-                            )
-                        }
+                if history.items.isEmpty {
+                    ScrollView {
+                        ContentUnavailableView(
+                            "No recent dictations",
+                            systemImage: "mic",
+                            description: Text("Quick Dictation results will appear here after they’re copied.")
+                        )
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 36)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 20)
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 8) {
+                            ForEach(history.items, id: \.self) { item in
+                                HistoryRow(
+                                    text: item,
+                                    isCopied: copiedItem == item,
+                                    onCopy: { copy(item) }
+                                )
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 20)
+                    }
                 }
             }
         }

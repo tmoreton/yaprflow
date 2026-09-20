@@ -1,5 +1,64 @@
 import Foundation
 
+enum FeedbackKind: String, CaseIterable, Identifiable, Sendable {
+    case problem = "Problem"
+    case suggestion = "Suggestion"
+    case question = "Question"
+
+    var id: Self { self }
+}
+
+struct FeedbackDraft: Equatable, Sendable {
+    static let recipient = "tim@yaprflow.com"
+
+    let kind: FeedbackKind
+    let summary: String
+    let details: String
+    let version: String
+    let build: String
+    let operatingSystem: String
+
+    var canCompose: Bool {
+        !trimmedSummary.isEmpty && !trimmedDetails.isEmpty
+    }
+
+    var emailSubject: String {
+        "Yaprflow \(kind.rawValue): \(trimmedSummary)"
+    }
+
+    var emailBody: String {
+        """
+        Type: \(kind.rawValue)
+        Summary: \(trimmedSummary)
+
+        \(trimmedDetails)
+
+        ---
+        Yaprflow \(version) (\(build))
+        \(operatingSystem)
+        """
+    }
+
+    var mailtoURL: URL? {
+        var components = URLComponents()
+        components.scheme = "mailto"
+        components.path = Self.recipient
+        components.queryItems = [
+            URLQueryItem(name: "subject", value: emailSubject),
+            URLQueryItem(name: "body", value: emailBody),
+        ]
+        return components.url
+    }
+
+    private var trimmedSummary: String {
+        summary.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var trimmedDetails: String {
+        details.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
 enum TelemetryFeature: String, Sendable {
     case meetingNotes = "meeting_notes"
     case history
