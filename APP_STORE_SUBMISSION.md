@@ -42,13 +42,13 @@ the App Store Connect metadata, agreements, compliance, and review steps below.
 
 On September 20, 2026, the direct Mac 5.2.0 (12) build completed the full
 Developer ID release path. Apple accepted and stapled the app under notary
-submission `fea9723d-b70f-425d-a9f7-19efcfcdf6e7`, then accepted and stapled
-the DMG under submission `05b54eb7-d400-424c-bb19-00866b87831a`. Gatekeeper
+submission `f474e830-0263-4227-9c00-8ed7ae42d1ae`, then accepted and stapled
+the DMG under submission `e067b84b-9f7f-4484-81fb-65c0cefcb688`. Gatekeeper
 accepted `build/yaprflow-5.2.0.dmg`; its SHA-256 is
-`3886a45be8247cdb4cabaa70d7456e8ddb4d48c1c8ad5d3d1ca2155776cc5e97`.
-The signed app also passed the Meeting Notes persistence and Quick Dictation
-capture-engine runtime smoke tests. Nothing was uploaded to a customer-facing
-download location.
+`f082f07153d5b5d863fee5c6701b9863c73db493d74b829c457d706c1e178cb7`.
+The signed app uses the final edge-to-edge flat-red icon and also passed the
+Meeting Notes persistence and Quick Dictation capture-engine runtime smoke
+tests. Nothing was uploaded to a customer-facing download location.
 
 The 5.2.0 (12) Mac App Store archive at
 `build/app-store/5.2.0-12/yaprflow.xcarchive` passed the release script's
