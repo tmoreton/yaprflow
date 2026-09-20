@@ -588,6 +588,9 @@ if [[ -n "${USE_APP:-}" ]]; then
     mkdir -p "$BUILD_DIR"
     echo "==> Using pre-built .app: $APP_PATH (skipping build + .app notarization)"
 else
+    echo "==> Verifying shared app icon"
+    scripts/verify-app-icon.sh
+
     # ---- Verify model files -------------------------------------------------
 
     # Every archive is built from the exact pinned model inventory. The fetch

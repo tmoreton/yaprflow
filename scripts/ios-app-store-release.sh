@@ -3,6 +3,8 @@
 #
 # This script deliberately never uploads. After it succeeds, upload the printed
 # .ipa with Transporter or App Store Connect tooling as a separate action.
+# For a TestFlight candidate, run scripts/testflight-release.sh so the macOS and
+# iOS/iPadOS builds are always produced as one paired release gate.
 #
 # Optional controls:
 #   ALLOW_DIRTY=1                    allow an uncommitted source tree
@@ -83,6 +85,7 @@ for command_name in \
         || fail "required command is unavailable: $command_name"
 done
 [[ -x /usr/libexec/PlistBuddy ]] || fail "/usr/libexec/PlistBuddy is unavailable"
+"$ROOT/scripts/verify-app-icon.sh"
 
 TEMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/yaprflow-ios-app-store-verify.XXXXXX")"
 cleanup_temp() {

@@ -219,6 +219,7 @@ scripts/build-sherpa-onnx-asr.sh builds pinned Apple native ASR-only frameworks
 scripts/publish-models.sh       maintains the public source-build model mirror
 scripts/app-store-release.sh    creates and verifies Mac App Store packages
 scripts/ios-app-store-release.sh creates and verifies iOS App Store archives
+scripts/testflight-release.sh   gates every TestFlight candidate on both platforms
 scripts/release.sh              creates signed DMGs and direct-download releases
 LICENSE                         current source license and historical boundaries
 COMMERCIAL-LICENSING.md         separate commercial source-license inquiries
@@ -273,11 +274,11 @@ scripts/ios-meeting-store-smoke.sh
 The shared schemes are:
 
 - `yaprflow`: direct-download macOS build with Sparkle, bundle ID
-  `com.tmoreton.yaprflow`, version 5.2.0 (12).
+  `com.tmoreton.yaprflow`, version 5.2.0 (13).
 - `yaprflow-AppStore`: Mac App Store build without Sparkle, using the same app
   identity and version so both editions are produced from the same source.
 - `yaprflow-iOS`: iPhone/iPad, bundle ID `com.tmoreton.yaprflow.ios`, version
-  1.0.0 (3).
+  1.0.0 (4).
 
 The fetch script pins exact Hugging Face revisions and validates every bundled
 model file with `scripts/model-checksums.sha256`.

@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		21F5D6BE12500B2C05C03C9D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = DE6C15A83BCAB236AB4D31C3 /* Assets.xcassets */; };
+		9C51000131D1000100000001 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 9C51000131D1000100000002 /* AppIcon.icon */; };
 		2A2FDF2C31C00B9800A00001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 2A2FDF2B31C00B9800A00001 /* PrivacyInfo.xcprivacy */; };
 		2A2FDF2E31C00B9800A00001 /* Acknowledgements.txt in Resources */ = {isa = PBXBuildFile; fileRef = 2A2FDF2D31C00B9800A00001 /* Acknowledgements.txt */; };
 		2A2FDF3031C1000200000001 /* ONNXRuntime-ThirdPartyNotices-v1.28.2.txt in Resources */ = {isa = PBXBuildFile; fileRef = 2A2FDF2F31C1000200000001 /* ONNXRuntime-ThirdPartyNotices-v1.28.2.txt */; };
@@ -73,6 +74,7 @@
 		53DAA96B0F07428A9B67E001 /* AIProviderCore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Shared/AIProviderCore.swift; sourceTree = SOURCE_ROOT; };
 		53DAA96B0F07428A9B67E004 /* TelemetryCore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Shared/TelemetryCore.swift; sourceTree = SOURCE_ROOT; };
 		9B4D100131D0000100000004 /* MeetingCore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Shared/MeetingCore.swift; sourceTree = SOURCE_ROOT; };
+		9C51000131D1000100000002 /* AppIcon.icon */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.iconcomposer.icon; name = AppIcon.icon; path = ../yaprflow/AppIcon.icon; sourceTree = "<group>"; };
 		6F53000131C5000100000005 /* Sparkle-2.10.0.txt */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text; path = "LICENSES/Sparkle-2.10.0.txt"; sourceTree = SOURCE_ROOT; };
 		7A53000131C6000100000010 /* yaprflow App Store.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = yaprflow.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8AC764B726D8D52670A9D93A /* yaprflow-iOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "yaprflow-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -185,6 +187,7 @@
 				B6843916C14C177A41165D16 /* AudioCapture.swift */,
 				C8DB5A205EACDB4ACD590805 /* HistoryStore.swift */,
 				C8DB5A205EACDB4ACD590806 /* MobileMeetingStore.swift */,
+				9C51000131D1000100000002 /* AppIcon.icon */,
 				DE6C15A83BCAB236AB4D31C3 /* Assets.xcassets */,
 				2A2FDF2B31C00B9800A00001 /* PrivacyInfo.xcprivacy */,
 				01B9F3CA97F12303F51C3977 /* Info.plist */,
@@ -326,6 +329,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9C51000131D1000100000001 /* AppIcon.icon in Resources */,
 				21F5D6BE12500B2C05C03C9D /* Assets.xcassets in Resources */,
 				2A2FDF2E31C00B9800A00001 /* Acknowledgements.txt in Resources */,
 				2A2FDF3131C1000200000001 /* ONNXRuntime-ThirdPartyNotices-v1.28.2.txt in Resources */,
@@ -479,7 +483,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_OBJC_WEAK = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = GVXC5FQ2RP;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -511,7 +515,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_OBJC_WEAK = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = GVXC5FQ2RP;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -666,7 +670,7 @@
 				CODE_SIGN_ENTITLEMENTS = yaprflow/yaprflow.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 12;
+				CURRENT_PROJECT_VERSION = 13;
 				DEVELOPMENT_TEAM = GVXC5FQ2RP;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -699,7 +703,7 @@
 				CODE_SIGN_ENTITLEMENTS = yaprflow/yaprflow.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 12;
+				CURRENT_PROJECT_VERSION = 13;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = GVXC5FQ2RP;
 				ENABLE_APP_SANDBOX = YES;
@@ -734,7 +738,7 @@
 				CODE_SIGN_ENTITLEMENTS = "yaprflow/yaprflow-AppStore.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 12;
+				CURRENT_PROJECT_VERSION = 13;
 				DEVELOPMENT_TEAM = GVXC5FQ2RP;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -767,7 +771,7 @@
 				CODE_SIGN_ENTITLEMENTS = "yaprflow/yaprflow-AppStore.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 12;
+				CURRENT_PROJECT_VERSION = 13;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = GVXC5FQ2RP;
 				ENABLE_APP_SANDBOX = YES;

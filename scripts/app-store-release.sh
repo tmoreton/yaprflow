@@ -4,6 +4,8 @@
 # This script deliberately does not upload anything. After it succeeds, upload
 # the printed .pkg with Transporter or App Store Connect tooling as a separate,
 # intentional step.
+# For a TestFlight candidate, run scripts/testflight-release.sh so the macOS and
+# iOS/iPadOS builds are always produced as one paired release gate.
 #
 # Optional controls:
 #   ALLOW_DIRTY=1                  allow an uncommitted source tree
@@ -42,7 +44,7 @@ EXPECTED_APPLICATION_ID="$EXPECTED_TEAM_ID.$EXPECTED_BUNDLE_ID"
 EXPECTED_DISTRIBUTION="app-store"
 
 usage() {
-    sed -n '2,14p' "$0"
+    sed -n '2,15p' "$0"
 }
 
 fail() {
@@ -94,6 +96,7 @@ done
 [[ -x /usr/libexec/PlistBuddy ]] || fail "/usr/libexec/PlistBuddy is unavailable"
 
 require_native_asr_artifacts
+"$ROOT/scripts/verify-app-icon.sh"
 
 ONNXRUNTIME_MACOS_FRAMEWORK="$SHERPA_ARTIFACTS_ROOT/OnnxRuntimeMacOS.xcframework/macos-arm64_x86_64/onnxruntime.framework"
 [[ -L "$ONNXRUNTIME_MACOS_FRAMEWORK/Versions/Current" \

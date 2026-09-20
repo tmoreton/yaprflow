@@ -392,9 +392,18 @@ private struct LiveMeetingWorkspace: View {
             Label("Transcript and meeting notes saved locally", systemImage: "checkmark.circle.fill")
                 .foregroundStyle(.green)
         case let .failed(message):
-            Label(message, systemImage: "exclamationmark.triangle.fill")
-                .foregroundStyle(.red)
-                .textSelection(.enabled)
+            HStack(spacing: 10) {
+                Label(message, systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.red)
+                    .textSelection(.enabled)
+                Spacer(minLength: 8)
+                if message.contains("Screen & System Audio") {
+                    Button("Open Settings") {
+                        openScreenCaptureSettings()
+                    }
+                    .controlSize(.small)
+                }
+            }
         }
     }
 
@@ -482,6 +491,13 @@ private struct LiveMeetingWorkspace: View {
     private var duration: String {
         let seconds = Int(session.elapsed)
         return String(format: "%02d:%02d", seconds / 60, seconds % 60)
+    }
+
+    private func openScreenCaptureSettings() {
+        guard let url = URL(
+            string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
+        ) else { return }
+        NSWorkspace.shared.open(url)
     }
 }
 

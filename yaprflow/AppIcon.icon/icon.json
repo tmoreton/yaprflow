@@ -1,0 +1,26 @@
+{
+  "fill" : {
+    "solid" : "extended-srgb:1.00000,0.29412,0.16863,1.00000"
+  },
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "image-name" : "waveform 2.svg",
+          "name" : "waveform 2"
+        }
+      ],
+      "shadow" : {
+        "kind" : "none",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : false,
+        "value" : 0.3
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "squares" : "shared"
+  }
+}

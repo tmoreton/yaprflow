@@ -15,8 +15,8 @@ Last reviewed: September 20, 2026
 
 | Platform | Bundle ID | Version | Build | App Store record |
 | --- | --- | --- | --- | --- |
-| macOS | `com.tmoreton.yaprflow` | 5.2.0 | 12 | Apple ID `6810892725` |
-| iPhone/iPad | `com.tmoreton.yaprflow.ios` | 1.0.0 | 3 | Not yet documented |
+| macOS | `com.tmoreton.yaprflow` | 5.2.0 | 13 | Apple ID `6810892725` |
+| iPhone/iPad | `com.tmoreton.yaprflow.ios` | 1.0.0 | 4 | Not yet documented |
 
 Keep both bundle identifiers stable. In particular, changing the macOS bundle
 ID would break continuity with the existing sandbox container and App Store
@@ -39,6 +39,11 @@ exclusion checks. Select build 11 in the intended TestFlight group and complete
 the App Store Connect metadata, agreements, compliance, and review steps below.
 
 ### Local 5.2.0 production evidence
+
+Every new TestFlight candidate must run `scripts/testflight-release.sh`. The
+wrapper always attempts and verifies both the macOS package and iOS/iPadOS IPA,
+and only succeeds when both platform builds pass. Upload both resulting
+artifacts together; the wrapper deliberately does not upload them.
 
 On September 20, 2026, the direct Mac 5.2.0 (12) build completed the full
 Developer ID release path. Apple accepted and stapled the app under notary
@@ -408,7 +413,7 @@ been deployed by this repository change.
 
 ## iPhone and iPad readiness
 
-The source target is now internally consistent at version 1.0.0 build 3. Its
+The source target is now internally consistent at version 1.0.0 build 4. Its
 Info.plist derives version/build from Xcode settings, includes iPad
 orientations, and declares its microphone purpose. Its app icon is opaque, and
 the target now bundles a privacy manifest plus third-party acknowledgements.
