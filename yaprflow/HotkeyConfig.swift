@@ -10,6 +10,11 @@ struct HotkeyConfig: Codable, Equatable {
         modifiers: UInt32(cmdKey)
     )
 
+    static let meetingNotesHotkey = HotkeyConfig(
+        keyCode: UInt32(kVK_ANSI_M),
+        modifiers: UInt32(cmdKey)
+    )
+
     private static let defaultsKey = "yaprflow.hotkey.v1"
 
     func save() {

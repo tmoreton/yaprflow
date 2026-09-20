@@ -77,23 +77,52 @@ struct SettingsView: View {
                 }
 
                 FeatureCard {
-                    HStack(spacing: 12) {
-                        Image(systemName: "keyboard")
-                            .foregroundStyle(.secondary)
-                            .frame(width: 26)
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Keyboard shortcut")
-                                .font(.callout.weight(.medium))
-                            Text("Start or stop dictation from any app.")
-                                .font(.caption)
+                    VStack(spacing: 0) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "mic")
                                 .foregroundStyle(.secondary)
+                                .frame(width: 26)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Quick Dictation")
+                                    .font(.callout.weight(.medium))
+                                Text("Start or stop dictation from any app.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+
+                            HotkeyRecorder(hotkey: appState.hotkey)
+                                .frame(width: 118, height: 28)
                         }
+                        .padding(.vertical, 8)
 
-                        Spacer()
+                        Divider().padding(.leading, 38)
 
-                        HotkeyRecorder(hotkey: appState.hotkey)
-                            .frame(width: 118, height: 28)
+                        HStack(spacing: 12) {
+                            Image(systemName: "person.2.wave.2")
+                                .foregroundStyle(.secondary)
+                                .frame(width: 26)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Meeting Notes")
+                                    .font(.callout.weight(.medium))
+                                Text("Open Meeting Notes from any app.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+
+                            Text(HotkeyConfig.meetingNotesHotkey.displayString)
+                                .font(.callout.monospaced())
+                                .padding(.horizontal, 10)
+                                .frame(height: 28)
+                                .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+                                .accessibilityLabel("Meeting Notes shortcut Command M")
+                        }
+                        .padding(.vertical, 8)
                     }
                 }
 

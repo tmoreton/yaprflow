@@ -49,7 +49,6 @@ private enum MeetingWorkspaceSection: String, CaseIterable {
 
 struct MeetingNotesView: View {
     @ObservedObject private var store = MeetingStore.shared
-    @ObservedObject private var calendar = CalendarMeetingService.shared
     @ObservedObject private var session = MeetingSessionController.shared
     @StateObject private var memory = MeetingMemoryModel()
     @State private var mode: MeetingNotesMode = .meetings
@@ -67,9 +66,9 @@ struct MeetingNotesView: View {
             case .meetings:
                 HSplitView {
                     sidebar
-                        .frame(minWidth: 250, idealWidth: 280, maxWidth: 330)
+                        .frame(minWidth: 220, idealWidth: 250, maxWidth: 290)
                     detail
-                        .frame(minWidth: 650, maxWidth: .infinity, maxHeight: .infinity)
+                        .frame(minWidth: 560, maxWidth: .infinity, maxHeight: .infinity)
                 }
             case .ask:
                 MeetingMemoryView(model: memory, meetings: store.meetings) { meetingID, segmentID in
@@ -80,61 +79,48 @@ struct MeetingNotesView: View {
                 }
             }
         }
-        .frame(minWidth: 940, minHeight: 680)
+        .frame(minWidth: 820, minHeight: 580)
         .background(Color(nsColor: .windowBackgroundColor))
-        .onAppear {
-            store.refresh()
-            calendar.refreshIfAuthorized()
-        }
+        .onAppear { store.refresh() }
         .onReceive(NotificationCenter.default.publisher(for: .yaprflowMeetingsChanged)) { _ in
             store.refresh()
         }
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            FeatureWindowHeader(
-                symbolName: "person.2.wave.2",
-                title: "Meeting Notes",
-                subtitle: "Private live transcription, structured notes, and searchable meeting memory.",
-                accent: .blue,
-                badge: "Audio not saved",
-                badgeSymbol: "lock.fill"
-            )
+        HStack(spacing: 14) {
+            Text("Meeting Notes")
+                .font(.title2.weight(.semibold))
 
-            HStack(spacing: 12) {
-                Picker("Meeting Notes section", selection: $mode) {
-                    ForEach(MeetingNotesMode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-                }
-                .labelsHidden()
-                .pickerStyle(.segmented)
-                .frame(width: 210)
-
-                Spacer()
-
-                if session.phase.isCapturing {
-                    Label(session.isPaused ? "Paused" : "Recording", systemImage: "record.circle.fill")
-                        .foregroundStyle(session.isPaused ? .orange : .red)
-                        .font(.callout.weight(.semibold))
-                        .accessibilityLabel(session.isPaused ? "Meeting capture paused" : "Meeting capture recording")
-                }
-
-                Button("New Meeting", systemImage: "plus") {
-                    session.prepare()
-                    showsLiveWorkspace = true
-                    selectedMeetingID = nil
-                    selectedEvidenceID = nil
-                    mode = .meetings
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(session.phase.isCapturing)
-                .keyboardShortcut("n", modifiers: [.command, .shift])
-                .help("Prepare a new meeting (Shift-Command-N)")
+            Picker("Meeting Notes section", selection: $mode) {
+                ForEach(MeetingNotesMode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
             }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+            .frame(width: 180)
+
+            Spacer()
+
+            if session.phase.isCapturing {
+                Label(session.isPaused ? "Paused" : "Recording", systemImage: "circle.fill")
+                    .foregroundStyle(session.isPaused ? .orange : .red)
+                    .font(.caption.weight(.semibold))
+                    .accessibilityLabel(session.isPaused ? "Meeting capture paused" : "Meeting capture recording")
+            }
+
+            Button("New", systemImage: "plus") {
+                session.prepare()
+                showsLiveWorkspace = true
+                selectedMeetingID = nil
+                selectedEvidenceID = nil
+                mode = .meetings
+            }
+            .disabled(session.phase.isCapturing)
+            .keyboardShortcut("n", modifiers: [.command, .shift])
+            .help("New meeting (Shift-Command-N)")
         }
-        .padding(.horizontal, 22)
-        .padding(.top, 18)
-        .padding(.bottom, 14)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 12)
     }
 
     private var sidebar: some View {
@@ -163,10 +149,8 @@ struct MeetingNotesView: View {
                     .stroke(Color(nsColor: .separatorColor).opacity(0.5), lineWidth: 1)
             }
 
-            calendarSection
-
             HStack {
-                Text("Saved")
+                Text("Meetings")
                     .font(.headline)
                 Spacer()
                 Text(search.isEmpty ? "\(store.meetings.count)" : "\(filteredMeetings.count) found")
@@ -207,82 +191,8 @@ struct MeetingNotesView: View {
                 }
             }
         }
-        .padding(14)
+        .padding(12)
         .background(Color(nsColor: .controlBackgroundColor).opacity(0.35))
-    }
-
-    @ViewBuilder
-    private var calendarSection: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            HStack {
-                Text("Upcoming")
-                    .font(.headline)
-                Spacer()
-                if calendar.isLoading { ProgressView().controlSize(.small) }
-                Button {
-                    calendar.canReadCalendar
-                        ? calendar.refreshIfAuthorized()
-                        : calendar.requestAccessAndRefresh()
-                } label: {
-                    Image(systemName: calendar.canReadCalendar ? "arrow.clockwise" : "calendar.badge.plus")
-                }
-                .buttonStyle(.plain)
-                .help(calendar.canReadCalendar ? "Refresh calendar" : "Connect calendar")
-            }
-
-            if !calendar.canReadCalendar {
-                Text("Add your upcoming meetings for one-click setup.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Button("Connect Apple Calendar") { calendar.requestAccessAndRefresh() }
-                    .buttonStyle(.link)
-            } else if calendar.meetings.isEmpty {
-                Text("No meetings in the next seven days")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(calendar.meetings.prefix(3)) { event in
-                    HStack(spacing: 8) {
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(event.title)
-                                .font(.caption.weight(.medium))
-                                .lineLimit(1)
-                            Text(event.startDate.formatted(date: .omitted, time: .shortened))
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Button(event.joinURL == nil ? "Use" : "Join") {
-                            session.prepare(calendarMeeting: event)
-                            showsLiveWorkspace = true
-                            selectedMeetingID = nil
-                            selectedEvidenceID = nil
-                            if event.joinURL != nil {
-                                calendar.openJoinURL(for: event)
-                            }
-                        }
-                        .controlSize(.small)
-                        .disabled(session.phase.isCapturing)
-                        .help(event.joinURL == nil
-                            ? "Prepare this meeting"
-                            : "Open the meeting link and prepare notes")
-                    }
-                }
-            }
-
-            if let error = calendar.errorMessage {
-                Text(error)
-                    .font(.caption2)
-                    .foregroundStyle(.red)
-                    .lineLimit(2)
-            }
-        }
-        .padding(10)
-        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
-        .overlay {
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(Color(nsColor: .separatorColor).opacity(0.45), lineWidth: 1)
-        }
     }
 
     @ViewBuilder
@@ -352,13 +262,13 @@ private struct SavedMeetingRow: View {
 private struct LiveMeetingWorkspace: View {
     @ObservedObject var session: MeetingSessionController
     @State private var section: MeetingWorkspaceSection = .capture
-    @State private var disclosureCopied = false
 
     var body: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 0) {
             controls
 
             if session.meeting.generatedNotes != nil {
+                Divider()
                 Picker("Meeting workspace", selection: $section) {
                     ForEach(MeetingWorkspaceSection.allCases, id: \.self) { item in
                         Text(item.rawValue).tag(item)
@@ -367,19 +277,20 @@ private struct LiveMeetingWorkspace: View {
                 .labelsHidden()
                 .pickerStyle(.segmented)
                 .frame(width: 270)
+                .padding(.vertical, 10)
             }
+
+            Divider()
 
             switch section {
             case .capture:
                 captureWorkspace
             case .summary:
-                FeatureCard {
-                    GeneratedNotesView(meeting: session.meeting) { session.regenerateNotes() }
-                }
+                GeneratedNotesView(meeting: session.meeting) { session.regenerateNotes() }
+                    .padding(16)
                 .frame(maxHeight: .infinity)
             }
         }
-        .padding(16)
         .onChange(of: session.phase) { _, phase in
             if phase == .complete, session.meeting.generatedNotes != nil {
                 section = .summary
@@ -387,86 +298,77 @@ private struct LiveMeetingWorkspace: View {
         }
         .onChange(of: session.meeting.id) { _, _ in
             section = .capture
-            disclosureCopied = false
         }
     }
 
     private var controls: some View {
-        FeatureCard {
-            VStack(spacing: 12) {
-                HStack(spacing: 12) {
-                    TextField("Meeting title", text: Binding(
-                        get: { session.meeting.title },
-                        set: session.updateTitle
-                    ))
-                    .textFieldStyle(.plain)
-                    .font(.title3.weight(.semibold))
-                    .accessibilityLabel("Meeting title")
+        VStack(spacing: 10) {
+            HStack(spacing: 12) {
+                TextField("Meeting title", text: Binding(
+                    get: { session.meeting.title },
+                    set: session.updateTitle
+                ))
+                .textFieldStyle(.plain)
+                .font(.title3.weight(.semibold))
+                .accessibilityLabel("Meeting title")
 
-                    Spacer(minLength: 12)
+                Spacer(minLength: 12)
 
-                    Label(duration, systemImage: "timer")
-                        .font(.callout.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                        .accessibilityLabel("Meeting duration \(duration)")
+                Text(duration)
+                    .font(.callout.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel("Meeting duration \(duration)")
+
+                if session.phase.isCapturing {
+                    Button(session.isPaused ? "Resume" : "Pause") {
+                        session.togglePause()
+                    }
+                    Button("Stop", role: .destructive) { session.stop() }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.red)
+                        .keyboardShortcut(.return, modifiers: [.command])
+                } else {
+                    Button("Start") { session.start() }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(isBusy)
+                        .keyboardShortcut(.return, modifiers: [.command])
                 }
-
-                Divider()
-
-                HStack(spacing: 10) {
-                    Text("Template")
-                        .font(.callout.weight(.medium))
-                    Picker("Template", selection: Binding(
-                        get: { session.meeting.templateID },
-                        set: session.selectTemplate
-                    )) {
-                        ForEach(MeetingTemplateCatalog.builtIns) { template in
-                            Label(template.name, systemImage: template.systemImage).tag(template.id)
-                        }
-                    }
-                    .labelsHidden()
-                    .frame(width: 190)
-                    .help("Choose how Yaprflow structures the final notes")
-
-                    Spacer(minLength: 8)
-
-                    Button(disclosureCopied ? "Copied" : "Disclosure", systemImage: disclosureCopied ? "checkmark" : "person.badge.shield.checkmark") {
-                        copyDisclosure()
-                    }
-                    .help("Copy a short recording disclosure")
-
-                    if session.phase.isCapturing {
-                        Button(session.isPaused ? "Resume" : "Pause", systemImage: session.isPaused ? "play.fill" : "pause.fill") {
-                            session.togglePause()
-                        }
-                        Button("Stop", systemImage: "stop.fill", role: .destructive) { session.stop() }
-                            .buttonStyle(.borderedProminent)
-                            .tint(.red)
-                            .keyboardShortcut(.return, modifiers: [.command])
-                    } else {
-                        Button("Start Meeting", systemImage: "record.circle") { session.start() }
-                            .buttonStyle(.borderedProminent)
-                            .disabled(isBusy)
-                            .keyboardShortcut(.return, modifiers: [.command])
-                    }
-                }
-
-                statusLine
-                    .frame(maxWidth: .infinity, alignment: .leading)
             }
+
+            HStack(spacing: 10) {
+                Picker("Template", selection: Binding(
+                    get: { session.meeting.templateID },
+                    set: session.selectTemplate
+                )) {
+                    ForEach(MeetingTemplateCatalog.builtIns) { template in
+                        Text(template.name).tag(template.id)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 175)
+                .help("Meeting notes template")
+
+                Spacer()
+
+                Label("Audio isn’t saved", systemImage: "lock.fill")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            statusLine
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .padding(16)
     }
 
     private var captureWorkspace: some View {
         HSplitView {
-            FeatureCard {
-                notesEditor
-            }
+            notesEditor
+                .padding(16)
             .frame(minWidth: 280, idealWidth: 340, maxHeight: .infinity)
 
-            FeatureCard {
-                transcript
-            }
+            transcript
+                .padding(16)
             .frame(minWidth: 330, maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(maxHeight: .infinity)
@@ -476,13 +378,12 @@ private struct LiveMeetingWorkspace: View {
     private var statusLine: some View {
         switch session.phase {
         case .idle:
-            Label(meetingPrivacyMessage, systemImage: "lock.fill")
-                .foregroundStyle(.secondary)
+            EmptyView()
         case let .preparing(message), let .finalizing(message):
             HStack { ProgressView().controlSize(.small); Text(message) }
                 .foregroundStyle(.secondary)
         case .recording:
-            Label("Recording microphone and Mac audio · visible indicator active", systemImage: "record.circle.fill")
+            Label("Recording microphone and Mac audio", systemImage: "record.circle.fill")
                 .foregroundStyle(.red)
         case .paused:
             Label("Capture paused", systemImage: "pause.circle.fill")
@@ -497,27 +398,13 @@ private struct LiveMeetingWorkspace: View {
         }
     }
 
-    private var meetingPrivacyMessage: String {
-        let settings = AIProviderSettings.shared
-        if settings.provider == .appleIntelligence || !settings.isConfigured {
-            return "Audio stays in memory only long enough to transcribe and is never saved."
-        }
-        return "Audio is never saved. At Stop, the transcript is sent directly to \(settings.provider.displayName) to generate notes."
-    }
-
     private var notesEditor: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("My notes")
-                    .font(.headline)
-                Spacer()
-                Text("Shapes the summary")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            Text("Notes")
+                .font(.headline)
             ZStack(alignment: .topLeading) {
                 if session.meeting.rawNotes.isEmpty {
-                    Text("Capture context, ideas, and details you don’t want to lose…")
+                    Text("Add notes…")
                         .foregroundStyle(.tertiary)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 11)
@@ -542,12 +429,8 @@ private struct LiveMeetingWorkspace: View {
 
     private var transcript: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("Live transcript")
-                    .font(.headline)
-                Spacer()
-                speakerKey
-            }
+            Text("Transcript")
+                .font(.headline)
 
             if hasTranscript {
                 ScrollView {
@@ -577,30 +460,13 @@ private struct LiveMeetingWorkspace: View {
                     Image(systemName: "waveform")
                         .font(.title2)
                         .foregroundStyle(.tertiary)
-                    Text("The conversation will appear here")
+                    Text("Transcript appears here")
                         .font(.callout.weight(.medium))
-                    Text("Yaprflow labels your microphone as Me and Mac audio as Them.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding()
             }
         }
-    }
-
-    private var speakerKey: some View {
-        HStack(spacing: 8) {
-            Label("Me", systemImage: "circle.fill")
-                .foregroundStyle(.blue)
-            Label("Them", systemImage: "circle.fill")
-                .foregroundStyle(.purple)
-        }
-        .font(.caption2)
-        .labelStyle(.titleAndIcon)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Speaker colors: Me is blue, Them is purple")
     }
 
     private var hasTranscript: Bool {
@@ -617,20 +483,6 @@ private struct LiveMeetingWorkspace: View {
         let seconds = Int(session.elapsed)
         return String(format: "%02d:%02d", seconds / 60, seconds % 60)
     }
-
-    private func copyDisclosure() {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(
-            "I’m using Yaprflow to create a private transcript and notes for this meeting. Audio is not retained.",
-            forType: .string
-        )
-        disclosureCopied = true
-        Task { @MainActor in
-            try? await Task.sleep(for: .seconds(2))
-            disclosureCopied = false
-        }
-    }
 }
 
 private struct SavedMeetingView: View {
@@ -645,92 +497,76 @@ private struct SavedMeetingView: View {
     }
 
     var body: some View {
-        VStack(spacing: 14) {
-            FeatureCard {
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(meeting.title)
-                            .font(.title2.weight(.semibold))
-                            .lineLimit(1)
-                        HStack(spacing: 8) {
-                            Text(meeting.startedAt.formatted(date: .long, time: .shortened))
-                            if let endedAt = meeting.endedAt {
-                                Text("·")
-                                Text(duration(until: endedAt))
-                            }
-                            Label("Saved locally", systemImage: "internaldrive")
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(meeting.title)
+                        .font(.title3.weight(.semibold))
+                        .lineLimit(1)
+                    HStack(spacing: 6) {
+                        Text(meeting.startedAt.formatted(date: .long, time: .shortened))
+                        if let endedAt = meeting.endedAt {
+                            Text("·")
+                            Text(duration(until: endedAt))
                         }
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                     }
-                    Spacer(minLength: 12)
-                    Button("Edit", systemImage: "pencil") { isEditing = true }
-                    Button(didCopy ? "Copied" : "Copy", systemImage: didCopy ? "checkmark" : "doc.on.doc") {
-                        copyMarkdown()
-                    }
-                    Button {
-                        reveal()
-                    } label: {
-                        Image(systemName: "folder")
-                    }
-                    .help("Reveal the Markdown file in Finder")
-                    .accessibilityLabel("Reveal meeting in Finder")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
+                Spacer(minLength: 12)
+                Button("Edit", systemImage: "pencil") { isEditing = true }
+                Button(didCopy ? "Copied" : "Copy", systemImage: didCopy ? "checkmark" : "doc.on.doc") {
+                    copyMarkdown()
+                }
+                Button {
+                    reveal()
+                } label: {
+                    Image(systemName: "folder")
+                }
+                .help("Reveal in Finder")
+                .accessibilityLabel("Reveal meeting in Finder")
             }
+            .padding(16)
+
+            Divider()
 
             HSplitView {
-                FeatureCard {
-                    GeneratedNotesView(meeting: meeting) { regenerate() } onEvidence: { id in
-                        selectedEvidenceID = id
-                    }
+                GeneratedNotesView(meeting: meeting) { regenerate() } onEvidence: { id in
+                    selectedEvidenceID = id
                 }
+                .padding(16)
                 .frame(minWidth: 330, maxHeight: .infinity)
 
-                FeatureCard {
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            Text("Transcript")
-                                .font(.headline)
-                            Spacer()
-                            Text("\(meeting.transcript.count) segments")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Transcript")
+                        .font(.headline)
 
-                        if meeting.transcript.isEmpty {
-                            VStack(spacing: 8) {
-                                Image(systemName: "waveform.slash")
-                                    .font(.title2)
-                                    .foregroundStyle(.tertiary)
-                                Text("No transcript was captured")
-                                    .font(.callout.weight(.medium))
-                            }
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        } else {
-                            ScrollViewReader { proxy in
-                                ScrollView {
-                                    LazyVStack(alignment: .leading, spacing: 7) {
-                                        ForEach(meeting.transcript) { segment in
-                                            TranscriptSegmentRow(
-                                                segment: segment,
-                                                isHighlighted: selectedEvidenceID == segment.id
-                                            )
-                                            .id(segment.id)
-                                        }
+                    if meeting.transcript.isEmpty {
+                        ContentUnavailableView("No transcript", systemImage: "waveform.slash")
+                    } else {
+                        ScrollViewReader { proxy in
+                            ScrollView {
+                                LazyVStack(alignment: .leading, spacing: 7) {
+                                    ForEach(meeting.transcript) { segment in
+                                        TranscriptSegmentRow(
+                                            segment: segment,
+                                            isHighlighted: selectedEvidenceID == segment.id
+                                        )
+                                        .id(segment.id)
                                     }
                                 }
-                                .onChange(of: selectedEvidenceID) { _, id in
-                                    guard let id else { return }
-                                    withAnimation { proxy.scrollTo(id, anchor: .center) }
-                                }
+                            }
+                            .onChange(of: selectedEvidenceID) { _, id in
+                                guard let id else { return }
+                                withAnimation { proxy.scrollTo(id, anchor: .center) }
                             }
                         }
                     }
                 }
+                .padding(16)
                 .frame(minWidth: 330, maxHeight: .infinity)
             }
         }
-        .padding(16)
         .sheet(isPresented: $isEditing) {
             SavedMeetingEditor(meeting: $meeting) {
                 _ = try? MeetingStore.shared.save(meeting)
@@ -949,140 +785,87 @@ private struct MeetingMemoryView: View {
     let onOpenEvidence: (UUID, UUID?) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Ask your meetings")
-                        .font(.title3.weight(.semibold))
-                    Text("Searches local meeting evidence, then answers with citations.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                TextField("Ask about your meetings", text: $model.question)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit { model.ask(meetings: meetings) }
+                    .accessibilityLabel("Ask your meetings")
+
+                if model.isRunning {
+                    ProgressView()
+                        .controlSize(.small)
                 }
-                Spacer()
-                Label("Local index", systemImage: "internaldrive")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
+
+                Button("Ask") {
+                    model.ask(meetings: meetings)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(
+                    meetings.isEmpty
+                        || model.question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        || model.isRunning
+                )
             }
+            .padding(16)
 
-            FeatureCard {
-                VStack(alignment: .leading, spacing: 10) {
-                    TextField("What did we decide about the launch?", text: $model.question)
-                        .textFieldStyle(.roundedBorder)
-                        .onSubmit { model.ask(meetings: meetings) }
-                        .accessibilityLabel("Ask your meetings")
+            Divider()
 
-                    if model.question.isEmpty, !meetings.isEmpty {
-                        HStack(spacing: 7) {
-                            suggestion("What decisions did we make?")
-                            suggestion("What are my open action items?")
-                            suggestion("Summarize the latest meeting")
-                        }
-                    }
-
-                    HStack {
-                        Text(model.progressMessage ?? availabilityMessage)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        if model.isRunning { ProgressView().controlSize(.small) }
-                        Button("Ask", systemImage: "arrow.up.circle.fill") {
-                            model.ask(meetings: meetings)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(
-                            meetings.isEmpty
-                                || model.question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                                || model.isRunning
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    if let error = model.errorMessage {
+                        Label(error, systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.red)
+                    } else if model.answer.isEmpty {
+                        ContentUnavailableView(
+                            meetings.isEmpty ? "No saved meetings" : "Ask anything",
+                            systemImage: meetings.isEmpty ? "person.2.slash" : "text.bubble",
+                            description: Text(
+                                meetings.isEmpty
+                                    ? "Record a meeting to get started."
+                                    : "Search decisions, action items, or anything discussed."
+                            )
                         )
-                    }
-                }
-            }
+                        .frame(maxWidth: .infinity, minHeight: 300)
+                    } else {
+                        Text(model.answer)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
 
-            if let error = model.errorMessage {
-                Label(error, systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.red)
-            }
+                        if !model.evidenceHits.isEmpty {
+                            Divider()
+                            Text("Sources")
+                                .font(.headline)
 
-            FeatureCard {
-                HSplitView {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Answer").font(.headline)
-                        ScrollView {
-                            if model.answer.isEmpty {
-                                VStack(spacing: 8) {
-                                    Image(systemName: meetings.isEmpty ? "person.2.slash" : "text.bubble")
-                                        .font(.title2)
-                                        .foregroundStyle(.tertiary)
-                                    Text(meetings.isEmpty ? "No saved meetings yet" : "Ask across every saved meeting")
-                                        .font(.callout.weight(.medium))
-                                    Text(meetings.isEmpty
-                                        ? "Record a meeting, then return here to search it."
-                                        : "Answers include the transcript passages used as evidence.")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                        .multilineTextAlignment(.center)
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 32)
-                            } else {
-                                Text(model.answer)
-                                    .textSelection(.enabled)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                        }
-                    }
-                    .padding(.trailing, 12)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Evidence").font(.headline)
-                        if model.evidenceHits.isEmpty {
-                            Text("Relevant transcript passages appear here.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        } else {
-                            ScrollView {
-                                LazyVStack(alignment: .leading, spacing: 8) {
-                                    ForEach(model.evidenceHits) { hit in
-                                        Button {
-                                            onOpenEvidence(hit.meetingID, hit.segmentID)
-                                        } label: {
-                                            VStack(alignment: .leading, spacing: 2) {
-                                                Text(hit.title).font(.caption.weight(.semibold))
-                                                Text(hit.excerpt).font(.caption).foregroundStyle(.secondary).lineLimit(3)
-                                            }
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                            .padding(8)
-                                            .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 7))
+                            LazyVStack(alignment: .leading, spacing: 6) {
+                                ForEach(model.evidenceHits) { hit in
+                                    Button {
+                                        onOpenEvidence(hit.meetingID, hit.segmentID)
+                                    } label: {
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(hit.title)
+                                                .font(.callout.weight(.medium))
+                                            Text(hit.excerpt)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                                .lineLimit(2)
                                         }
-                                        .buttonStyle(.plain)
-                                        .accessibilityLabel("Open evidence from \(hit.title)")
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(.vertical, 5)
                                     }
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel("Open evidence from \(hit.title)")
                                 }
                             }
                         }
                     }
-                    .frame(minWidth: 260, idealWidth: 320)
-                    .frame(maxHeight: .infinity, alignment: .topLeading)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .frame(maxWidth: 760, alignment: .leading)
+                .padding(20)
             }
             .frame(maxHeight: .infinity)
         }
-        .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-
-    private var availabilityMessage: String {
-        meetings.isEmpty ? "Record a meeting to get started" : "\(meetings.count) meetings available"
-    }
-
-    private func suggestion(_ title: String) -> some View {
-        Button(title) {
-            model.question = title
-        }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
     }
 }
 
@@ -1090,8 +873,8 @@ private struct MeetingMemoryView: View {
 enum MeetingNotesWindowController {
     private static let window = FeatureWindowController(
         title: "Yaprflow Meeting Notes",
-        contentSize: NSSize(width: 1100, height: 760),
-        minimumSize: NSSize(width: 940, height: 680)
+        contentSize: NSSize(width: 980, height: 680),
+        minimumSize: NSSize(width: 820, height: 580)
     ) {
         MeetingNotesView()
     }

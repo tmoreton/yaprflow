@@ -9,18 +9,47 @@ final class GlobalHotkey {
     static let shared = GlobalHotkey()
 
     nonisolated(unsafe) static var onFire: (@Sendable () -> Void)?
+    nonisolated(unsafe) static var onMeetingNotesFire: (@Sendable () -> Void)?
 
-    private var hotKeyRef: EventHotKeyRef?
+    private var quickDictationHotKeyRef: EventHotKeyRef?
+    private var meetingNotesHotKeyRef: EventHotKeyRef?
     private var eventHandlerRef: EventHandlerRef?
 
     private init() {}
 
     @discardableResult
     func register(keyCode: UInt32, modifiers: UInt32) -> Bool {
-        unregisterHotKey()
-        guard installEventHandlerIfNeeded() else { return false }
+        unregisterHotKey(&quickDictationHotKeyRef)
+        guard let ref = makeHotKey(
+            id: 1,
+            keyCode: keyCode,
+            modifiers: modifiers
+        ) else { return false }
+        quickDictationHotKeyRef = ref
+        log.info("Registered Quick Dictation hotkey keyCode=\(keyCode, privacy: .public) modifiers=\(modifiers, privacy: .public)")
+        return true
+    }
 
-        let hotKeyID = EventHotKeyID(signature: 0x59_50_72_66 /* 'YPrf' */, id: 1)
+    @discardableResult
+    func registerMeetingNotes(keyCode: UInt32, modifiers: UInt32) -> Bool {
+        unregisterHotKey(&meetingNotesHotKeyRef)
+        guard let ref = makeHotKey(
+            id: 2,
+            keyCode: keyCode,
+            modifiers: modifiers
+        ) else { return false }
+        meetingNotesHotKeyRef = ref
+        log.info("Registered Meeting Notes hotkey keyCode=\(keyCode, privacy: .public) modifiers=\(modifiers, privacy: .public)")
+        return true
+    }
+
+    private func makeHotKey(
+        id: UInt32,
+        keyCode: UInt32,
+        modifiers: UInt32
+    ) -> EventHotKeyRef? {
+        guard installEventHandlerIfNeeded() else { return nil }
+        let hotKeyID = EventHotKeyID(signature: 0x59_50_72_66 /* 'YPrf' */, id: id)
         var ref: EventHotKeyRef?
         let status = RegisterEventHotKey(
             keyCode,
@@ -31,24 +60,23 @@ final class GlobalHotkey {
             &ref
         )
         if status == noErr {
-            hotKeyRef = ref
-            log.info("Registered global hotkey keyCode=\(keyCode, privacy: .public) modifiers=\(modifiers, privacy: .public)")
-            return true
+            return ref
         } else {
-            log.error("RegisterEventHotKey failed: \(status, privacy: .public)")
-            return false
+            log.error("RegisterEventHotKey id=\(id, privacy: .public) failed: \(status, privacy: .public)")
+            return nil
         }
     }
 
     func unregister() {
-        unregisterHotKey()
+        unregisterHotKey(&quickDictationHotKeyRef)
+        unregisterHotKey(&meetingNotesHotKeyRef)
         if let ref = eventHandlerRef {
             RemoveEventHandler(ref)
             eventHandlerRef = nil
         }
     }
 
-    private func unregisterHotKey() {
+    private func unregisterHotKey(_ hotKeyRef: inout EventHotKeyRef?) {
         if let ref = hotKeyRef {
             UnregisterEventHotKey(ref)
             hotKeyRef = nil
@@ -63,9 +91,27 @@ final class GlobalHotkey {
         )
         let status = InstallEventHandler(
             GetApplicationEventTarget(),
-            { _, _, _ in
-                let handler = GlobalHotkey.onFire
-                log.info("Received global hotkey event")
+            { _, event, _ in
+                guard let event else { return OSStatus(eventNotHandledErr) }
+                var hotKeyID = EventHotKeyID()
+                let parameterStatus = GetEventParameter(
+                    event,
+                    EventParamName(kEventParamDirectObject),
+                    EventParamType(typeEventHotKeyID),
+                    nil,
+                    MemoryLayout<EventHotKeyID>.size,
+                    nil,
+                    &hotKeyID
+                )
+                guard parameterStatus == noErr else { return parameterStatus }
+
+                let handler: (@Sendable () -> Void)?
+                switch hotKeyID.id {
+                case 1: handler = GlobalHotkey.onFire
+                case 2: handler = GlobalHotkey.onMeetingNotesFire
+                default: return OSStatus(eventNotHandledErr)
+                }
+                log.info("Received global hotkey id=\(hotKeyID.id, privacy: .public)")
                 DispatchQueue.main.async { handler?() }
                 return noErr
             },

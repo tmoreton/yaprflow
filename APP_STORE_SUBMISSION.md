@@ -81,12 +81,13 @@ uploaded.
 ### Draft What's New in Version 5.2.0
 
 Yaprflow now separates Quick Dictation from Meeting Notes. Quick Dictation
-turns speech into clipboard text from a global shortcut. Meeting Notes captures
+turns speech into clipboard text from a global shortcut. Command-M opens a
+cleaner, more focused Meeting Notes workspace for capturing
 microphone and Mac audio without a meeting bot, combines the local transcript
 with typed notes and calendar context, and creates editable structured notes
 with evidence links. This release also adds meeting templates, local meeting
-search, cross-meeting questions, a cleaner mode-first menu, and a unified
-flat-red app icon across Mac, iPhone, and iPad.
+search, cross-meeting questions, a simpler Ask experience, a cleaner mode-first
+menu, and a unified flat-red app icon across Mac, iPhone, and iPad.
 
 Use this text when 5.2.0 is submitted as an update to a version that reached
 Ready for Distribution. App Store Connect may not show or require the field if

@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import Combine
 import OSLog
 import SwiftUI
@@ -79,6 +80,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             MainActor.assumeIsolated {
                 let config = AppState.shared.hotkey
                 GlobalHotkey.shared.register(keyCode: config.keyCode, modifiers: config.modifiers)
+                let meetingConfig = HotkeyConfig.meetingNotesHotkey
+                GlobalHotkey.shared.registerMeetingNotes(
+                    keyCode: meetingConfig.keyCode,
+                    modifiers: meetingConfig.modifiers
+                )
             }
         }
 
@@ -286,9 +292,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             meetingIsBusy = false
         }
 
-        // Present the two product modes as a single primary group. Their
-        // subtitles describe the different outcomes instead of making users
-        // infer the distinction from two unrelated menu commands.
         let quickTitle = quickDictationIsActive ? "Stop Quick Dictation" : "Quick Dictation"
         let quickItem = NSMenuItem(
             title: quickTitle,
@@ -299,9 +302,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         quickItem.view = CaptureModeMenuItemView(
             symbolName: quickDictationIsActive ? "stop.circle.fill" : "mic.fill",
             title: quickTitle,
-            subtitle: quickDictationIsActive
-                ? "Finish and copy to the clipboard"
-                : "Speak, then paste anywhere",
             accessoryTitle: AppState.shared.hotkey.displayString,
             target: self,
             action: #selector(toggleTranscription),
@@ -310,35 +310,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         quickItem.isEnabled = !meetingIsCapturing && !meetingIsBusy
         menu.addItem(quickItem)
 
-        let meetingTitle: String
-        let meetingSubtitle: String
-        switch meetingPhase {
-        case .recording:
-            meetingTitle = "Stop Meeting"
-            meetingSubtitle = "Finish transcript and generate notes"
-        case .paused:
-            meetingTitle = "Stop Meeting"
-            meetingSubtitle = "Meeting capture is paused"
-        case .preparing:
-            meetingTitle = "Starting Meeting…"
-            meetingSubtitle = "Preparing microphone and Mac audio"
-        case .finalizing:
-            meetingTitle = "Finishing Meeting…"
-            meetingSubtitle = "Saving transcript and generating notes"
-        default:
-            meetingTitle = "Meeting Notes"
-            meetingSubtitle = "Capture microphone and Mac audio"
-        }
         let meetingItem = NSMenuItem(
-            title: meetingTitle,
+            title: "Meeting Notes",
             action: #selector(showMeetingNotes),
             keyEquivalent: ""
         )
         meetingItem.target = self
         meetingItem.view = CaptureModeMenuItemView(
-            symbolName: meetingIsCapturing ? "stop.circle.fill" : "person.2.wave.2",
-            title: meetingTitle,
-            subtitle: meetingSubtitle,
+            symbolName: "person.2.wave.2",
+            title: "Meeting Notes",
+            accessoryTitle: HotkeyConfig.meetingNotesHotkey.displayString,
             target: self,
             action: #selector(showMeetingNotes),
             isEnabled: { !quickDictationIsActive && !meetingIsBusy }
@@ -368,18 +349,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         )
         menu.addItem(historyItem)
 
-        #if DIRECT_DISTRIBUTION
-        let updateItem = NSMenuItem()
-        updateItem.view = IconActionMenuItemView(
-            symbolName: "arrow.triangle.2.circlepath",
-            title: "Check for Updates…",
-            target: self,
-            action: #selector(checkForUpdates),
-            isEnabled: { AppUpdater.shared.canCheckForUpdates }
-        )
-        menu.addItem(updateItem)
-        #endif
-
         menu.addItem(NSMenuItem.separator())
 
         let footerItem = NSMenuItem()
@@ -403,21 +372,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func showMeetingNotes() {
-        if MeetingSessionController.shared.isRecording {
-            MeetingSessionController.shared.stop()
-        }
         MeetingNotesWindowController.show()
     }
 
     @objc private func showHistory() {
         AppPanelWindowController.show(.history)
     }
-
-    #if DIRECT_DISTRIBUTION
-    @objc private func checkForUpdates() {
-        AppUpdater.shared.checkForUpdates()
-    }
-    #endif
 
     @objc private func showSettings() {
         AppPanelWindowController.show(.settings)
@@ -426,21 +386,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func registerHotkey() -> Bool {
         GlobalHotkey.onFire = {
             Task { @MainActor in
-                log.info("Global hotkey activated")
+                log.info("Quick Dictation hotkey activated")
                 TranscriptionController.shared.toggle()
             }
         }
+        GlobalHotkey.onMeetingNotesFire = {
+            Task { @MainActor in
+                log.info("Meeting Notes hotkey activated")
+                MeetingNotesWindowController.show()
+            }
+        }
+
         let config = AppState.shared.hotkey
-        let registered = GlobalHotkey.shared.register(
+        let quickDictationRegistered = GlobalHotkey.shared.register(
             keyCode: config.keyCode,
             modifiers: config.modifiers
         )
-        if !registered {
+        let meetingConfig = HotkeyConfig.meetingNotesHotkey
+        let meetingNotesRegistered = GlobalHotkey.shared.registerMeetingNotes(
+            keyCode: meetingConfig.keyCode,
+            modifiers: meetingConfig.modifiers
+        )
+        if !quickDictationRegistered {
             AppState.shared.status = .error(
-                "Keyboard shortcut unavailable. Quit any other Yaprflow copy, then reopen the app."
+                "Quick Dictation shortcut unavailable. Quit any other Yaprflow copy, then reopen the app."
+            )
+        } else if !meetingNotesRegistered {
+            AppState.shared.status = .error(
+                "Meeting Notes shortcut ⌘M is unavailable. Quit any other Yaprflow copy, then reopen the app."
             )
         }
-        return registered
+        return quickDictationRegistered && meetingNotesRegistered
     }
 
     private func runPreviewSmokeTest() {

@@ -1,13 +1,10 @@
 import AppKit
 
-/// A larger primary menu row used for Yaprflow's two capture modes. The
-/// subtitle makes the different outcomes clear before a recording starts:
-/// Quick Dictation copies text, while Meeting Notes creates a saved record.
+/// A compact primary menu row used for Yaprflow's two capture modes.
 @MainActor
 final class CaptureModeMenuItemView: NSView {
     private let iconView = NSImageView()
     private let titleField = NSTextField(labelWithString: "")
-    private let subtitleField = NSTextField(labelWithString: "")
     private let accessoryField = NSTextField(labelWithString: "")
     private weak var actionTarget: AnyObject?
     private let action: Selector
@@ -18,7 +15,6 @@ final class CaptureModeMenuItemView: NSView {
     init(
         symbolName: String,
         title: String,
-        subtitle: String,
         accessoryTitle: String? = nil,
         target: AnyObject,
         action: Selector,
@@ -27,12 +23,11 @@ final class CaptureModeMenuItemView: NSView {
         self.actionTarget = target
         self.action = action
         self.isEnabledProvider = isEnabled
-        super.init(frame: NSRect(x: 0, y: 0, width: 260, height: 48))
+        super.init(frame: NSRect(x: 0, y: 0, width: 260, height: 32))
         autoresizingMask = [.width]
         setup(
             symbolName: symbolName,
             title: title,
-            subtitle: subtitle,
             accessoryTitle: accessoryTitle
         )
         updateAppearance()
@@ -41,13 +36,12 @@ final class CaptureModeMenuItemView: NSView {
     required init?(coder: NSCoder) { fatalError() }
 
     override var intrinsicContentSize: NSSize {
-        NSSize(width: 260, height: 48)
+        NSSize(width: 260, height: 32)
     }
 
     private func setup(
         symbolName: String,
         title: String,
-        subtitle: String,
         accessoryTitle: String?
     ) {
         iconView.translatesAutoresizingMaskIntoConstraints = false
@@ -60,12 +54,6 @@ final class CaptureModeMenuItemView: NSView {
         titleField.stringValue = title
         titleField.lineBreakMode = .byTruncatingTail
         addSubview(titleField)
-
-        subtitleField.translatesAutoresizingMaskIntoConstraints = false
-        subtitleField.font = NSFont.menuFont(ofSize: 11)
-        subtitleField.stringValue = subtitle
-        subtitleField.lineBreakMode = .byTruncatingTail
-        addSubview(subtitleField)
 
         accessoryField.translatesAutoresizingMaskIntoConstraints = false
         accessoryField.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
@@ -81,20 +69,15 @@ final class CaptureModeMenuItemView: NSView {
             iconView.heightAnchor.constraint(equalToConstant: 20),
 
             titleField.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 8),
-            titleField.topAnchor.constraint(equalTo: topAnchor, constant: 8),
+            titleField.centerYAnchor.constraint(equalTo: centerYAnchor),
 
             accessoryField.leadingAnchor.constraint(greaterThanOrEqualTo: titleField.trailingAnchor, constant: 8),
             accessoryField.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -14),
             accessoryField.firstBaselineAnchor.constraint(equalTo: titleField.firstBaselineAnchor),
-
-            subtitleField.leadingAnchor.constraint(equalTo: titleField.leadingAnchor),
-            subtitleField.topAnchor.constraint(equalTo: titleField.bottomAnchor, constant: 1),
-            subtitleField.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -14),
         ])
 
         setAccessibilityRole(.button)
         setAccessibilityLabel(title)
-        setAccessibilityHelp(subtitle)
     }
 
     override func updateTrackingAreas() {
@@ -146,20 +129,17 @@ final class CaptureModeMenuItemView: NSView {
     private func updateAppearance() {
         let enabled = isEnabledProvider()
         let primaryColor: NSColor
-        let secondaryColor: NSColor
         if isHovered && enabled {
             primaryColor = .white
-            secondaryColor = .white.withAlphaComponent(0.78)
         } else if !enabled {
             primaryColor = .disabledControlTextColor
-            secondaryColor = .disabledControlTextColor
         } else {
             primaryColor = .labelColor
-            secondaryColor = .secondaryLabelColor
         }
         titleField.textColor = primaryColor
-        subtitleField.textColor = secondaryColor
-        accessoryField.textColor = secondaryColor
+        accessoryField.textColor = enabled
+            ? (isHovered ? .white : .secondaryLabelColor)
+            : .disabledControlTextColor
         iconView.contentTintColor = primaryColor
         setAccessibilityEnabled(enabled)
         needsDisplay = true

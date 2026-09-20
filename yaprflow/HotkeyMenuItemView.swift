@@ -16,6 +16,8 @@ struct HotkeyRecorder: NSViewRepresentable {
 
 @MainActor
 final class HotkeyRecorderButton: NSButton {
+    private static let defaultTooltip =
+        "Click, then press a shortcut with Command, Option, Control, or Shift."
     private var isCapturingShortcut = false
 
     init() {
@@ -25,7 +27,7 @@ final class HotkeyRecorderButton: NSButton {
         setButtonType(.momentaryPushIn)
         target = self
         action = #selector(beginCapture)
-        toolTip = "Click, then press a shortcut with Command, Option, Control, or Shift."
+        toolTip = Self.defaultTooltip
         setAccessibilityLabel("Keyboard shortcut")
         refresh()
     }
@@ -46,6 +48,7 @@ final class HotkeyRecorderButton: NSButton {
         } else {
             title = AppState.shared.hotkey.displayString
             contentTintColor = nil
+            toolTip = Self.defaultTooltip
             setAccessibilityValue(title)
         }
     }
@@ -102,6 +105,12 @@ final class HotkeyRecorderButton: NSButton {
         }
 
         let newConfig = HotkeyConfig(keyCode: UInt32(event.keyCode), modifiers: carbonMods)
+        guard newConfig != .meetingNotesHotkey else {
+            NSSound.beep()
+            title = "⌘M is in use"
+            toolTip = "Command-M opens Meeting Notes. Choose another shortcut for Quick Dictation."
+            return true
+        }
         AppState.shared.hotkey = newConfig
         newConfig.save()
         NotificationCenter.default.post(name: .yaprflowHotkeyChanged, object: nil)
@@ -122,5 +131,10 @@ final class HotkeyRecorderButton: NSButton {
     private func restoreCurrentHotkeyRegistration() {
         let current = AppState.shared.hotkey
         GlobalHotkey.shared.register(keyCode: current.keyCode, modifiers: current.modifiers)
+        let meeting = HotkeyConfig.meetingNotesHotkey
+        GlobalHotkey.shared.registerMeetingNotes(
+            keyCode: meeting.keyCode,
+            modifiers: meeting.modifiers
+        )
     }
 }
