@@ -2,6 +2,7 @@ import AppKit
 import Combine
 import OSLog
 import SwiftUI
+import UserNotifications
 
 private let log = Logger(subsystem: "com.tmoreton.yaprflow", category: "App")
 
@@ -12,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private var statusItem: NSStatusItem?
     private var statusCancellable: AnyCancellable?
+    private var meetingStatusCancellable: AnyCancellable?
     private var residencyTask: Task<Void, Never>?
     private var isAutomaticTerminationDisabled = false
 
@@ -19,6 +21,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let arguments = ProcessInfo.processInfo.arguments
         let isPreviewSmokeTest = arguments.contains("--smoke-test-preview")
         let isRecordingSmokeTest = arguments.contains("--smoke-test-recording")
+        let isMeetingNotesSmokeTest = arguments.contains("--smoke-test-meeting-notes")
 
         // AppKit finishes its window-restoration bookkeeping after this
         // callback and enables automatic termination for windowless apps.
@@ -28,14 +31,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         scheduleAutomaticTerminationOptOut()
 
         installStatusItem()
+        UNUserNotificationCenter.current().delegate = self
         if !isPreviewSmokeTest {
             Telemetry.shared.beginRun()
         }
-        if !isPreviewSmokeTest {
+        if !isPreviewSmokeTest && !isMeetingNotesSmokeTest {
             TranscriptionController.shared.prepareSpeechRecognizer()
         }
         #if DIRECT_DISTRIBUTION
-        if !isPreviewSmokeTest && !isRecordingSmokeTest {
+        if !isPreviewSmokeTest && !isRecordingSmokeTest && !isMeetingNotesSmokeTest {
             AppUpdater.shared.start()
         }
         #endif
@@ -45,12 +49,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // Nemotron is warmed above so the first hotkey press avoids its ONNX
         // graph-loading cost; idle and memory-pressure paths still release it.
 
-        if !isPreviewSmokeTest, !OnboardingWindowController.hasCompleted {
+        if !isPreviewSmokeTest, !isMeetingNotesSmokeTest, !OnboardingWindowController.hasCompleted {
             OnboardingWindowController.shared.show()
         }
 
         if isPreviewSmokeTest {
             runPreviewSmokeTest()
+        }
+
+
+        if isMeetingNotesSmokeTest {
+            MeetingNotesWindowController.show()
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(750))
+                let windowPassed = MeetingNotesWindowController.isVisibleForSmokeTest
+                let persistencePassed = MeetingStore.runPersistenceSmokeTest()
+                let passed = windowPassed && persistencePassed
+                let output = "YAPRFLOW_MEETING_NOTES_SMOKE_TEST=\(passed ? "PASS" : "FAIL") window=\(windowPassed) persistence=\(persistencePassed)\n"
+                FileHandle.standardOutput.write(Data(output.utf8))
+                NSApp.terminate(nil)
+            }
         }
 
         NotificationCenter.default.addObserver(
@@ -160,14 +178,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
             self.statusCancellable = AppState.shared.$status
                 .removeDuplicates()
-                .sink { [weak self] status in
-                    self?.updateStatusItem(for: status)
+                .sink { [weak self] _ in
+                    self?.updateStatusItem()
                 }
+            self.meetingStatusCancellable = MeetingSessionController.shared.$phase
+                .removeDuplicates()
+                .sink { [weak self] _ in self?.updateStatusItem() }
         }
     }
 
-    private func updateStatusItem(for status: TranscriptionStatus) {
+    private func updateStatusItem() {
         guard let button = statusItem?.button else { return }
+
+        let meetingPhase = MeetingSessionController.shared.phase
+        if meetingPhase == .recording || meetingPhase == .paused {
+            button.image = Self.statusItemImage(tint: meetingPhase == .paused ? .systemOrange : .systemRed)
+            button.toolTip = meetingPhase == .paused ? "Yaprflow meeting capture is paused" : "Yaprflow is recording a meeting"
+            button.setAccessibilityLabel(button.toolTip ?? "Yaprflow meeting capture")
+            button.contentTintColor = nil
+            return
+        }
+        if case let .preparing(message) = meetingPhase {
+            button.image = Self.statusItemImage(tint: .systemOrange)
+            button.toolTip = "Yaprflow Meeting Notes: \(message)"
+            button.setAccessibilityLabel(button.toolTip ?? "Yaprflow is preparing Meeting Notes")
+            button.contentTintColor = nil
+            return
+        }
+        if case let .finalizing(message) = meetingPhase {
+            button.image = Self.statusItemImage(tint: .systemOrange)
+            button.toolTip = "Yaprflow Meeting Notes: \(message)"
+            button.setAccessibilityLabel(button.toolTip ?? "Yaprflow is finalizing Meeting Notes")
+            button.contentTintColor = nil
+            return
+        }
+
+        let status = AppState.shared.status
 
         switch status {
         case let .preparing(message):
@@ -243,6 +289,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         )
         menu.addItem(transcribeItem)
 
+        let meetingItem = NSMenuItem(
+            title: MeetingSessionController.shared.isRecording ? "Stop Meeting" : "Meeting Notes…",
+            action: #selector(showMeetingNotes),
+            keyEquivalent: ""
+        )
+        meetingItem.target = self
+        meetingItem.image = NSImage(
+            systemSymbolName: "person.2.wave.2",
+            accessibilityDescription: "Meeting Notes"
+        )
+        menu.addItem(meetingItem)
+
         let aiItem = NSMenuItem()
         aiItem.view = IconActionMenuItemView(
             symbolName: "sparkles",
@@ -295,6 +353,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func showAIActions() {
         AppPanelWindowController.show(.aiSummary)
+    }
+
+    @objc private func showMeetingNotes() {
+        if MeetingSessionController.shared.isRecording {
+            MeetingSessionController.shared.stop()
+        }
+        MeetingNotesWindowController.show()
     }
 
     @objc private func showHistory() {
@@ -377,5 +442,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             state.setDesktopPreviewEnabledForSmokeTest(originalPreference)
             NSApp.terminate(nil)
         }
+    }
+}
+
+extension AppDelegate: UNUserNotificationCenterDelegate {
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse
+    ) async {
+        let eventID = response.notification.request.content.userInfo["calendarEventID"] as? String
+        await MainActor.run {
+            CalendarMeetingService.shared.refreshIfAuthorized()
+            let event = eventID.flatMap { id in
+                CalendarMeetingService.shared.meetings.first { $0.id == id }
+            }
+            MeetingNotesWindowController.show(calendarMeeting: event)
+            if event != nil {
+                MeetingSessionController.shared.start()
+            }
+        }
+    }
+
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification
+    ) async -> UNNotificationPresentationOptions {
+        [.banner, .sound]
     }
 }

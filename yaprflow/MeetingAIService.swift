@@ -1,0 +1,75 @@
+import Foundation
+
+enum MeetingAIError: LocalizedError {
+    case modelUnavailable
+    case noTranscript
+    case invalidStructuredResponse
+
+    var errorDescription: String? {
+        switch self {
+        case .modelUnavailable: "Configure an AI provider in Settings before generating meeting notes."
+        case .noTranscript: "Record some conversation before generating meeting notes."
+        case .invalidStructuredResponse: "The AI response could not be read as structured meeting notes. Try generating again."
+        }
+    }
+}
+
+@MainActor
+enum MeetingAIService {
+    static func generateNotes(
+        for meeting: MeetingRecord,
+        progress: @escaping (String) -> Void
+    ) async throws -> MeetingGeneratedNotes {
+        guard !meeting.transcript.isEmpty else { throw MeetingAIError.noTranscript }
+        let template = MeetingTemplateCatalog.template(id: meeting.templateID)
+        let task = MeetingPromptBuilder.generationInstructions(for: meeting, template: template)
+        let source = MeetingPromptBuilder.sourceTranscript(for: meeting)
+        let response = try await generate(prompt: task, source: source, progress: progress)
+        do {
+            return try MeetingGeneratedNotesParser.parse(
+                response,
+                validSegmentIDs: Set(meeting.transcript.map(\.id))
+            )
+        } catch {
+            throw MeetingAIError.invalidStructuredResponse
+        }
+    }
+
+    static func answer(
+        question: String,
+        meetings: [MeetingRecord],
+        progress: @escaping (String) -> Void
+    ) async throws -> String {
+        let context = MeetingSearchIndex.context(for: question, in: meetings)
+        guard !context.isEmpty else {
+            return "I couldn’t find relevant evidence in your saved meetings."
+        }
+        let prompt = "Answer the user's question using only the supplied meeting excerpts. Cite claims inline using the exact bracketed meeting and segment references. If the evidence is insufficient, say so.\n\nQuestion: \(question)"
+        return try await generate(prompt: prompt, source: context, progress: progress)
+    }
+
+    private static func generate(
+        prompt: String,
+        source: String,
+        progress: @escaping (String) -> Void
+    ) async throws -> String {
+        let settings = AIProviderSettings.shared
+        guard settings.isConfigured else { throw MeetingAIError.modelUnavailable }
+
+        if settings.provider == .appleIntelligence {
+            guard #available(macOS 26.0, *) else { throw MeetingAIError.modelUnavailable }
+            return try await TranscriptAIProcessor.generate(
+                prompt: prompt,
+                transcript: source,
+                progress: { progress($0.message) }
+            )
+        }
+
+        return try await RemoteTranscriptAIProcessor.generate(
+            prompt: prompt,
+            transcript: source,
+            configuration: try settings.configuration(),
+            progress: progress
+        )
+    }
+}

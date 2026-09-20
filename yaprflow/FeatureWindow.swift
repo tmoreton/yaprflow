@@ -103,6 +103,8 @@ final class FeatureWindowController: NSObject, NSWindowDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
+    var isVisibleForSmokeTest: Bool { window?.isVisible == true }
+
     nonisolated func windowWillClose(_ notification: Notification) {
         Task { @MainActor in
             self.window = nil

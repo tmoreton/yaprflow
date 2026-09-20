@@ -32,6 +32,8 @@
 		53DAA96B0F07428A9B67E003 /* AIProviderCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53DAA96B0F07428A9B67E001 /* AIProviderCore.swift */; };
 		53DAA96B0F07428A9B67E005 /* TelemetryCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53DAA96B0F07428A9B67E004 /* TelemetryCore.swift */; };
 		53DAA96B0F07428A9B67E006 /* TelemetryCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53DAA96B0F07428A9B67E004 /* TelemetryCore.swift */; };
+		9B4D100131D0000100000001 /* MeetingCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B4D100131D0000100000004 /* MeetingCore.swift */; };
+		9B4D100131D0000100000002 /* MeetingCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B4D100131D0000100000004 /* MeetingCore.swift */; };
 		6F53000131C5000100000001 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 6F53000131C5000100000003 /* Sparkle */; };
 		6F53000131C5000100000004 /* Sparkle-2.10.0.txt in Resources */ = {isa = PBXBuildFile; fileRef = 6F53000131C5000100000005 /* Sparkle-2.10.0.txt */; };
 		7A53000131C6000100000001 /* SherpaOnnxASR in Frameworks */ = {isa = PBXBuildFile; productRef = 7A53000131C600010000001A /* SherpaOnnxASR */; };
@@ -40,6 +42,7 @@
 		7A53000131C6000100000004 /* TranscriptPolishing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A57A00131C3000100000018 /* TranscriptPolishing.swift */; };
 		7A53000131C6000100000005 /* AIProviderCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53DAA96B0F07428A9B67E001 /* AIProviderCore.swift */; };
 		7A53000131C6000100000006 /* TelemetryCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53DAA96B0F07428A9B67E004 /* TelemetryCore.swift */; };
+		9B4D100131D0000100000003 /* MeetingCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B4D100131D0000100000004 /* MeetingCore.swift */; };
 		7A53000131C6000100000007 /* ONNXRuntime-ThirdPartyNotices-v1.28.2.txt in Resources */ = {isa = PBXBuildFile; fileRef = 2A2FDF2F31C1000200000001 /* ONNXRuntime-ThirdPartyNotices-v1.28.2.txt */; };
 		7A53000131C6000100000008 /* SherpaOnnx-ThirdParty-v1.13.8 in Resources */ = {isa = PBXBuildFile; fileRef = 2A2FDF3231C1000200000001 /* SherpaOnnx-ThirdParty-v1.13.8 */; };
 		7A53000131C6000100000009 /* OpenMDW-1.1.txt in Resources */ = {isa = PBXBuildFile; fileRef = 2A2FDF3931C1000300000001 /* OpenMDW-1.1.txt */; };
@@ -68,6 +71,7 @@
 		2A57A00131C3000100000018 /* TranscriptPolishing.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Shared/TranscriptPolishing.swift; sourceTree = SOURCE_ROOT; };
 		53DAA96B0F07428A9B67E001 /* AIProviderCore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Shared/AIProviderCore.swift; sourceTree = SOURCE_ROOT; };
 		53DAA96B0F07428A9B67E004 /* TelemetryCore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Shared/TelemetryCore.swift; sourceTree = SOURCE_ROOT; };
+		9B4D100131D0000100000004 /* MeetingCore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Shared/MeetingCore.swift; sourceTree = SOURCE_ROOT; };
 		6F53000131C5000100000005 /* Sparkle-2.10.0.txt */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text; path = "LICENSES/Sparkle-2.10.0.txt"; sourceTree = SOURCE_ROOT; };
 		7A53000131C6000100000010 /* yaprflow App Store.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = yaprflow.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8AC764B726D8D52670A9D93A /* yaprflow-iOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "yaprflow-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -147,6 +151,7 @@
 				2A57A00131C3000100000018 /* TranscriptPolishing.swift */,
 				53DAA96B0F07428A9B67E001 /* AIProviderCore.swift */,
 				53DAA96B0F07428A9B67E004 /* TelemetryCore.swift */,
+				9B4D100131D0000100000004 /* MeetingCore.swift */,
 				6F53000131C5000100000005 /* Sparkle-2.10.0.txt */,
 				2A2FDF2D31C00B9800A00001 /* Acknowledgements.txt */,
 				2A2FDF2F31C1000200000001 /* ONNXRuntime-ThirdPartyNotices-v1.28.2.txt */,
@@ -425,6 +430,7 @@
 				2A57A00131C3000100000016 /* TranscriptPolishing.swift in Sources */,
 				53DAA96B0F07428A9B67E002 /* AIProviderCore.swift in Sources */,
 				53DAA96B0F07428A9B67E005 /* TelemetryCore.swift in Sources */,
+				9B4D100131D0000100000001 /* MeetingCore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -437,6 +443,7 @@
 				2A57A00131C3000100000017 /* TranscriptPolishing.swift in Sources */,
 				53DAA96B0F07428A9B67E003 /* AIProviderCore.swift in Sources */,
 				53DAA96B0F07428A9B67E006 /* TelemetryCore.swift in Sources */,
+				9B4D100131D0000100000002 /* MeetingCore.swift in Sources */,
 				E8B1666ED700EDFBA5C576D3 /* YaprflowApp.swift in Sources */,
 				8C7A18FCDA66C92FA3E0F8F4 /* ContentView.swift in Sources */,
 				E3FFA860792C84B288FB9E2B /* TranscriptionEngine.swift in Sources */,
@@ -454,6 +461,7 @@
 				7A53000131C6000100000004 /* TranscriptPolishing.swift in Sources */,
 				7A53000131C6000100000005 /* AIProviderCore.swift in Sources */,
 				7A53000131C6000100000006 /* TelemetryCore.swift in Sources */,
+				9B4D100131D0000100000003 /* MeetingCore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

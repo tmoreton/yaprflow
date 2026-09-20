@@ -220,6 +220,10 @@ final class TranscriptionController {
     }
 
     func toggle() {
+        if MeetingSessionController.shared.isRecording {
+            state.status = .error("Stop Meeting Notes before starting dictation")
+            return
+        }
         log.info("Recording toggle requested (active: \(self.isActive, privacy: .public), starting: \(self.isStarting, privacy: .public), stopping: \(self.isStopping, privacy: .public))")
         Task { @MainActor in
             if isActive {

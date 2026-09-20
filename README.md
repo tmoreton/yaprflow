@@ -14,6 +14,11 @@ archive. Long-form dictation can be turned into summaries, structured notes,
 or other useful text with Apple's on-device model, your own OpenAI or
 OpenRouter key, or Ollama running on your Mac.
 
+Meeting Notes is a separate Mac workflow that captures microphone and system
+audio without a meeting bot, transcribes both locally as Me and Them, combines
+the live transcript with the user's typed notes, and saves evidence-linked
+meeting notes on the Mac. Raw meeting audio is never retained.
+
 The Mac app is distributed as signed, notarized downloads from yaprflow.com.
 There is no in-app sign-in, advertising, cross-app tracking, or cloud
 transcription service. The source remains available for inspection and
@@ -29,6 +34,12 @@ licensed noncommercial builds.
   includes audio, transcript text, prompts, or feedback messages.
 - **One hotkey workflow on Mac**: start and stop dictation with Command-T, or
   change the shortcut from the menu-bar item.
+- **Private Meeting Notes**: capture microphone and Mac audio, type guiding
+  notes, use calendar context and meeting templates, and generate decisions,
+  action items, follow-up email text, and transcript-linked evidence.
+- **Meeting memory**: search saved meetings locally with full-text and on-device
+  semantic retrieval, or ask questions across relevant meeting excerpts with
+  citations back to the underlying transcript.
 - **Polished or exact text**: choose a cleaned-up result or retain the model's
   wording more closely.
 - **Local vocabulary**: deterministic phrase replacements for names, acronyms,
@@ -49,8 +60,8 @@ licensed noncommercial builds.
   PolyForm Noncommercial 1.0.0. Commercial use requires a separate license;
   the historical Apache-2.0 and PolyForm Shield boundaries are preserved.
 
-Yaprflow captures microphone speech and transcript text. It does not capture
-system audio or retain raw meeting recordings.
+Yaprflow captures microphone speech and, only while Meeting Notes is active,
+system audio. It does not retain raw dictation or meeting recordings.
 
 ## Install
 
@@ -84,6 +95,10 @@ Yaprflow runs as a menu-bar app. Click the waveform icon to open the menu.
   Automatic when a recording may use different languages.
 - **AI Summary, History, and Settings** opens a single tabbed window for
   transforming transcripts, browsing local history, and changing settings.
+- **Meeting Notes** opens the calendar-aware meeting workspace. It supports
+  one-click join and record, typed notes, live Me/Them transcription, seven
+  templates, editable generated notes, evidence jumps, local search, and
+  cross-meeting questions.
 - **Send Feedback** is available in Settings for reporting a problem, making a
   suggestion, or asking a question. Review and send the prepared email in your
   mail app; no transcript or audio is attached.
@@ -126,11 +141,15 @@ On macOS, Yaprflow writes user data into its existing sandbox container's
 Application Support directory:
 
 - Transcripts: `Yaprflow/Transcripts/*.md`
+- Meetings: `Yaprflow/Meetings/*.{json,md}`
 - Vocabulary: `Yaprflow/Vocabulary.md`
 - Preferences: bundle domain `com.tmoreton.yaprflow`
 
 Use the `Folder` action in History to reveal saved transcripts. Raw microphone
-audio is held only for processing and is not retained after transcription.
+and system audio are held only for processing and are not retained after
+transcription. Calendar access is optional and is used to show upcoming
+meetings, attendees, join links, and reminders; selected event context is saved
+with the local meeting record.
 
 On iOS, up to three recent transcript strings and preferences are stored in the
 app's separate local container. There is currently no Mac/iOS sync.

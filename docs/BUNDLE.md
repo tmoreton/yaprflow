@@ -46,15 +46,20 @@ preferences.
 - Capture spoken thoughts and copy the result for use in email, notes, and
   other productivity tools.
 - Keep and browse a private local transcript archive.
+- Capture bot-free Mac meetings with separate microphone and system-audio
+  transcripts, human notes, calendar context, and evidence-linked results.
+- Search and ask questions across locally saved meetings.
 - Correct names, acronyms, product terms, and preferred spellings with a local
   vocabulary.
 - Summarize, rewrite, extract action items from, and otherwise transform
   transcripts on supported Macs.
 - Dictate on iPhone or iPad and quickly re-copy recent transcripts.
 
-Yaprflow does not currently retain raw recordings or capture system audio. It
-should not be marketed as a meeting recorder unless those capabilities are
-implemented and separately reviewed for privacy and App Store compliance.
+Yaprflow does not retain raw recordings. Meeting Notes captures system audio
+only during an explicitly started meeting session, shows a persistent recording
+indicator, and stores the resulting transcript and notes locally. Calendar and
+Screen & System Audio Recording permissions must be separately reviewed during
+privacy and App Store release checks.
 
 ## Core features
 
