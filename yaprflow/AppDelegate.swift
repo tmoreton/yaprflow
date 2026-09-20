@@ -336,8 +336,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         meetingItem.isEnabled = !quickDictationIsActive && !meetingIsBusy
         menu.addItem(meetingItem)
 
-        menu.addItem(NSMenuItem.separator())
-
         let historyItem = NSMenuItem()
         historyItem.view = IconActionMenuItemView(
             symbolName: "books.vertical",

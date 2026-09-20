@@ -113,7 +113,7 @@ struct LibraryView: View {
     @State private var filter: LibraryFilter = .all
     @State private var selection: LibrarySelection = .allMeetings
     @State private var search = ""
-    @State private var allMeetingsPrompt = "What are the most important decisions and action items across my recent meetings?"
+    @State private var allMeetingsPrompt = LibraryPromptCatalog.allMeetingsDefaultPrompt
 
     var body: some View {
         VStack(spacing: 0) {
@@ -441,9 +441,11 @@ struct LibraryView: View {
                 Spacer()
 
                 Menu("Use preset") {
-                    ForEach(currentPresets, id: \.title) { preset in
-                        Button(preset.title) {
+                    ForEach(currentPresets) { preset in
+                        Button {
                             setCurrentPrompt(preset.prompt)
+                        } label: {
+                            Label(preset.title, systemImage: preset.systemImage)
                         }
                     }
 
@@ -451,7 +453,7 @@ struct LibraryView: View {
 
                     Button("Reset") {
                         if selection == .allMeetings {
-                            allMeetingsPrompt = "What are the most important decisions and action items across my recent meetings?"
+                            allMeetingsPrompt = LibraryPromptCatalog.allMeetingsDefaultPrompt
                         } else {
                             ai.resetPrompt()
                         }
@@ -604,19 +606,10 @@ struct LibraryView: View {
         }
     }
 
-    private var currentPresets: [(title: String, prompt: String)] {
-        if selection == .allMeetings {
-            return [
-                ("Decisions", "What decisions were made across my meetings? Include the meeting for each decision."),
-                ("Action Items", "What action items, owners, and deadlines were mentioned across my meetings?"),
-                ("Open Questions", "What unresolved questions or blockers remain across my meetings?"),
-            ]
-        }
-        return [
-            ("Summarize", "Summarize this content into concise bullet points. Preserve important details, decisions, names, and follow-up actions."),
-            ("Action Items", "Extract the action items. Include the owner and deadline when stated. Do not invent missing details."),
-            ("Rewrite", "Rewrite this content as clear, polished prose. Preserve its meaning and factual details while removing repetition and filler."),
-        ]
+    private var currentPresets: [LibraryPromptPreset] {
+        selection == .allMeetings
+            ? LibraryPromptCatalog.allMeetingPresets
+            : LibraryPromptCatalog.itemPresets
     }
 
     private var currentResult: String {

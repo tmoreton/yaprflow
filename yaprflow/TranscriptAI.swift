@@ -4,11 +4,10 @@ import FoundationModels
 
 @MainActor
 final class TranscriptAIModel: ObservableObject {
-    static let defaultPrompt = """
-    Summarize this content into concise bullet points. Preserve important details, decisions, names, and follow-up actions.
-    """
+    static let defaultPrompt = LibraryPromptCatalog.itemDefaultPrompt
 
     private static let promptKey = "yaprflow.ai.prompt"
+    private static let legacyDefaultPrompt = "Summarize this content into concise bullet points. Preserve important details, decisions, names, and follow-up actions."
 
     @Published var prompt: String {
         didSet {
@@ -24,7 +23,13 @@ final class TranscriptAIModel: ObservableObject {
     private var generationID = UUID()
 
     init() {
-        prompt = UserDefaults.standard.string(forKey: Self.promptKey) ?? Self.defaultPrompt
+        let storedPrompt = UserDefaults.standard.string(forKey: Self.promptKey)
+        if storedPrompt?.trimmingCharacters(in: .whitespacesAndNewlines) == Self.legacyDefaultPrompt {
+            prompt = Self.defaultPrompt
+            UserDefaults.standard.set(Self.defaultPrompt, forKey: Self.promptKey)
+        } else {
+            prompt = storedPrompt ?? Self.defaultPrompt
+        }
         refreshAvailability()
     }
 

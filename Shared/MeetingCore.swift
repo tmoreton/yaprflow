@@ -248,6 +248,223 @@ public enum MeetingTemplateCatalog {
     }
 }
 
+public struct LibraryPromptPreset: Identifiable, Hashable, Sendable {
+    public let id: String
+    public let title: String
+    public let systemImage: String
+    public let prompt: String
+
+    public init(id: String, title: String, systemImage: String, prompt: String) {
+        self.id = id
+        self.title = title
+        self.systemImage = systemImage
+        self.prompt = prompt
+    }
+}
+
+public enum LibraryPromptCatalog {
+    public static let structuredBrief = LibraryPromptPreset(
+        id: "structured-brief",
+        title: "Structured Brief",
+        systemImage: "doc.text",
+        prompt: """
+        Turn this source into a concise, trustworthy brief. Use only information in the source. Do not invent or infer missing facts, owners, dates, decisions, or intent. Preserve important names, numbers, dates, and commitments, and distinguish confirmed decisions from ideas or proposals.
+
+        Use these sections, omitting any section with no supporting information:
+        ## Overview
+        Summarize the purpose and outcome in 2–4 sentences.
+
+        ## Key points
+        Group related points and remove repetition.
+
+        ## Decisions
+        List only decisions that were explicitly made.
+
+        ## Action items
+        Format each item as: - [ ] Action — Owner: name or Not stated — Due: date or Not stated
+
+        ## Open questions
+        Capture unresolved questions, disagreements, and information still needed.
+
+        ## Important details
+        Retain exact names, figures, dates, links, constraints, and dependencies that matter later.
+        """
+    )
+
+    public static let actionPlan = LibraryPromptPreset(
+        id: "action-plan",
+        title: "Action Plan",
+        systemImage: "checklist",
+        prompt: """
+        Convert this source into an execution-ready action plan. Use only stated information and never invent an owner, deadline, status, dependency, or priority. Merge duplicate commitments while preserving meaningful differences.
+
+        Use these sections, omitting empty sections:
+        ## Intended outcome
+        State the result the work is meant to achieve.
+
+        ## Next actions
+        Format each item as: - [ ] Action — Owner: name or Not stated — Due: date or Not stated — Status: stated status or Not stated
+        Order items by dependency, then urgency when the source makes either clear.
+
+        ## Dependencies and handoffs
+        Identify what must happen first and who is waiting on whom.
+
+        ## Risks and blockers
+        Separate confirmed blockers from possible risks.
+
+        ## Follow-ups needed
+        List missing owners, dates, approvals, or answers that must be clarified.
+        """
+    )
+
+    public static let followUpEmail = LibraryPromptPreset(
+        id: "follow-up-email",
+        title: "Follow-up Email",
+        systemImage: "envelope",
+        prompt: """
+        Draft a concise, professional follow-up email from this source. Use only facts in the source and do not invent recipients, decisions, owners, dates, or commitments. Keep the tone warm, direct, and easy to scan.
+
+        Output:
+        Subject: a specific subject line
+
+        A brief opening that states the shared context or outcome.
+
+        Decisions
+        - Only explicitly confirmed decisions.
+
+        Next steps
+        - [ ] Action — Owner: name or Not stated — Due: date or Not stated
+
+        Open items
+        - Questions, approvals, or blockers that still need resolution.
+
+        End with a short confirmation request or next checkpoint. Omit any section that the source does not support, and do not include commentary outside the email.
+        """
+    )
+
+    public static let detailedNotes = LibraryPromptPreset(
+        id: "detailed-notes",
+        title: "Detailed Notes",
+        systemImage: "list.bullet.rectangle",
+        prompt: """
+        Organize this source into detailed reference notes without losing nuance. Use only the source and do not invent facts or silently turn suggestions into decisions. Consolidate repetition, preserve dissent and uncertainty, and retain exact names, dates, numbers, constraints, examples, and terminology.
+
+        Use these sections, omitting empty sections:
+        ## Context and goals
+        ## Discussion by topic
+        Group the material under descriptive topic headings and capture the reasoning, alternatives, and tradeoffs discussed.
+        ## Decisions
+        ## Action items
+        Include owner and due date when stated; otherwise write Not stated.
+        ## Open questions and risks
+        ## Key facts and references
+
+        Prefer clear bullets, but use short paragraphs where the reasoning would be lost in a bullet.
+        """
+    )
+
+    public static let executiveBrief = LibraryPromptPreset(
+        id: "executive-brief",
+        title: "Executive Brief",
+        systemImage: "sparkles.rectangle.stack",
+        prompt: """
+        Build an executive brief from the relevant saved meetings. Use only supported evidence. Never invent a fact, owner, deadline, decision, or trend, and do not present a proposal as an agreement. Combine duplicates and call out meaningful conflicts between meetings.
+
+        Use these sections, omitting empty sections:
+        ## Executive overview
+        Summarize the most consequential outcomes and changes in 3–5 sentences.
+
+        ## Decisions
+        List confirmed decisions and name the source meeting for each.
+
+        ## Commitments and next steps
+        Format each item as: - [ ] Action — Owner: name or Not stated — Due: date or Not stated — Meeting: title
+
+        ## Risks and blockers
+        Distinguish active blockers from potential risks.
+
+        ## Open questions
+        Capture unresolved issues and the next clarification needed.
+
+        Cite every substantive bullet with the exact bracketed meeting or segment reference supplied in the source.
+        """
+    )
+
+    public static let actionTracker = LibraryPromptPreset(
+        id: "action-tracker",
+        title: "Action Tracker",
+        systemImage: "checkmark.circle",
+        prompt: """
+        Find explicit commitments, assigned work, deadlines, handoffs, and follow-ups across the relevant saved meetings. Use only supported evidence, merge true duplicates, and never invent an owner, date, priority, or completion status.
+
+        Organize the result as:
+        ## Assigned actions
+        - [ ] Action — Owner: name — Due: date or Not stated — Status: stated status or Not stated — Meeting: title
+
+        ## Unassigned actions
+        - [ ] Action — Owner: Not stated — Due: date or Not stated — Meeting: title
+
+        ## Blocked or dependent work
+        Explain the blocker or dependency and the action it affects.
+
+        ## Follow-ups to clarify
+        List missing owners, dates, approvals, and conflicting commitments.
+
+        Cite every item with the exact bracketed meeting or segment reference supplied in the source. If an action is only suggested, label it Proposed rather than Assigned.
+        """
+    )
+
+    public static let decisionLog = LibraryPromptPreset(
+        id: "decision-log",
+        title: "Decision Log",
+        systemImage: "signpost.right.and.left",
+        prompt: """
+        Create a decision log across the relevant saved meetings. Include only decisions that were explicitly confirmed; keep recommendations, options, and unresolved debates separate. Never invent rationale, owners, dates, or consequences.
+
+        For each confirmed decision, provide:
+        ## Decision: short outcome
+        - Meeting: title
+        - Decision: what was agreed
+        - Rationale: stated reasoning, or Not stated
+        - Owner: name, or Not stated
+        - Effective date or deadline: date, or Not stated
+        - Implications: only consequences explicitly discussed
+        - Remaining uncertainty: any unresolved part
+
+        Then add:
+        ## Pending decisions
+        List decisions still awaiting input, approval, or a tie-breaker.
+
+        Cite every entry with the exact bracketed meeting or segment reference supplied in the source. Note conflicts when later meetings revise an earlier decision.
+        """
+    )
+
+    public static let followUpQueue = LibraryPromptPreset(
+        id: "follow-up-queue",
+        title: "Follow-up Queue",
+        systemImage: "paperplane",
+        prompt: """
+        Identify the highest-value follow-ups across the relevant saved meetings and turn them into a concise outreach queue. Use only supported evidence. Never invent a recipient, promise, owner, date, or decision.
+
+        For each follow-up, provide:
+        ## Follow-up: short purpose
+        - Source meeting: title
+        - Recipient: stated person or Not stated
+        - Goal: the answer, confirmation, approval, or action needed
+        - Owner: stated person or Not stated
+        - Due: stated date or Not stated
+        - Context: one sentence explaining why it matters
+
+        Draft a short ready-to-send message with a specific subject line, a direct request, and the relevant confirmed context. Keep each draft under 120 words. Limit the queue to the five most consequential follow-ups and cite each one with the exact bracketed meeting or segment reference supplied in the source.
+        """
+    )
+
+    public static let itemPresets = [structuredBrief, actionPlan, followUpEmail, detailedNotes]
+    public static let allMeetingPresets = [executiveBrief, actionTracker, decisionLog, followUpQueue]
+    public static let itemDefaultPrompt = structuredBrief.prompt
+    public static let allMeetingsDefaultPrompt = executiveBrief.prompt
+}
+
 public struct MeetingSearchHit: Identifiable, Hashable, Sendable {
     public let meetingID: UUID
     public let segmentID: UUID?

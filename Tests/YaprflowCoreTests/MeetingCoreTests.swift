@@ -94,6 +94,18 @@ struct MeetingCoreTests {
         #expect(MeetingTemplateCatalog.template(id: "missing").id == MeetingTemplateCatalog.generalID)
     }
 
+    @Test("Library presets provide structured, trustworthy workflows")
+    func libraryPromptPresets() {
+        let presets = LibraryPromptCatalog.itemPresets + LibraryPromptCatalog.allMeetingPresets
+
+        #expect(presets.count == 8)
+        #expect(Set(presets.map(\.id)).count == presets.count)
+        #expect(presets.allSatisfy { $0.prompt.split(separator: "\n").count >= 8 })
+        #expect(presets.allSatisfy { $0.prompt.localizedCaseInsensitiveContains("invent") })
+        #expect(LibraryPromptCatalog.itemPresets.contains { $0.id == "follow-up-email" })
+        #expect(LibraryPromptCatalog.allMeetingPresets.contains { $0.id == "follow-up-queue" })
+    }
+
     @Test("Markdown export retains evidence anchors")
     func markdownExport() {
         let segment = MeetingTranscriptSegment(
