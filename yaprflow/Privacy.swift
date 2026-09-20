@@ -188,7 +188,7 @@ struct SettingsView: View {
                         Divider().padding(.leading, 38)
                         PrivacyRow(
                             symbol: "sparkles",
-                            title: "Meeting summaries",
+                            title: "AI features",
                             detail: aiPrivacyDetail,
                             status: aiSettings.provider == .ollama
                                 ? "Ollama"

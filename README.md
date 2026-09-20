@@ -10,9 +10,10 @@
 Yaprflow is the voice and AI productivity app planned for a privacy-first
 software bundle. The Mac app records microphone input, transcribes speech locally,
 copies the finished text to the clipboard, and keeps a local Markdown
-archive. Meeting Notes turns conversations into structured summaries with
-Apple's on-device model, your own OpenAI or OpenRouter key, or Ollama running
-on your Mac.
+archive. The consolidated Mac workspace lets you browse those saved dictations,
+run reusable AI prompts and presets, and turn meetings into structured summaries
+with Apple's on-device model, your own OpenAI or OpenRouter key, or Ollama
+running on your Mac.
 
 Meeting Notes is a separate Mac workflow that captures microphone and system
 audio without a meeting bot, transcribes both locally as Me and Them, combines
@@ -55,6 +56,9 @@ licensed noncommercial builds.
   with key points, decisions, action items, personal notes, evidence links, and
   a collapsed transcript. Use Apple Intelligence on a supported Mac, your own
   OpenAI or OpenRouter key, or local Ollama.
+- **Transcript tools**: select any saved dictation from searchable history, then
+  summarize it, extract action items, rewrite it, or run a custom reusable prompt
+  with the same selectable AI providers.
 - **Smart Markdown archive**: each completed Mac transcript is saved locally;
   Apple Intelligence can add a title, topic, and description on supported Macs.
   Automatic titles with another provider require a separate opt-in.
@@ -101,9 +105,10 @@ Yaprflow runs as a menu-bar app. Click the waveform icon to open the menu.
 - **Choose speech language**: Settings defaults to English (United States) for
   more consistent English dictation. Choose any other supported locale, or
   Automatic when a recording may use different languages.
-- **History and Settings** opens a single tabbed window for browsing local
-  dictation history and changing settings.
-- **Meeting Notes** opens the calendar-aware meeting workspace. It supports
+- **Yaprflow workspace** keeps Meetings, Ask, Transcripts, and Settings in one
+  window. The Transcripts section combines searchable history with presets,
+  custom prompts, editable AI output, and provider controls.
+- **Meeting Notes** is the calendar-aware section of that workspace. It supports
   one-click join and record, typed notes, live Me/Them transcription, seven
   templates, editable generated notes, evidence jumps, local search, and
   cross-meeting questions.
@@ -134,12 +139,12 @@ with `#` are ignored.
 ## Privacy and local data
 
 At runtime, Yaprflow does not contact a Yaprflow-operated service, download
-speech models, upload audio, or require a login. Mac meeting summaries use
-Apple's on-device model by default. If you select OpenAI or OpenRouter, the
-meeting transcript, personal notes, and summary instructions go directly to
-that provider using your own key. Ollama uses its service on your Mac; Ollama
-cloud models may contact Ollama's cloud. Automatic titles with these providers
-are a separate opt-in. See the published
+speech models, upload audio, or require a login. Mac meeting summaries and
+transcript tools use Apple's on-device model by default. If you select OpenAI
+or OpenRouter, only the text and instructions for the AI action you run go
+directly to that provider using your own key. Ollama uses its service on your
+Mac; Ollama cloud models may contact Ollama's cloud. Automatic titles with
+these providers are a separate opt-in. See the published
 [Privacy Policy](https://yaprflow.com/privacy.html) for the full disclosure.
 
 The Mac telemetry switch sends fixed usage and failure events to
@@ -154,7 +159,7 @@ Application Support directory:
 - Vocabulary: `Yaprflow/Vocabulary.md`
 - Preferences: bundle domain `com.tmoreton.yaprflow`
 
-Use the `Folder` action in History to reveal saved transcripts. Raw microphone
+Use the `Folder` action in Transcripts to reveal saved transcripts. Raw microphone
 and system audio are held only for processing and are not retained after
 transcription. Calendar access is optional and is used to show upcoming
 meetings, attendees, join links, and reminders; selected event context is saved
@@ -188,9 +193,10 @@ detection. The full FluidAudio package is not linked into the apps.
    (United States) is the default, and Automatic detection remains available.
 5. Yaprflow applies local cleanup and vocabulary replacements.
 6. Final text is copied to the clipboard and saved as Markdown.
-7. The selected AI provider creates structured notes for finished meetings.
-   Apple Intelligence is on-device; cloud providers receive meeting text only
-   when used, and automatic cloud archive titles require opt-in.
+7. The selected AI provider creates structured notes for finished meetings or
+   transforms a selected saved dictation with a preset or custom prompt. Apple
+   Intelligence is on-device; cloud providers receive text only when used, and
+   automatic cloud archive titles require opt-in.
 
 The complete Nemotron 3.5 ASR and Silero VAD models are bundled in official
 apps. On Mac, background preparation begins at launch, the speech recognizer

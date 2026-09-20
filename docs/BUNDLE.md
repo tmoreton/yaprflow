@@ -77,7 +77,8 @@ privacy and App Store release checks.
 - Optional on-device summaries, rewrites, custom transformations, titles,
   topics, and descriptions through Apple's Foundation Models framework on
   supported Macs.
-- Optional OpenAI, OpenRouter, and Ollama providers for Mac AI Summary. Cloud
+- Optional OpenAI, OpenRouter, and Ollama providers for Mac meeting summaries
+  and transcript tools. Cloud
   keys are stored in the Mac Keychain. Automatic titles with these providers
   require a separate opt-in.
 - No Yaprflow account, subscription, advertising, analytics, or tracking.
@@ -91,7 +92,7 @@ sandbox container. On iOS, recent Quick Dictation results, preferences, and
 in-person meeting JSON/Markdown records remain in the local app container.
 Apple Intelligence processing uses the on-device Foundation
 Models framework. Selecting OpenAI or OpenRouter sends the selected transcript
-and prompt to that provider when AI Summary is run; automatic titles with a
+and prompt to that provider when an AI tool is run; automatic titles with a
 selected external provider require a separate opt-in. Ollama requests go to
 localhost, although an Ollama cloud model may use its own cloud service.
 

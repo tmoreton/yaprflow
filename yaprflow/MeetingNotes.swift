@@ -37,16 +37,24 @@ private final class MeetingMemoryModel: ObservableObject {
     }
 }
 
-private enum MeetingNotesMode: String, CaseIterable {
+enum MeetingNotesDestination: String, CaseIterable {
     case meetings = "Meetings"
     case ask = "Ask"
+    case transcripts = "Transcripts"
+    case settings = "Settings"
+}
+
+@MainActor
+private final class MeetingNotesNavigation: ObservableObject {
+    static let shared = MeetingNotesNavigation()
+    @Published var destination: MeetingNotesDestination = .meetings
 }
 
 struct MeetingNotesView: View {
     @ObservedObject private var store = MeetingStore.shared
     @ObservedObject private var session = MeetingSessionController.shared
+    @ObservedObject private var navigation = MeetingNotesNavigation.shared
     @StateObject private var memory = MeetingMemoryModel()
-    @State private var mode: MeetingNotesMode = .meetings
     @State private var search = ""
     @State private var selectedMeetingID: UUID?
     @State private var selectedEvidenceID: UUID?
@@ -57,7 +65,7 @@ struct MeetingNotesView: View {
             header
             Divider()
 
-            switch mode {
+            switch navigation.destination {
             case .meetings:
                 HSplitView {
                     sidebar
@@ -70,29 +78,41 @@ struct MeetingNotesView: View {
                     selectedMeetingID = meetingID
                     selectedEvidenceID = segmentID
                     showsLiveWorkspace = false
-                    mode = .meetings
+                    navigation.destination = .meetings
                 }
+            case .transcripts:
+                TranscriptAIView {
+                    navigation.destination = .settings
+                }
+            case .settings:
+                SettingsView()
             }
         }
         .frame(minWidth: 820, minHeight: 580)
         .background(Color(nsColor: .windowBackgroundColor))
-        .onAppear { store.refresh() }
+        .onAppear {
+            store.refresh()
+            Telemetry.shared.track(.featureOpened(telemetryFeature(for: navigation.destination)))
+        }
         .onReceive(NotificationCenter.default.publisher(for: .yaprflowMeetingsChanged)) { _ in
             store.refresh()
+        }
+        .onChange(of: navigation.destination) { _, destination in
+            Telemetry.shared.track(.featureOpened(telemetryFeature(for: destination)))
         }
     }
 
     private var header: some View {
         HStack(spacing: 14) {
-            Text("Meeting Notes")
+            Text("Yaprflow")
                 .font(.title2.weight(.semibold))
 
-            Picker("Meeting Notes section", selection: $mode) {
-                ForEach(MeetingNotesMode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+            Picker("Workspace", selection: $navigation.destination) {
+                ForEach(MeetingNotesDestination.allCases, id: \.self) { Text($0.rawValue).tag($0) }
             }
             .labelsHidden()
             .pickerStyle(.segmented)
-            .frame(width: 180)
+            .frame(width: 370)
 
             Spacer()
 
@@ -103,16 +123,18 @@ struct MeetingNotesView: View {
                     .accessibilityLabel(session.isPaused ? "Meeting capture paused" : "Meeting capture recording")
             }
 
-            Button("New", systemImage: "plus") {
-                session.prepare()
-                showsLiveWorkspace = true
-                selectedMeetingID = nil
-                selectedEvidenceID = nil
-                mode = .meetings
+            if navigation.destination == .meetings {
+                Button("New", systemImage: "plus") {
+                    session.prepare()
+                    showsLiveWorkspace = true
+                    selectedMeetingID = nil
+                    selectedEvidenceID = nil
+                    navigation.destination = .meetings
+                }
+                .disabled(session.phase.isCapturing)
+                .keyboardShortcut("n", modifiers: [.command, .shift])
+                .help("New meeting (Shift-Command-N)")
             }
-            .disabled(session.phase.isCapturing)
-            .keyboardShortcut("n", modifiers: [.command, .shift])
-            .help("New meeting (Shift-Command-N)")
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 12)
@@ -211,6 +233,14 @@ struct MeetingNotesView: View {
         guard !trimmed.isEmpty else { return store.meetings }
         let ids = Set(MeetingSearchIndex.search(trimmed, in: store.meetings).map(\.meetingID))
         return store.meetings.filter { ids.contains($0.id) }
+    }
+
+    private func telemetryFeature(for destination: MeetingNotesDestination) -> TelemetryFeature {
+        switch destination {
+        case .meetings, .ask: .meetingNotes
+        case .transcripts: .history
+        case .settings: .settings
+        }
     }
 }
 
@@ -1064,13 +1094,17 @@ enum MeetingNotesWindowController {
         MeetingNotesView()
     }
 
-    static func show(calendarMeeting: CalendarMeeting? = nil) {
+    static func show(
+        _ destination: MeetingNotesDestination = .meetings,
+        calendarMeeting: CalendarMeeting? = nil
+    ) {
+        MeetingNotesNavigation.shared.destination = destination
         if let calendarMeeting {
             MeetingSessionController.shared.prepare(calendarMeeting: calendarMeeting)
         }
-        Telemetry.shared.track(.featureOpened(.meetingNotes))
         window.show()
     }
 
     static var isVisibleForSmokeTest: Bool { window.isVisibleForSmokeTest }
+    static var destinationForSmokeTest: MeetingNotesDestination { MeetingNotesNavigation.shared.destination }
 }

@@ -62,11 +62,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if isMeetingNotesSmokeTest {
             MeetingNotesWindowController.show()
             Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(750))
+                try? await Task.sleep(for: .milliseconds(350))
                 let windowPassed = MeetingNotesWindowController.isVisibleForSmokeTest
+                MeetingNotesWindowController.show(.transcripts)
+                try? await Task.sleep(for: .milliseconds(200))
+                let transcriptsPassed = MeetingNotesWindowController.isVisibleForSmokeTest
+                    && MeetingNotesWindowController.destinationForSmokeTest == .transcripts
+                MeetingNotesWindowController.show(.settings)
+                try? await Task.sleep(for: .milliseconds(200))
+                let settingsPassed = MeetingNotesWindowController.isVisibleForSmokeTest
+                    && MeetingNotesWindowController.destinationForSmokeTest == .settings
+                MeetingNotesWindowController.show(.meetings)
                 let persistencePassed = MeetingStore.runPersistenceSmokeTest()
-                let passed = windowPassed && persistencePassed
-                let output = "YAPRFLOW_MEETING_NOTES_SMOKE_TEST=\(passed ? "PASS" : "FAIL") window=\(windowPassed) persistence=\(persistencePassed)\n"
+                let passed = windowPassed && transcriptsPassed && settingsPassed && persistencePassed
+                let output = "YAPRFLOW_MEETING_NOTES_SMOKE_TEST=\(passed ? "PASS" : "FAIL") window=\(windowPassed) transcripts=\(transcriptsPassed) settings=\(settingsPassed) persistence=\(persistencePassed)\n"
                 FileHandle.standardOutput.write(Data(output.utf8))
                 NSApp.terminate(nil)
             }
@@ -362,11 +371,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func showHistory() {
-        AppPanelWindowController.show(.history)
+        MeetingNotesWindowController.show(.transcripts)
     }
 
     @objc private func showSettings() {
-        AppPanelWindowController.show(.settings)
+        MeetingNotesWindowController.show(.settings)
     }
 
     private func registerHotkey() -> Bool {
