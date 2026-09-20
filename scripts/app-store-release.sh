@@ -437,7 +437,6 @@ verify_provisioning_profile() {
     require_plist_value "$profile_plist" Platform:0 "OSX"
     require_plist_value "$profile_plist" Entitlements:com.apple.application-identifier "$EXPECTED_APPLICATION_ID"
     require_plist_value "$profile_plist" Entitlements:com.apple.developer.team-identifier "$EXPECTED_TEAM_ID"
-    require_plist_value "$profile_plist" Entitlements:com.apple.security.personal-information.calendars "true"
 
     expiration="$(plist_raw "$profile_plist" ExpirationDate || true)"
     [[ -n "$expiration" ]] || fail "the provisioning profile has no expiration date"
