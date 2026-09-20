@@ -330,7 +330,7 @@ final class TranscriptionController {
         }
         return RecordingSmokeTestResult(
             succeeded: !isActive,
-            message: "The Transcribe menu action and microphone capture engine started and stopped successfully."
+            message: "Quick Dictation and the microphone capture engine started and stopped successfully."
         )
     }
 

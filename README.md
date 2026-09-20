@@ -87,7 +87,8 @@ take a little longer while the on-device runtimes initialize.
 
 Yaprflow runs as a menu-bar app. Click the waveform icon to open the menu.
 
-- **Transcribe** starts or stops dictation.
+- **Quick Dictation** starts or stops short-form speech-to-text and copies the
+  result to the clipboard.
 - **Change shortcut**: open Settings, click the keyboard shortcut button, then
   press the new key combination. Escape cancels shortcut capture.
 - **Choose speech language**: Settings defaults to English (United States) for

@@ -1,5 +1,171 @@
 import AppKit
 
+/// A larger primary menu row used for Yaprflow's two capture modes. The
+/// subtitle makes the different outcomes clear before a recording starts:
+/// Quick Dictation copies text, while Meeting Notes creates a saved record.
+@MainActor
+final class CaptureModeMenuItemView: NSView {
+    private let iconView = NSImageView()
+    private let titleField = NSTextField(labelWithString: "")
+    private let subtitleField = NSTextField(labelWithString: "")
+    private let accessoryField = NSTextField(labelWithString: "")
+    private weak var actionTarget: AnyObject?
+    private let action: Selector
+    private let isEnabledProvider: () -> Bool
+    private var trackingArea: NSTrackingArea?
+    private var isHovered = false
+
+    init(
+        symbolName: String,
+        title: String,
+        subtitle: String,
+        accessoryTitle: String? = nil,
+        target: AnyObject,
+        action: Selector,
+        isEnabled: @escaping () -> Bool
+    ) {
+        self.actionTarget = target
+        self.action = action
+        self.isEnabledProvider = isEnabled
+        super.init(frame: NSRect(x: 0, y: 0, width: 260, height: 48))
+        autoresizingMask = [.width]
+        setup(
+            symbolName: symbolName,
+            title: title,
+            subtitle: subtitle,
+            accessoryTitle: accessoryTitle
+        )
+        updateAppearance()
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: 260, height: 48)
+    }
+
+    private func setup(
+        symbolName: String,
+        title: String,
+        subtitle: String,
+        accessoryTitle: String?
+    ) {
+        iconView.translatesAutoresizingMaskIntoConstraints = false
+        iconView.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil)
+        iconView.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 15, weight: .medium)
+        addSubview(iconView)
+
+        titleField.translatesAutoresizingMaskIntoConstraints = false
+        titleField.font = NSFont.systemFont(ofSize: 13, weight: .medium)
+        titleField.stringValue = title
+        titleField.lineBreakMode = .byTruncatingTail
+        addSubview(titleField)
+
+        subtitleField.translatesAutoresizingMaskIntoConstraints = false
+        subtitleField.font = NSFont.menuFont(ofSize: 11)
+        subtitleField.stringValue = subtitle
+        subtitleField.lineBreakMode = .byTruncatingTail
+        addSubview(subtitleField)
+
+        accessoryField.translatesAutoresizingMaskIntoConstraints = false
+        accessoryField.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+        accessoryField.stringValue = accessoryTitle ?? ""
+        accessoryField.alignment = .right
+        accessoryField.isHidden = accessoryTitle == nil
+        addSubview(accessoryField)
+
+        NSLayoutConstraint.activate([
+            iconView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14),
+            iconView.centerYAnchor.constraint(equalTo: centerYAnchor),
+            iconView.widthAnchor.constraint(equalToConstant: 20),
+            iconView.heightAnchor.constraint(equalToConstant: 20),
+
+            titleField.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 8),
+            titleField.topAnchor.constraint(equalTo: topAnchor, constant: 8),
+
+            accessoryField.leadingAnchor.constraint(greaterThanOrEqualTo: titleField.trailingAnchor, constant: 8),
+            accessoryField.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -14),
+            accessoryField.firstBaselineAnchor.constraint(equalTo: titleField.firstBaselineAnchor),
+
+            subtitleField.leadingAnchor.constraint(equalTo: titleField.leadingAnchor),
+            subtitleField.topAnchor.constraint(equalTo: titleField.bottomAnchor, constant: 1),
+            subtitleField.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -14),
+        ])
+
+        setAccessibilityRole(.button)
+        setAccessibilityLabel(title)
+        setAccessibilityHelp(subtitle)
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let area = trackingArea { removeTrackingArea(area) }
+        let area = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+            owner: self
+        )
+        addTrackingArea(area)
+        trackingArea = area
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        guard isEnabledProvider() else { return }
+        isHovered = true
+        updateAppearance()
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        isHovered = false
+        updateAppearance()
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        guard isEnabledProvider(), let target = actionTarget else { return }
+        NSApp.sendAction(action, to: target, from: self)
+        enclosingMenuItem?.menu?.cancelTracking()
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        isHovered = false
+        updateAppearance()
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        if isHovered && isEnabledProvider() {
+            NSColor.selectedContentBackgroundColor.setFill()
+            NSBezierPath(
+                roundedRect: bounds.insetBy(dx: 4, dy: 1),
+                xRadius: 5,
+                yRadius: 5
+            ).fill()
+        }
+    }
+
+    private func updateAppearance() {
+        let enabled = isEnabledProvider()
+        let primaryColor: NSColor
+        let secondaryColor: NSColor
+        if isHovered && enabled {
+            primaryColor = .white
+            secondaryColor = .white.withAlphaComponent(0.78)
+        } else if !enabled {
+            primaryColor = .disabledControlTextColor
+            secondaryColor = .disabledControlTextColor
+        } else {
+            primaryColor = .labelColor
+            secondaryColor = .secondaryLabelColor
+        }
+        titleField.textColor = primaryColor
+        subtitleField.textColor = secondaryColor
+        accessoryField.textColor = secondaryColor
+        iconView.contentTintColor = primaryColor
+        setAccessibilityEnabled(enabled)
+        needsDisplay = true
+    }
+}
+
 /// Custom menu item view that keeps action icons and titles on a shared column.
 /// Standard `NSMenuItem.image` reserves a
 /// checkmark column to the left of the image, so icons rendered that way sit

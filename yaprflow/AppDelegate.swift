@@ -268,37 +268,85 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
 
-        // Keep the primary action native so AppKit owns the entire hit target.
-        // The previous split custom row let its text fields swallow clicks.
-        let isStartingOrRecording: Bool
+        let quickDictationIsActive: Bool
         switch AppState.shared.status {
         case .preparing, .listening:
-            isStartingOrRecording = true
+            quickDictationIsActive = true
         default:
-            isStartingOrRecording = false
+            quickDictationIsActive = false
         }
-        let transcribeItem = NSMenuItem(
-            title: isStartingOrRecording ? "Stop Recording" : "Transcribe",
+
+        let meetingPhase = MeetingSessionController.shared.phase
+        let meetingIsCapturing = meetingPhase.isCapturing
+        let meetingIsBusy: Bool
+        switch meetingPhase {
+        case .preparing, .finalizing:
+            meetingIsBusy = true
+        default:
+            meetingIsBusy = false
+        }
+
+        // Present the two product modes as a single primary group. Their
+        // subtitles describe the different outcomes instead of making users
+        // infer the distinction from two unrelated menu commands.
+        let quickTitle = quickDictationIsActive ? "Stop Quick Dictation" : "Quick Dictation"
+        let quickItem = NSMenuItem(
+            title: quickTitle,
             action: #selector(toggleTranscription),
             keyEquivalent: ""
         )
-        transcribeItem.target = self
-        transcribeItem.image = NSImage(
-            systemSymbolName: "record.circle",
-            accessibilityDescription: "Transcribe"
+        quickItem.target = self
+        quickItem.view = CaptureModeMenuItemView(
+            symbolName: quickDictationIsActive ? "stop.circle.fill" : "mic.fill",
+            title: quickTitle,
+            subtitle: quickDictationIsActive
+                ? "Finish and copy to the clipboard"
+                : "Speak, then paste anywhere",
+            accessoryTitle: AppState.shared.hotkey.displayString,
+            target: self,
+            action: #selector(toggleTranscription),
+            isEnabled: { !meetingIsCapturing && !meetingIsBusy }
         )
-        menu.addItem(transcribeItem)
+        quickItem.isEnabled = !meetingIsCapturing && !meetingIsBusy
+        menu.addItem(quickItem)
 
-        let meetingIsRecording = MeetingSessionController.shared.isRecording
-        let meetingItem = NSMenuItem()
-        meetingItem.view = IconActionMenuItemView(
-            symbolName: meetingIsRecording ? "stop.circle.fill" : "person.2.wave.2",
-            title: meetingIsRecording ? "Stop Meeting" : "Meeting Notes…",
+        let meetingTitle: String
+        let meetingSubtitle: String
+        switch meetingPhase {
+        case .recording:
+            meetingTitle = "Stop Meeting"
+            meetingSubtitle = "Finish transcript and generate notes"
+        case .paused:
+            meetingTitle = "Stop Meeting"
+            meetingSubtitle = "Meeting capture is paused"
+        case .preparing:
+            meetingTitle = "Starting Meeting…"
+            meetingSubtitle = "Preparing microphone and Mac audio"
+        case .finalizing:
+            meetingTitle = "Finishing Meeting…"
+            meetingSubtitle = "Saving transcript and generating notes"
+        default:
+            meetingTitle = "Meeting Notes"
+            meetingSubtitle = "Capture microphone and Mac audio"
+        }
+        let meetingItem = NSMenuItem(
+            title: meetingTitle,
+            action: #selector(showMeetingNotes),
+            keyEquivalent: ""
+        )
+        meetingItem.target = self
+        meetingItem.view = CaptureModeMenuItemView(
+            symbolName: meetingIsCapturing ? "stop.circle.fill" : "person.2.wave.2",
+            title: meetingTitle,
+            subtitle: meetingSubtitle,
             target: self,
             action: #selector(showMeetingNotes),
-            isEnabled: { true }
+            isEnabled: { !quickDictationIsActive && !meetingIsBusy }
         )
+        meetingItem.isEnabled = !quickDictationIsActive && !meetingIsBusy
         menu.addItem(meetingItem)
+
+        menu.addItem(NSMenuItem.separator())
 
         let aiItem = NSMenuItem()
         aiItem.view = IconActionMenuItemView(
@@ -346,7 +394,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func quit() { NSApp.terminate(nil) }
 
     @objc private func toggleTranscription() {
-        log.info("Transcribe menu action activated")
+        log.info("Quick Dictation menu action activated")
         TranscriptionController.shared.toggle()
     }
 
