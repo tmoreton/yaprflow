@@ -56,8 +56,8 @@ licensed noncommercial builds.
   with key points, decisions, action items, personal notes, evidence links, and
   a collapsed transcript. Use Apple Intelligence on a supported Mac, your own
   OpenAI or OpenRouter key, or local Ollama.
-- **Unified Library**: search meetings and dictations together, ask across all
-  meetings with linked sources, or select one item to create a structured
+- **Unified workspace**: search meetings and dictations together, ask across
+  all meetings with linked sources, or select one item to create a structured
   brief, action plan, detailed notes, follow-up email, or custom result.
 - **Smart Markdown archive**: each completed Mac transcript is saved locally;
   Apple Intelligence can add a title, topic, and description on supported Macs.
@@ -105,14 +105,13 @@ Yaprflow runs as a menu-bar app. Click the waveform icon to open the menu.
 - **Choose speech language**: Settings defaults to English (United States) for
   more consistent English dictation. Choose any other supported locale, or
   Automatic when a recording may use different languages.
-- **Yaprflow workspace** keeps Meetings, Library, and Settings in one window.
-  Library combines meeting memory and dictation history behind one source
-  selector, shared prompt surface, structured presets, AI output, and provider
-  controls.
-- **Meeting Notes** is the calendar-aware section of that workspace. It supports
-  one-click join and record, typed notes, live Me/Them transcription, seven
-  templates, editable generated notes, evidence jumps, local search, and
-  cross-meeting questions.
+- **Yaprflow workspace** keeps live capture, saved meetings, and Quick Dictation
+  history in one searchable sidebar. Choose any item to read, copy, organize,
+  or ask AI about it without switching pages.
+- **Meeting Notes** supports one-click join and record, typed notes, live
+  Me/Them transcription, seven templates, editable generated notes, evidence
+  jumps, and cross-meeting questions. Settings stays one click away without
+  competing with the primary workflow.
 - **Send Feedback** is available in Settings for reporting a problem, making a
   suggestion, or asking a question. Review and send the prepared email in your
   mail app; no transcript or audio is attached.

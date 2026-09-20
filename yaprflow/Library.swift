@@ -50,15 +50,6 @@ private final class MeetingMemoryModel: ObservableObject {
         }
     }
 
-    func clearOutput() {
-        generationID = UUID()
-        answer = ""
-        isRunning = false
-        progressMessage = nil
-        errorMessage = nil
-        evidenceHits = []
-    }
-
     private static func citedEvidence(
         in answer: String,
         meetings: [MeetingRecord]
@@ -88,325 +79,234 @@ private final class MeetingMemoryModel: ObservableObject {
     }
 }
 
-private enum LibraryFilter: String, CaseIterable {
-    case all = "All"
-    case meetings = "Meetings"
-    case dictations = "Dictations"
+private enum AIWorkspaceSource {
+    case allMeetings([MeetingRecord])
+    case meeting(MeetingRecord)
+    case dictation(TranscriptHistoryItem)
 }
 
-private enum LibrarySelection: Hashable {
-    case allMeetings
-    case meeting(UUID)
-    case dictation(URL)
-}
-
-struct LibraryView: View {
-    @ObservedObject private var appState = AppState.shared
+struct AllMeetingsWorkspace: View {
     @StateObject private var ai = TranscriptAIModel()
     @StateObject private var memory = MeetingMemoryModel()
-    @StateObject private var history = TranscriptHistoryModel()
+    @State private var prompt = LibraryPromptCatalog.allMeetingsDefaultPrompt
 
     let meetings: [MeetingRecord]
     let onOpenEvidence: (UUID, UUID?) -> Void
     let onOpenSettings: () -> Void
 
-    @State private var filter: LibraryFilter = .all
-    @State private var selection: LibrarySelection = .allMeetings
-    @State private var search = ""
-    @State private var allMeetingsPrompt = LibraryPromptCatalog.allMeetingsDefaultPrompt
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Ask all meetings")
+                    .font(.title3.weight(.semibold))
+                Text(meetings.isEmpty
+                    ? "Your saved meetings will become searchable here."
+                    : "Search decisions, action items, and context across \(meetings.count) meeting\(meetings.count == 1 ? "" : "s").")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            AIWorkspaceContent(
+                source: .allMeetings(meetings),
+                prompt: $prompt,
+                ai: ai,
+                memory: memory,
+                showsEmptyResult: true,
+                compact: false,
+                onOpenEvidence: onOpenEvidence,
+                onOpenSettings: onOpenSettings
+            )
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+
+struct MeetingAskPanel: View {
+    @StateObject private var ai = TranscriptAIModel()
+    @StateObject private var memory = MeetingMemoryModel()
+    @State private var isExpanded = false
+
+    let meeting: MeetingRecord
+    let onOpenEvidence: (UUID?) -> Void
+    let onOpenSettings: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
-            header
-                .padding(.horizontal, 18)
-                .padding(.vertical, 14)
-
-            Divider()
-
-            HSplitView {
-                sourceSidebar
-                    .frame(minWidth: 230, idealWidth: 260, maxWidth: 300)
-
-                workspace
-                    .frame(minWidth: 520, maxWidth: .infinity, maxHeight: .infinity)
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .windowBackgroundColor))
-        .onAppear {
-            ai.refreshAvailability()
-            history.refresh()
-            TranscriptMetadataEnricher.shared.enqueueMissingTranscripts()
-        }
-        .onChange(of: selection) { oldSelection, newSelection in
-            if oldSelection != newSelection {
-                ai.clearOutput()
-                memory.clearOutput()
-            }
-            if case let .dictation(url) = newSelection {
-                history.selection = url
-            }
-        }
-        .onChange(of: appState.lastTranscript) { _, _ in
-            history.refresh()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .yaprflowTranscriptArchiveChanged)) { notification in
-            if let change = notification.object as? TranscriptArchiveChange,
-               selection == .dictation(change.oldURL) {
-                selection = .dictation(change.newURL)
-            }
-            history.handleArchiveChange(notification)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .yaprflowAIProviderSettingsChanged)) { _ in
-            ai.refreshAvailability()
-        }
-    }
-
-    private var header: some View {
-        HStack(spacing: 14) {
-            FeatureWindowHeader(
-                symbolName: "books.vertical.fill",
-                title: "Library",
-                subtitle: "Ask across meetings or work with one saved item.",
-                accent: .purple,
-                badge: providerBadge,
-                badgeSymbol: providerBadgeSymbol
-            )
-
-            Spacer(minLength: 12)
-
-            Button("AI Settings", systemImage: "slider.horizontal.3") {
-                onOpenSettings()
-            }
-            .help("Choose an AI provider and model")
-        }
-    }
-
-    private var sourceSidebar: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Picker("Library filter", selection: $filter) {
-                ForEach(LibraryFilter.allCases, id: \.self) { item in
-                    Text(item.rawValue).tag(item)
-                }
-            }
-            .labelsHidden()
-            .pickerStyle(.segmented)
-
-            HStack(spacing: 7) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                TextField("Search library", text: $search)
-                    .textFieldStyle(.plain)
-                if !search.isEmpty {
-                    Button {
-                        search = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.tertiary)
-                    .help("Clear search")
-                }
-            }
-            .padding(.horizontal, 9)
-            .frame(height: 30)
-            .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 7))
-            .overlay {
-                RoundedRectangle(cornerRadius: 7)
-                    .stroke(Color(nsColor: .separatorColor).opacity(0.5), lineWidth: 1)
-            }
-
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 4) {
-                    if filter != .dictations {
-                        if normalizedSearch.isEmpty {
-                            sourceButton(selection: .allMeetings) {
-                                HStack(spacing: 9) {
-                                    Image(systemName: "sparkles")
-                                        .foregroundStyle(.purple)
-                                        .frame(width: 20)
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("All meetings")
-                                            .font(.callout.weight(.medium))
-                                        Text("Ask across \(meetings.count) saved meeting\(meetings.count == 1 ? "" : "s")")
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                }
-                            }
-                        }
-
-                        if !filteredMeetings.isEmpty {
-                            sectionLabel("Meetings")
-                            ForEach(filteredMeetings) { meeting in
-                                sourceButton(selection: .meeting(meeting.id)) {
-                                    meetingRow(meeting)
-                                }
-                            }
-                        }
-                    }
-
-                    if filter != .meetings, !filteredDictations.isEmpty {
-                        sectionLabel("Dictations")
-                        ForEach(filteredDictations) { item in
-                            sourceButton(selection: .dictation(item.id)) {
-                                dictationRow(item)
-                            }
-                        }
-                    }
-
-                    if hasNoSearchResults {
-                        VStack(spacing: 8) {
-                            Image(systemName: "magnifyingglass")
-                                .font(.title3)
-                                .foregroundStyle(.tertiary)
-                            Text("No matching items")
-                                .font(.callout.weight(.medium))
-                            Text("Try a different search.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 40)
-                    }
-                }
-                .frame(maxWidth: .infinity)
-            }
-
-            Divider()
-
-            sourceActions
-        }
-        .padding(12)
-        .background(Color(nsColor: .controlBackgroundColor).opacity(0.35))
-    }
-
-    private func sourceButton<Content: View>(
-        selection itemSelection: LibrarySelection,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        Button {
-            selection = itemSelection
-        } label: {
-            content()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .background(
-                    selection == itemSelection ? Color.accentColor.opacity(0.13) : .clear,
-                    in: RoundedRectangle(cornerRadius: 8)
-                )
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func sectionLabel(_ title: String) -> some View {
-        Text(title.uppercased())
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(.tertiary)
-            .padding(.horizontal, 10)
-            .padding(.top, 8)
-    }
-
-    private func meetingRow(_ meeting: MeetingRecord) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "person.2")
-                    .foregroundStyle(.secondary)
-                    .frame(width: 18)
-                Text(meeting.title)
-                    .font(.callout.weight(.medium))
-                    .lineLimit(1)
-                Spacer(minLength: 4)
-                Text(meeting.startedAt.formatted(date: .numeric, time: .omitted))
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
-            Text(meetingPreview(meeting))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-        }
-    }
-
-    private func dictationRow(_ item: TranscriptHistoryItem) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "waveform")
-                    .foregroundStyle(.secondary)
-                    .frame(width: 18)
-                Text(item.title)
-                    .font(.callout.weight(.medium))
-                    .lineLimit(1)
-                Spacer(minLength: 4)
-                Text(item.recordedAt.formatted(date: .numeric, time: .omitted))
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
-            Text(item.preview)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-        }
-    }
-
-    @ViewBuilder
-    private var sourceActions: some View {
-        HStack(spacing: 8) {
             Button {
-                history.refresh()
+                withAnimation(.easeInOut(duration: 0.16)) {
+                    isExpanded.toggle()
+                }
             } label: {
-                Image(systemName: "arrow.clockwise")
+                HStack(spacing: 9) {
+                    Image(systemName: "sparkles")
+                        .foregroundStyle(.purple)
+                    Text("Ask this meeting")
+                        .font(.callout.weight(.medium))
+                    Text("Use a preset or ask a question")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.up")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 16)
+                .frame(height: 44)
+                .contentShape(Rectangle())
             }
-            .help("Refresh library")
+            .buttonStyle(.plain)
 
-            Spacer()
-
-            switch selection {
-            case let .meeting(id):
-                Button("Open Meeting") {
-                    onOpenEvidence(id, nil)
-                }
-            case .dictation:
-                Button {
-                    history.revealSelection()
-                } label: {
-                    Image(systemName: "folder")
-                }
-                .help("Show in Finder")
-
-                Button("Open") {
-                    history.openSelected()
-                }
-
-                Button("Copy", systemImage: "doc.on.clipboard") {
-                    history.copySelected()
-                }
-                .disabled(history.selectedItem?.transcript.isEmpty != false)
-            case .allMeetings:
-                EmptyView()
+            if isExpanded {
+                Divider()
+                AIWorkspaceContent(
+                    source: .meeting(meeting),
+                    prompt: $ai.prompt,
+                    ai: ai,
+                    memory: memory,
+                    showsEmptyResult: false,
+                    compact: true,
+                    onOpenEvidence: { _, segmentID in onOpenEvidence(segmentID) },
+                    onOpenSettings: onOpenSettings
+                )
+                .padding(12)
+                .transition(.opacity)
             }
         }
+        .background(Color(nsColor: .controlBackgroundColor).opacity(0.25))
     }
+}
 
-    private var workspace: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
+struct DictationWorkspace: View {
+    @StateObject private var ai = TranscriptAIModel()
+    @StateObject private var memory = MeetingMemoryModel()
+    @State private var isAskExpanded = false
+    @State private var didCopy = false
+
+    let item: TranscriptHistoryItem
+    let onOpenSettings: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(sourceTitle)
+                    Text(item.title)
                         .font(.title3.weight(.semibold))
                         .lineLimit(1)
-                    Text(sourceDescription)
+                    Text("\(item.dateDescription) · \(wordDescription(item.transcript))")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+                Spacer(minLength: 12)
+                Button(didCopy ? "Copied" : "Copy", systemImage: didCopy ? "checkmark" : "doc.on.doc") {
+                    copyTranscript()
+                }
+                .disabled(item.transcript.isEmpty)
+                Button {
+                    NSWorkspace.shared.open(item.url)
+                } label: {
+                    Image(systemName: "arrow.up.forward.app")
+                }
+                .help("Open in default app")
+                .accessibilityLabel("Open dictation in default app")
+                Button {
+                    NSWorkspace.shared.activateFileViewerSelecting([item.url])
+                } label: {
+                    Image(systemName: "folder")
+                }
+                .help("Reveal in Finder")
+                .accessibilityLabel("Reveal dictation in Finder")
+            }
+            .padding(16)
 
-                Spacer()
+            Divider()
 
-                sourceKindLabel
+            ScrollView {
+                Text(item.transcript.isEmpty ? "No transcript was saved." : item.transcript)
+                    .font(.body)
+                    .foregroundStyle(item.transcript.isEmpty ? .secondary : .primary)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: 760, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(20)
             }
 
+            Divider()
+
+            VStack(spacing: 0) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.16)) {
+                        isAskExpanded.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 9) {
+                        Image(systemName: "sparkles")
+                            .foregroundStyle(.purple)
+                        Text("Work with this dictation")
+                            .font(.callout.weight(.medium))
+                        Text("Summarize, organize, or draft a follow-up")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Image(systemName: isAskExpanded ? "chevron.down" : "chevron.up")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 16)
+                    .frame(height: 44)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                if isAskExpanded {
+                    Divider()
+                    AIWorkspaceContent(
+                        source: .dictation(item),
+                        prompt: $ai.prompt,
+                        ai: ai,
+                        memory: memory,
+                        showsEmptyResult: false,
+                        compact: true,
+                        onOpenEvidence: { _, _ in },
+                        onOpenSettings: onOpenSettings
+                    )
+                    .padding(12)
+                    .transition(.opacity)
+                }
+            }
+            .background(Color(nsColor: .controlBackgroundColor).opacity(0.25))
+        }
+    }
+
+    private func copyTranscript() {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(item.transcript, forType: .string)
+        didCopy = true
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2))
+            didCopy = false
+        }
+    }
+
+    private func wordDescription(_ text: String) -> String {
+        let count = text.split(whereSeparator: \.isWhitespace).count
+        return "\(count) \(count == 1 ? "word" : "words")"
+    }
+}
+
+private struct AIWorkspaceContent: View {
+    let source: AIWorkspaceSource
+    @Binding var prompt: String
+    @ObservedObject var ai: TranscriptAIModel
+    @ObservedObject var memory: MeetingMemoryModel
+    let showsEmptyResult: Bool
+    let compact: Bool
+    let onOpenEvidence: (UUID, UUID?) -> Void
+    let onOpenSettings: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
             FeatureCard {
                 promptSection
             }
@@ -418,24 +318,26 @@ struct LibraryView: View {
                     .textSelection(.enabled)
             }
 
-            FeatureCard {
-                resultSection
+            if showsEmptyResult || !currentResult.isEmpty {
+                FeatureCard {
+                    resultSection
+                }
+                .frame(maxHeight: compact ? 220 : .infinity)
             }
-            .frame(maxHeight: .infinity)
         }
-        .padding(18)
-    }
-
-    private var sourceKindLabel: some View {
-        Label(sourceKind, systemImage: sourceKindSymbol)
-            .font(.caption.weight(.medium))
-            .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, maxHeight: compact ? nil : .infinity, alignment: .topLeading)
+        .onAppear {
+            ai.refreshAvailability()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .yaprflowAIProviderSettingsChanged)) { _ in
+            ai.refreshAvailability()
+        }
     }
 
     private var promptSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(selection == .allMeetings ? "Ask" : "Prompt")
+                Text(source.isAllMeetings ? "Ask" : "Prompt")
                     .font(.callout.weight(.medium))
 
                 Spacer()
@@ -443,7 +345,7 @@ struct LibraryView: View {
                 Menu("Use preset") {
                     ForEach(currentPresets) { preset in
                         Button {
-                            setCurrentPrompt(preset.prompt)
+                            prompt = preset.prompt
                         } label: {
                             Label(preset.title, systemImage: preset.systemImage)
                         }
@@ -452,22 +354,20 @@ struct LibraryView: View {
                     Divider()
 
                     Button("Reset") {
-                        if selection == .allMeetings {
-                            allMeetingsPrompt = LibraryPromptCatalog.allMeetingsDefaultPrompt
-                        } else {
-                            ai.resetPrompt()
-                        }
+                        prompt = source.isAllMeetings
+                            ? LibraryPromptCatalog.allMeetingsDefaultPrompt
+                            : TranscriptAIModel.defaultPrompt
                     }
                 }
                 .menuStyle(.borderlessButton)
                 .fixedSize()
             }
 
-            TextEditor(text: currentPromptBinding)
+            TextEditor(text: $prompt)
                 .font(.body)
                 .scrollContentBackground(.hidden)
                 .padding(7)
-                .frame(minHeight: 72, maxHeight: 92)
+                .frame(minHeight: compact ? 60 : 72, maxHeight: compact ? 76 : 92)
                 .background(.background, in: RoundedRectangle(cornerRadius: 7))
                 .overlay {
                     RoundedRectangle(cornerRadius: 7)
@@ -481,6 +381,15 @@ struct LibraryView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+
+                Button {
+                    onOpenSettings()
+                } label: {
+                    Image(systemName: "gearshape")
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help("AI settings")
 
                 Spacer()
 
@@ -497,13 +406,14 @@ struct LibraryView: View {
             }
 
             if selectedProvider.sendsTranscriptOffDevice {
-                Text("This sends the selected source and prompt to \(selectedProvider.displayName).")
+                Text("This sends the selected text and prompt to \(selectedProvider.displayName).")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
         }
     }
 
+    @ViewBuilder
     private var resultSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
@@ -523,12 +433,12 @@ struct LibraryView: View {
 
             if currentResult.isEmpty {
                 ContentUnavailableView(
-                    emptyResultTitle,
-                    systemImage: selection == .allMeetings ? "text.bubble" : "sparkles",
+                    "Ask your meetings",
+                    systemImage: "text.bubble",
                     description: Text(emptyResultDescription)
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if usesMeetingMemory {
+            } else if source.usesMeetingMemory {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         Text(memory.answer)
@@ -565,7 +475,7 @@ struct LibraryView: View {
                     .font(.body)
                     .scrollContentBackground(.hidden)
                     .padding(7)
-                    .frame(minHeight: 120, maxHeight: .infinity)
+                    .frame(minHeight: 110, maxHeight: .infinity)
                     .background(.background, in: RoundedRectangle(cornerRadius: 7))
                     .overlay {
                         RoundedRectangle(cornerRadius: 7)
@@ -577,217 +487,80 @@ struct LibraryView: View {
     }
 
     private func run() {
-        switch selection {
-        case .allMeetings:
-            memory.ask(question: allMeetingsPrompt, meetings: meetings)
-        case let .meeting(id):
-            guard let meeting = meetings.first(where: { $0.id == id }) else { return }
-            memory.ask(question: ai.prompt, meetings: [meeting], includeAllSegments: true)
-        case .dictation:
-            ai.run(transcript: selectedSourceText)
+        switch source {
+        case let .allMeetings(meetings):
+            memory.ask(question: prompt, meetings: meetings)
+        case let .meeting(meeting):
+            memory.ask(question: prompt, meetings: [meeting], includeAllSegments: true)
+        case let .dictation(item):
+            ai.run(transcript: item.transcript)
         }
     }
 
     private var selectedProvider: AIProviderKind { AIProviderSettings.shared.provider }
 
-    private var providerBadge: String {
-        switch selectedProvider {
-        case .appleIntelligence: "On-device"
-        case .openAI, .openRouter: "Cloud"
-        case .ollama: "Ollama"
-        }
-    }
-
-    private var providerBadgeSymbol: String {
-        switch selectedProvider {
-        case .appleIntelligence: "lock.fill"
-        case .openAI, .openRouter: "cloud"
-        case .ollama: "desktopcomputer"
-        }
-    }
-
     private var currentPresets: [LibraryPromptPreset] {
-        selection == .allMeetings
+        source.isAllMeetings
             ? LibraryPromptCatalog.allMeetingPresets
             : LibraryPromptCatalog.itemPresets
     }
 
     private var currentResult: String {
-        usesMeetingMemory ? memory.answer : ai.result
+        source.usesMeetingMemory ? memory.answer : ai.result
     }
 
     private var currentError: String? {
-        usesMeetingMemory ? memory.errorMessage : ai.errorMessage
+        source.usesMeetingMemory ? memory.errorMessage : ai.errorMessage
     }
 
     private var currentProgress: String? {
-        usesMeetingMemory ? memory.progressMessage : ai.processingMessage
+        source.usesMeetingMemory ? memory.progressMessage : ai.processingMessage
     }
 
     private var isRunning: Bool {
-        usesMeetingMemory ? memory.isRunning : ai.isRunning
+        source.usesMeetingMemory ? memory.isRunning : ai.isRunning
     }
 
     private var runButtonTitle: String {
-        selection == .allMeetings ? "Ask" : "Run"
+        source.isAllMeetings ? "Ask" : "Run"
     }
 
     private var runIsDisabled: Bool {
         isRunning
             || !ai.isModelAvailable
-            || currentPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            || (selection == .allMeetings ? meetings.isEmpty : selectedSourceText.isEmpty)
+            || prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !source.hasContent
     }
 
-    private var usesMeetingMemory: Bool {
-        switch selection {
+    private var emptyResultDescription: String {
+        source.hasContent
+            ? "Ask about decisions, action items, or anything discussed."
+            : "Record a meeting to get started."
+    }
+}
+
+private extension AIWorkspaceSource {
+    var isAllMeetings: Bool {
+        if case .allMeetings = self { return true }
+        return false
+    }
+
+    var usesMeetingMemory: Bool {
+        switch self {
         case .allMeetings, .meeting: true
         case .dictation: false
         }
     }
 
-    private var currentPrompt: String {
-        selection == .allMeetings ? allMeetingsPrompt : ai.prompt
-    }
-
-    private var currentPromptBinding: Binding<String> {
-        Binding(
-            get: { currentPrompt },
-            set: { setCurrentPrompt($0) }
-        )
-    }
-
-    private func setCurrentPrompt(_ prompt: String) {
-        if selection == .allMeetings {
-            allMeetingsPrompt = prompt
-        } else {
-            ai.prompt = prompt
-        }
-    }
-
-    private var sourceTitle: String {
-        switch selection {
-        case .allMeetings:
-            "All meetings"
-        case let .meeting(id):
-            meetings.first { $0.id == id }?.title ?? "Meeting"
-        case let .dictation(url):
-            history.items.first { $0.id == url }?.title ?? "Dictation"
-        }
-    }
-
-    private var sourceDescription: String {
-        switch selection {
-        case .allMeetings:
-            return "Ask across \(meetings.count) saved meeting\(meetings.count == 1 ? "" : "s") with linked sources."
-        case let .meeting(id):
-            guard let meeting = meetings.first(where: { $0.id == id }) else { return "Meeting unavailable" }
-            return "\(meeting.startedAt.formatted(date: .abbreviated, time: .shortened)) · \(wordDescription(selectedSourceText))"
-        case let .dictation(url):
-            guard let item = history.items.first(where: { $0.id == url }) else { return "Dictation unavailable" }
-            return "\(item.dateDescription) · \(wordDescription(item.transcript))"
-        }
-    }
-
-    private var sourceKind: String {
-        switch selection {
-        case .allMeetings: "Meeting memory"
-        case .meeting: "Meeting"
-        case .dictation: "Dictation"
-        }
-    }
-
-    private var sourceKindSymbol: String {
-        switch selection {
-        case .allMeetings: "person.2.wave.2"
-        case .meeting: "person.2"
-        case .dictation: "waveform"
-        }
-    }
-
-    private var selectedSourceText: String {
-        switch selection {
-        case .allMeetings:
-            return ""
-        case let .meeting(id):
-            guard let meeting = meetings.first(where: { $0.id == id }) else { return "" }
-            return meetingSource(meeting)
-        case let .dictation(url):
-            return history.items.first { $0.id == url }?.transcript ?? ""
-        }
-    }
-
-    private func meetingSource(_ meeting: MeetingRecord) -> String {
-        var sections: [String] = []
-        if !meeting.rawNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            sections.append("Notes:\n\(meeting.rawNotes)")
-        }
-        if !meeting.plainTranscript.isEmpty {
-            sections.append("Transcript:\n\(meeting.plainTranscript)")
-        }
-        return sections.joined(separator: "\n\n")
-    }
-
-    private func wordDescription(_ text: String) -> String {
-        let count = text.split(whereSeparator: \.isWhitespace).count
-        return "\(count) \(count == 1 ? "word" : "words")"
-    }
-
-    private func meetingPreview(_ meeting: MeetingRecord) -> String {
-        if let overview = meeting.generatedNotes?.overview, !overview.isEmpty { return overview }
-        if !meeting.rawNotes.isEmpty { return meeting.rawNotes }
-        return meeting.transcript.first?.text ?? "No transcript"
-    }
-
-    private var filteredMeetings: [MeetingRecord] {
-        let query = normalizedSearch
-        guard !query.isEmpty else { return meetings }
-        return meetings.filter { meeting in
-            meeting.title.localizedCaseInsensitiveContains(query)
-                || meeting.rawNotes.localizedCaseInsensitiveContains(query)
-                || meeting.plainTranscript.localizedCaseInsensitiveContains(query)
-                || meeting.generatedNotes?.overview.localizedCaseInsensitiveContains(query) == true
-        }
-    }
-
-    private var filteredDictations: [TranscriptHistoryItem] {
-        let query = normalizedSearch
-        guard !query.isEmpty else { return history.items }
-        return history.items.filter { item in
-            item.title.localizedCaseInsensitiveContains(query)
-                || item.topic?.localizedCaseInsensitiveContains(query) == true
-                || item.generatedDescription?.localizedCaseInsensitiveContains(query) == true
-                || item.transcript.localizedCaseInsensitiveContains(query)
-        }
-    }
-
-    private var normalizedSearch: String {
-        search.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private var hasNoSearchResults: Bool {
-        guard !normalizedSearch.isEmpty else { return false }
-        return switch filter {
-        case .all: filteredMeetings.isEmpty && filteredDictations.isEmpty
-        case .meetings: filteredMeetings.isEmpty
-        case .dictations: filteredDictations.isEmpty
-        }
-    }
-
-    private var emptyResultTitle: String {
-        selection == .allMeetings ? "Ask your meetings" : "Ready when you are"
-    }
-
-    private var emptyResultDescription: String {
-        switch selection {
-        case .allMeetings:
-            meetings.isEmpty
-                ? "Record a meeting to get started."
-                : "Ask about decisions, action items, or anything discussed."
-        case .meeting:
-            "Use a preset or enter a prompt for this meeting."
-        case .dictation:
-            "Use a preset or enter a prompt for this dictation."
+    var hasContent: Bool {
+        switch self {
+        case let .allMeetings(meetings):
+            !meetings.isEmpty
+        case let .meeting(meeting):
+            !meeting.rawNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                || !meeting.transcript.isEmpty
+        case let .dictation(item):
+            !item.transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }
     }
 }

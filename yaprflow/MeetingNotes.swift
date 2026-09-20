@@ -3,25 +3,32 @@ import Combine
 import SwiftUI
 
 enum MeetingNotesDestination: String, CaseIterable {
-    case meetings = "Meetings"
-    case library = "Library"
+    case workspace = "Workspace"
     case settings = "Settings"
+}
+
+enum MeetingWorkspaceSelection: Hashable {
+    case liveMeeting
+    case allMeetings
+    case meeting(UUID)
+    case dictation(URL)
 }
 
 @MainActor
 private final class MeetingNotesNavigation: ObservableObject {
     static let shared = MeetingNotesNavigation()
-    @Published var destination: MeetingNotesDestination = .meetings
+    @Published var destination: MeetingNotesDestination = .workspace
+    @Published var selection: MeetingWorkspaceSelection = .liveMeeting
 }
 
 struct MeetingNotesView: View {
+    @ObservedObject private var appState = AppState.shared
     @ObservedObject private var store = MeetingStore.shared
     @ObservedObject private var session = MeetingSessionController.shared
     @ObservedObject private var navigation = MeetingNotesNavigation.shared
+    @StateObject private var history = TranscriptHistoryModel()
     @State private var search = ""
-    @State private var selectedMeetingID: UUID?
     @State private var selectedEvidenceID: UUID?
-    @State private var showsLiveWorkspace = true
     @State private var meetingPendingDeletion: MeetingRecord?
 
     var body: some View {
@@ -30,24 +37,13 @@ struct MeetingNotesView: View {
             Divider()
 
             switch navigation.destination {
-            case .meetings:
+            case .workspace:
                 HSplitView {
                     sidebar
-                        .frame(minWidth: 220, idealWidth: 250, maxWidth: 290)
+                        .frame(minWidth: 230, idealWidth: 260, maxWidth: 300)
                     detail
                         .frame(minWidth: 560, maxWidth: .infinity, maxHeight: .infinity)
                 }
-            case .library:
-                LibraryView(
-                    meetings: store.meetings,
-                    onOpenEvidence: { meetingID, segmentID in
-                        selectedMeetingID = meetingID
-                        selectedEvidenceID = segmentID
-                        showsLiveWorkspace = false
-                        navigation.destination = .meetings
-                    },
-                    onOpenSettings: { navigation.destination = .settings }
-                )
             case .settings:
                 SettingsView()
             }
@@ -56,10 +52,33 @@ struct MeetingNotesView: View {
         .background(Color(nsColor: .windowBackgroundColor))
         .onAppear {
             store.refresh()
+            history.refresh()
+            TranscriptMetadataEnricher.shared.enqueueMissingTranscripts()
             Telemetry.shared.track(.featureOpened(telemetryFeature(for: navigation.destination)))
         }
         .onReceive(NotificationCenter.default.publisher(for: .yaprflowMeetingsChanged)) { _ in
             store.refresh()
+        }
+        .onChange(of: appState.lastTranscript) { _, _ in
+            history.refresh()
+        }
+        .onChange(of: navigation.selection) { _, selection in
+            if case .meeting = selection {
+                // Evidence is cleared by direct sidebar navigation and kept
+                // when an AI source link opens a specific transcript segment.
+            } else {
+                selectedEvidenceID = nil
+            }
+            if case let .dictation(url) = selection {
+                history.selection = url
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .yaprflowTranscriptArchiveChanged)) { notification in
+            if let change = notification.object as? TranscriptArchiveChange,
+               navigation.selection == .dictation(change.oldURL) {
+                navigation.selection = .dictation(change.newURL)
+            }
+            history.handleArchiveChange(notification)
         }
         .onChange(of: navigation.destination) { _, destination in
             Telemetry.shared.track(.featureOpened(telemetryFeature(for: destination)))
@@ -97,15 +116,8 @@ struct MeetingNotesView: View {
 
     private var header: some View {
         HStack(spacing: 14) {
-            Text("Yaprflow")
+            Text(navigation.destination == .settings ? "Settings" : "Yaprflow")
                 .font(.title2.weight(.semibold))
-
-            Picker("Workspace", selection: $navigation.destination) {
-                ForEach(MeetingNotesDestination.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-            }
-            .labelsHidden()
-            .pickerStyle(.segmented)
-            .frame(width: 300)
 
             Spacer()
 
@@ -116,17 +128,24 @@ struct MeetingNotesView: View {
                     .accessibilityLabel(session.isPaused ? "Meeting capture paused" : "Meeting capture recording")
             }
 
-            if navigation.destination == .meetings {
-                Button("New", systemImage: "plus") {
-                    session.prepare()
-                    showsLiveWorkspace = true
-                    selectedMeetingID = nil
-                    selectedEvidenceID = nil
-                    navigation.destination = .meetings
+            if navigation.destination == .workspace {
+                Button("New Meeting", systemImage: "plus") { startNewMeeting() }
+                    .disabled(session.phase.isCapturing)
+                    .keyboardShortcut("n", modifiers: [.command, .shift])
+                    .help("New meeting (Shift-Command-N)")
+
+                Button {
+                    navigation.destination = .settings
+                } label: {
+                    Image(systemName: "gearshape")
                 }
-                .disabled(session.phase.isCapturing)
-                .keyboardShortcut("n", modifiers: [.command, .shift])
-                .help("New meeting (Shift-Command-N)")
+                .help("Settings")
+                .accessibilityLabel("Open Settings")
+            } else {
+                Button("Done") {
+                    navigation.destination = .workspace
+                }
+                .keyboardShortcut(.cancelAction)
             }
         }
         .padding(.horizontal, 18)
@@ -138,7 +157,7 @@ struct MeetingNotesView: View {
             HStack(spacing: 7) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
-                TextField("Search meetings", text: $search)
+                TextField("Search notes", text: $search)
                     .textFieldStyle(.plain)
                 if !search.isEmpty {
                     Button {
@@ -159,42 +178,49 @@ struct MeetingNotesView: View {
                     .stroke(Color(nsColor: .separatorColor).opacity(0.5), lineWidth: 1)
             }
 
-            HStack {
-                Text("Meetings")
-                    .font(.headline)
-                Spacer()
-                Text(search.isEmpty ? "\(store.meetings.count)" : "\(filteredMeetings.count) found")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            if filteredMeetings.isEmpty {
-                VStack(spacing: 8) {
-                    Image(systemName: search.isEmpty ? "person.2.wave.2" : "magnifyingglass")
-                        .font(.title3)
-                        .foregroundStyle(.tertiary)
-                    Text(search.isEmpty ? "Your saved meetings will appear here." : "No meetings match your search.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding()
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 4) {
-                        ForEach(filteredMeetings) { meeting in
-                            Button {
-                                selectedMeetingID = meeting.id
-                                selectedEvidenceID = nil
-                                showsLiveWorkspace = false
-                            } label: {
-                                SavedMeetingRow(
-                                    meeting: meeting,
-                                    isSelected: !showsLiveWorkspace && selectedMeetingID == meeting.id
-                                )
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 4) {
+                    if showsCurrentMeeting {
+                        sourceButton(selection: .liveMeeting) {
+                            HStack(spacing: 9) {
+                                Image(systemName: session.phase.isCapturing ? "record.circle.fill" : "person.2.wave.2")
+                                    .foregroundStyle(session.phase.isCapturing ? .red : .blue)
+                                    .frame(width: 20)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(currentMeetingLabel)
+                                        .font(.callout.weight(.medium))
+                                    Text(session.meeting.title)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                }
                             }
-                            .buttonStyle(.plain)
+                        }
+                    }
+
+                    if normalizedSearch.isEmpty {
+                        sourceButton(selection: .allMeetings) {
+                            HStack(spacing: 9) {
+                                Image(systemName: "sparkles")
+                                    .foregroundStyle(.purple)
+                                    .frame(width: 20)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Ask all meetings")
+                                        .font(.callout.weight(.medium))
+                                    Text("Find decisions, actions, and context")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+
+                    if !filteredMeetings.isEmpty {
+                        sectionLabel("Meetings", count: filteredMeetings.count)
+                        ForEach(filteredMeetings) { meeting in
+                            sourceButton(selection: .meeting(meeting.id)) {
+                                SavedMeetingRow(meeting: meeting)
+                            }
                             .accessibilityLabel("Open \(meeting.title)")
                             .contextMenu {
                                 Button("Delete Meeting", systemImage: "trash", role: .destructive) {
@@ -203,44 +229,220 @@ struct MeetingNotesView: View {
                             }
                         }
                     }
+
+                    if !filteredDictations.isEmpty {
+                        sectionLabel("Dictations", count: filteredDictations.count)
+                        ForEach(filteredDictations) { item in
+                            sourceButton(selection: .dictation(item.id)) {
+                                DictationRow(item: item)
+                            }
+                            .contextMenu {
+                                Button("Copy Transcript", systemImage: "doc.on.clipboard") {
+                                    copyDictation(item)
+                                }
+                                Button("Open in Default App", systemImage: "arrow.up.forward.app") {
+                                    NSWorkspace.shared.open(item.url)
+                                }
+                                Button("Reveal in Finder", systemImage: "folder") {
+                                    NSWorkspace.shared.activateFileViewerSelecting([item.url])
+                                }
+                            }
+                        }
+                    }
+
+                    if hasNoSearchResults {
+                        VStack(spacing: 8) {
+                            Image(systemName: "magnifyingglass")
+                                .font(.title3)
+                                .foregroundStyle(.tertiary)
+                            Text("No matching notes")
+                                .font(.callout.weight(.medium))
+                            Text("Try a different search.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 40)
+                    } else if normalizedSearch.isEmpty && store.meetings.isEmpty && history.items.isEmpty {
+                        VStack(spacing: 8) {
+                            Image(systemName: "waveform")
+                                .font(.title3)
+                                .foregroundStyle(.tertiary)
+                            Text("Your meetings and dictations will appear here.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 32)
+                    }
                 }
+                .frame(maxWidth: .infinity)
             }
         }
         .padding(12)
         .background(Color(nsColor: .controlBackgroundColor).opacity(0.35))
     }
 
+    private func sourceButton<Content: View>(
+        selection: MeetingWorkspaceSelection,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        Button {
+            selectedEvidenceID = nil
+            navigation.selection = selection
+        } label: {
+            content()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 7)
+                .background(
+                    navigation.selection == selection ? Color.accentColor.opacity(0.13) : .clear,
+                    in: RoundedRectangle(cornerRadius: 8)
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func sectionLabel(_ title: String, count: Int) -> some View {
+        HStack {
+            Text(title.uppercased())
+            Spacer()
+            Text("\(count)")
+        }
+        .font(.caption2.weight(.semibold))
+        .foregroundStyle(.tertiary)
+        .padding(.horizontal, 8)
+        .padding(.top, 10)
+    }
+
     @ViewBuilder
     private var detail: some View {
-        if showsLiveWorkspace {
+        switch navigation.selection {
+        case .liveMeeting:
             LiveMeetingWorkspace(session: session)
-        } else if let id = selectedMeetingID, let meeting = store.meeting(id: id) {
-            SavedMeetingView(
-                initialMeeting: meeting,
-                initialEvidenceID: selectedEvidenceID,
-                onDelete: { meetingPendingDeletion = $0 }
+        case .allMeetings:
+            AllMeetingsWorkspace(
+                meetings: store.meetings,
+                onOpenEvidence: openEvidence,
+                onOpenSettings: { navigation.destination = .settings }
             )
-                .id("\(meeting.id.uuidString)-\(selectedEvidenceID?.uuidString ?? "none")")
-        } else {
-            ContentUnavailableView(
-                "Choose a meeting",
-                systemImage: "person.2.wave.2",
-                description: Text("Select a saved meeting or start a new one.")
-            )
+        case let .meeting(id):
+            if let meeting = store.meeting(id: id) {
+                SavedMeetingView(
+                    initialMeeting: meeting,
+                    initialEvidenceID: selectedEvidenceID,
+                    onDelete: { meetingPendingDeletion = $0 },
+                    onOpenSettings: { navigation.destination = .settings }
+                )
+                .id(meeting.id)
+            } else {
+                ContentUnavailableView(
+                    "Meeting unavailable",
+                    systemImage: "person.2.slash",
+                    description: Text("Choose another meeting from the sidebar.")
+                )
+            }
+        case let .dictation(url):
+            if let item = history.items.first(where: { $0.id == url }) {
+                DictationWorkspace(
+                    item: item,
+                    onOpenSettings: { navigation.destination = .settings }
+                )
+                .id(item.id)
+            } else {
+                ContentUnavailableView(
+                    "Dictation unavailable",
+                    systemImage: "waveform.slash",
+                    description: Text("Choose another dictation from the sidebar.")
+                )
+            }
         }
     }
 
+    private func openEvidence(_ meetingID: UUID, _ segmentID: UUID?) {
+        selectedEvidenceID = segmentID
+        navigation.selection = .meeting(meetingID)
+    }
+
+    private func startNewMeeting() {
+        session.prepare()
+        selectedEvidenceID = nil
+        navigation.destination = .workspace
+        navigation.selection = .liveMeeting
+    }
+
     private var filteredMeetings: [MeetingRecord] {
-        let trimmed = search.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return store.meetings }
-        let ids = Set(MeetingSearchIndex.search(trimmed, in: store.meetings).map(\.meetingID))
-        return store.meetings.filter { ids.contains($0.id) }
+        let query = normalizedSearch
+        let savedMeetings = store.meetings.filter { $0.id != session.meeting.id }
+        guard !query.isEmpty else { return savedMeetings }
+        return savedMeetings.filter { meeting in
+            meeting.title.localizedCaseInsensitiveContains(query)
+                || meeting.rawNotes.localizedCaseInsensitiveContains(query)
+                || meeting.plainTranscript.localizedCaseInsensitiveContains(query)
+                || meeting.generatedNotes?.overview.localizedCaseInsensitiveContains(query) == true
+        }
+    }
+
+    private var filteredDictations: [TranscriptHistoryItem] {
+        let query = normalizedSearch
+        guard !query.isEmpty else { return history.items }
+        return history.items.filter { item in
+            item.title.localizedCaseInsensitiveContains(query)
+                || item.topic?.localizedCaseInsensitiveContains(query) == true
+                || item.generatedDescription?.localizedCaseInsensitiveContains(query) == true
+                || item.transcript.localizedCaseInsensitiveContains(query)
+        }
+    }
+
+    private var normalizedSearch: String {
+        search.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var showsCurrentMeeting: Bool {
+        normalizedSearch.isEmpty || currentMeetingMatchesSearch
+    }
+
+    private var currentMeetingMatchesSearch: Bool {
+        let query = normalizedSearch
+        guard !query.isEmpty else { return true }
+        return session.meeting.title.localizedCaseInsensitiveContains(query)
+            || session.meeting.rawNotes.localizedCaseInsensitiveContains(query)
+            || session.meeting.plainTranscript.localizedCaseInsensitiveContains(query)
+            || session.meeting.generatedNotes?.overview.localizedCaseInsensitiveContains(query) == true
+    }
+
+    private var currentMeetingLabel: String {
+        switch session.phase {
+        case .preparing, .recording, .paused:
+            "Live meeting"
+        case .finalizing:
+            "Finishing meeting"
+        case .complete, .failed:
+            "Recent meeting"
+        case .idle:
+            "New meeting"
+        }
+    }
+
+    private var hasNoSearchResults: Bool {
+        !normalizedSearch.isEmpty
+            && !currentMeetingMatchesSearch
+            && filteredMeetings.isEmpty
+            && filteredDictations.isEmpty
+    }
+
+    private func copyDictation(_ item: TranscriptHistoryItem) {
+        guard !item.transcript.isEmpty else { return }
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(item.transcript, forType: .string)
     }
 
     private func telemetryFeature(for destination: MeetingNotesDestination) -> TelemetryFeature {
         switch destination {
-        case .meetings: .meetingNotes
-        case .library: .history
+        case .workspace: .meetingNotes
         case .settings: .settings
         }
     }
@@ -248,21 +450,50 @@ struct MeetingNotesView: View {
     private func delete(_ meeting: MeetingRecord) {
         meetingPendingDeletion = nil
         guard store.delete(meeting) else { return }
-        if selectedMeetingID == meeting.id {
-            selectedMeetingID = nil
+        if navigation.selection == .meeting(meeting.id) {
             selectedEvidenceID = nil
-            showsLiveWorkspace = false
+            navigation.selection = .liveMeeting
+        }
+    }
+}
+
+private struct DictationRow: View {
+    let item: TranscriptHistoryItem
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Image(systemName: "waveform")
+                    .foregroundStyle(.secondary)
+                    .frame(width: 18)
+                Text(item.title)
+                    .font(.callout.weight(.medium))
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                Text(item.recordedAt.formatted(date: .omitted, time: .shortened))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            Text(item.recordedAt.formatted(date: .abbreviated, time: .omitted))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            Text(item.preview)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
         }
     }
 }
 
 private struct SavedMeetingRow: View {
     let meeting: MeetingRecord
-    let isSelected: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Image(systemName: "person.2")
+                    .foregroundStyle(.secondary)
+                    .frame(width: 18)
                 Text(meeting.title)
                     .font(.callout.weight(.medium))
                     .lineLimit(1)
@@ -280,12 +511,6 @@ private struct SavedMeetingRow: View {
                 .lineLimit(2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(9)
-        .background(
-            isSelected ? Color.accentColor.opacity(0.16) : Color.clear,
-            in: RoundedRectangle(cornerRadius: 8)
-        )
-        .contentShape(Rectangle())
     }
 
     private var preview: String {
@@ -559,15 +784,18 @@ private struct SavedMeetingView: View {
     @State private var generationMessage: String?
     @State private var generationError: String?
     let onDelete: (MeetingRecord) -> Void
+    let onOpenSettings: () -> Void
 
     init(
         initialMeeting: MeetingRecord,
         initialEvidenceID: UUID? = nil,
-        onDelete: @escaping (MeetingRecord) -> Void
+        onDelete: @escaping (MeetingRecord) -> Void,
+        onOpenSettings: @escaping () -> Void
     ) {
         _meeting = State(initialValue: initialMeeting)
         _selectedEvidenceID = State(initialValue: initialEvidenceID)
         self.onDelete = onDelete
+        self.onOpenSettings = onOpenSettings
     }
 
     var body: some View {
@@ -618,6 +846,16 @@ private struct SavedMeetingView: View {
                 generationMessage: generationMessage,
                 generationError: generationError,
                 onGenerate: regenerate
+            )
+
+            Divider()
+
+            MeetingAskPanel(
+                meeting: meeting,
+                onOpenEvidence: { segmentID in
+                    selectedEvidenceID = segmentID
+                },
+                onOpenSettings: onOpenSettings
             )
         }
         .sheet(isPresented: $isEditing) {
@@ -1034,16 +1272,22 @@ enum MeetingNotesWindowController {
     }
 
     static func show(
-        _ destination: MeetingNotesDestination = .meetings,
+        _ destination: MeetingNotesDestination = .workspace,
+        selection: MeetingWorkspaceSelection? = nil,
         calendarMeeting: CalendarMeeting? = nil
     ) {
         MeetingNotesNavigation.shared.destination = destination
+        if let selection {
+            MeetingNotesNavigation.shared.selection = selection
+        }
         if let calendarMeeting {
             MeetingSessionController.shared.prepare(calendarMeeting: calendarMeeting)
+            MeetingNotesNavigation.shared.selection = .liveMeeting
         }
         window.show()
     }
 
     static var isVisibleForSmokeTest: Bool { window.isVisibleForSmokeTest }
     static var destinationForSmokeTest: MeetingNotesDestination { MeetingNotesNavigation.shared.destination }
+    static var selectionForSmokeTest: MeetingWorkspaceSelection { MeetingNotesNavigation.shared.selection }
 }

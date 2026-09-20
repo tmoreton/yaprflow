@@ -64,18 +64,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             Task { @MainActor in
                 try? await Task.sleep(for: .milliseconds(350))
                 let windowPassed = MeetingNotesWindowController.isVisibleForSmokeTest
-                MeetingNotesWindowController.show(.library)
+                MeetingNotesWindowController.show(.workspace, selection: .allMeetings)
                 try? await Task.sleep(for: .milliseconds(200))
-                let libraryPassed = MeetingNotesWindowController.isVisibleForSmokeTest
-                    && MeetingNotesWindowController.destinationForSmokeTest == .library
+                let workspacePassed = MeetingNotesWindowController.isVisibleForSmokeTest
+                    && MeetingNotesWindowController.destinationForSmokeTest == .workspace
+                    && MeetingNotesWindowController.selectionForSmokeTest == .allMeetings
                 MeetingNotesWindowController.show(.settings)
                 try? await Task.sleep(for: .milliseconds(200))
                 let settingsPassed = MeetingNotesWindowController.isVisibleForSmokeTest
                     && MeetingNotesWindowController.destinationForSmokeTest == .settings
-                MeetingNotesWindowController.show(.meetings)
+                MeetingNotesWindowController.show(.workspace, selection: .liveMeeting)
                 let persistencePassed = MeetingStore.runPersistenceSmokeTest()
-                let passed = windowPassed && libraryPassed && settingsPassed && persistencePassed
-                let output = "YAPRFLOW_MEETING_NOTES_SMOKE_TEST=\(passed ? "PASS" : "FAIL") window=\(windowPassed) library=\(libraryPassed) settings=\(settingsPassed) persistence=\(persistencePassed)\n"
+                let passed = windowPassed && workspacePassed && settingsPassed && persistencePassed
+                let output = "YAPRFLOW_MEETING_NOTES_SMOKE_TEST=\(passed ? "PASS" : "FAIL") window=\(windowPassed) workspace=\(workspacePassed) settings=\(settingsPassed) persistence=\(persistencePassed)\n"
                 FileHandle.standardOutput.write(Data(output.utf8))
                 NSApp.terminate(nil)
             }
@@ -339,9 +340,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let historyItem = NSMenuItem()
         historyItem.view = IconActionMenuItemView(
             symbolName: "books.vertical",
-            title: "Library",
+            title: "Notes & Dictations",
             target: self,
-            action: #selector(showLibrary),
+            action: #selector(showNotesAndDictations),
             isEnabled: { true }
         )
         menu.addItem(historyItem)
@@ -365,11 +366,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func showMeetingNotes() {
-        MeetingNotesWindowController.show()
+        MeetingNotesWindowController.show(.workspace, selection: .liveMeeting)
     }
 
-    @objc private func showLibrary() {
-        MeetingNotesWindowController.show(.library)
+    @objc private func showNotesAndDictations() {
+        MeetingNotesWindowController.show(.workspace)
     }
 
     @objc private func showSettings() {
@@ -386,7 +387,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         GlobalHotkey.onMeetingNotesFire = {
             Task { @MainActor in
                 log.info("Meeting Notes hotkey activated")
-                MeetingNotesWindowController.show()
+                MeetingNotesWindowController.show(.workspace, selection: .liveMeeting)
             }
         }
 
