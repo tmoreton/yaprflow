@@ -379,6 +379,7 @@ verify_app_store_signature() {
     require_plist_value "$entitlements_plist" com.apple.security.app-sandbox "true"
     require_plist_value "$entitlements_plist" com.apple.security.device.audio-input "true"
     require_plist_value "$entitlements_plist" com.apple.security.network.client "true"
+    require_plist_value "$entitlements_plist" com.apple.security.personal-information.calendars "true"
 
     actual_entitlement_keys="$(
         /usr/libexec/PlistBuddy -c Print "$entitlements_plist" \
@@ -399,6 +400,7 @@ verify_app_store_signature() {
             com.apple.security.app-sandbox \
             com.apple.security.device.audio-input \
             com.apple.security.network.client \
+            com.apple.security.personal-information.calendars \
             | LC_ALL=C sort
     )"
     if [[ "$actual_entitlement_keys" != "$expected_entitlement_keys" ]]; then
@@ -435,6 +437,7 @@ verify_provisioning_profile() {
     require_plist_value "$profile_plist" Platform:0 "OSX"
     require_plist_value "$profile_plist" Entitlements:com.apple.application-identifier "$EXPECTED_APPLICATION_ID"
     require_plist_value "$profile_plist" Entitlements:com.apple.developer.team-identifier "$EXPECTED_TEAM_ID"
+    require_plist_value "$profile_plist" Entitlements:com.apple.security.personal-information.calendars "true"
 
     expiration="$(plist_raw "$profile_plist" ExpirationDate || true)"
     [[ -n "$expiration" ]] || fail "the provisioning profile has no expiration date"
