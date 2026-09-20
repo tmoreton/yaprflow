@@ -289,15 +289,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         )
         menu.addItem(transcribeItem)
 
-        let meetingItem = NSMenuItem(
-            title: MeetingSessionController.shared.isRecording ? "Stop Meeting" : "Meeting Notes…",
+        let meetingIsRecording = MeetingSessionController.shared.isRecording
+        let meetingItem = NSMenuItem()
+        meetingItem.view = IconActionMenuItemView(
+            symbolName: meetingIsRecording ? "stop.circle.fill" : "person.2.wave.2",
+            title: meetingIsRecording ? "Stop Meeting" : "Meeting Notes…",
+            target: self,
             action: #selector(showMeetingNotes),
-            keyEquivalent: ""
-        )
-        meetingItem.target = self
-        meetingItem.image = NSImage(
-            systemSymbolName: "person.2.wave.2",
-            accessibilityDescription: "Meeting Notes"
+            isEnabled: { true }
         )
         menu.addItem(meetingItem)
 
