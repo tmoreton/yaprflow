@@ -64,11 +64,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             Task { @MainActor in
                 try? await Task.sleep(for: .milliseconds(350))
                 let windowPassed = MeetingNotesWindowController.isVisibleForSmokeTest
-                MeetingNotesWindowController.show(.workspace, selection: .allMeetings)
+                MeetingNotesWindowController.show(.workspace, selection: .liveMeeting)
                 try? await Task.sleep(for: .milliseconds(200))
                 let workspacePassed = MeetingNotesWindowController.isVisibleForSmokeTest
                     && MeetingNotesWindowController.destinationForSmokeTest == .workspace
-                    && MeetingNotesWindowController.selectionForSmokeTest == .allMeetings
+                    && MeetingNotesWindowController.selectionForSmokeTest == .liveMeeting
                 MeetingNotesWindowController.show(.settings)
                 try? await Task.sleep(for: .milliseconds(200))
                 let settingsPassed = MeetingNotesWindowController.isVisibleForSmokeTest

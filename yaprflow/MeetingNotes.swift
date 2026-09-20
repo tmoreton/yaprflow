@@ -9,7 +9,6 @@ enum MeetingNotesDestination: String, CaseIterable {
 
 enum MeetingWorkspaceSelection: Hashable {
     case liveMeeting
-    case allMeetings
     case meeting(UUID)
     case dictation(URL)
 }
@@ -116,6 +115,12 @@ struct MeetingNotesView: View {
 
     private var header: some View {
         HStack(spacing: 14) {
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .interpolation(.high)
+                .frame(width: 30, height: 30)
+                .accessibilityHidden(true)
+
             Text(navigation.destination == .settings ? "Settings" : "Yaprflow")
                 .font(.title2.weight(.semibold))
 
@@ -198,23 +203,6 @@ struct MeetingNotesView: View {
                         }
                     }
 
-                    if normalizedSearch.isEmpty {
-                        sourceButton(selection: .allMeetings) {
-                            HStack(spacing: 9) {
-                                Image(systemName: "sparkles")
-                                    .foregroundStyle(.purple)
-                                    .frame(width: 20)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Ask all meetings")
-                                        .font(.callout.weight(.medium))
-                                    Text("Find decisions, actions, and context")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                    }
-
                     if !filteredMeetings.isEmpty {
                         sectionLabel("Meetings", count: filteredMeetings.count)
                         ForEach(filteredMeetings) { meeting in
@@ -263,7 +251,10 @@ struct MeetingNotesView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 40)
-                    } else if normalizedSearch.isEmpty && store.meetings.isEmpty && history.items.isEmpty {
+                    } else if normalizedSearch.isEmpty
+                                && !showsCurrentMeeting
+                                && store.meetings.isEmpty
+                                && history.items.isEmpty {
                         VStack(spacing: 8) {
                             Image(systemName: "waveform")
                                 .font(.title3)
@@ -322,12 +313,6 @@ struct MeetingNotesView: View {
         switch navigation.selection {
         case .liveMeeting:
             LiveMeetingWorkspace(session: session)
-        case .allMeetings:
-            AllMeetingsWorkspace(
-                meetings: store.meetings,
-                onOpenEvidence: openEvidence,
-                onOpenSettings: { navigation.destination = .settings }
-            )
         case let .meeting(id):
             if let meeting = store.meeting(id: id) {
                 SavedMeetingView(
@@ -401,7 +386,15 @@ struct MeetingNotesView: View {
     }
 
     private var showsCurrentMeeting: Bool {
-        normalizedSearch.isEmpty || currentMeetingMatchesSearch
+        hasCurrentMeeting && (normalizedSearch.isEmpty || currentMeetingMatchesSearch)
+    }
+
+    private var hasCurrentMeeting: Bool {
+        session.phase != .idle
+            || session.meeting.endedAt != nil
+            || !session.meeting.transcript.isEmpty
+            || !session.meeting.rawNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || session.meeting.title != "New meeting"
     }
 
     private var currentMeetingMatchesSearch: Bool {
@@ -428,7 +421,7 @@ struct MeetingNotesView: View {
 
     private var hasNoSearchResults: Bool {
         !normalizedSearch.isEmpty
-            && !currentMeetingMatchesSearch
+            && !showsCurrentMeeting
             && filteredMeetings.isEmpty
             && filteredDictations.isEmpty
     }
@@ -1264,7 +1257,7 @@ private struct TranscriptSegmentRow: View {
 @MainActor
 enum MeetingNotesWindowController {
     private static let window = FeatureWindowController(
-        title: "Yaprflow",
+        title: "",
         contentSize: NSSize(width: 980, height: 680),
         minimumSize: NSSize(width: 820, height: 580)
     ) {
