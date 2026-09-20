@@ -24,13 +24,29 @@ enum MeetingAIService {
         let template = MeetingTemplateCatalog.template(id: meeting.templateID)
         let task = MeetingPromptBuilder.generationInstructions(for: meeting, template: template)
         let source = MeetingPromptBuilder.sourceTranscript(for: meeting)
-        let response = try await generate(prompt: task, source: source, progress: progress)
+        let provider = AIProviderSettings.shared.provider
+        let tracksRequest = AIProviderSettings.shared.isConfigured
+        if tracksRequest { Telemetry.shared.track(.aiSummaryStarted(provider)) }
+        let response: String
         do {
-            return try MeetingGeneratedNotesParser.parse(
+            response = try await generate(prompt: task, source: source, progress: progress)
+        } catch {
+            if tracksRequest {
+                Telemetry.shared.track(.aiSummaryFailed(provider, telemetryFailure(for: error)))
+            }
+            throw error
+        }
+        do {
+            let notes = try MeetingGeneratedNotesParser.parse(
                 response,
                 validSegmentIDs: Set(meeting.transcript.map(\.id))
             )
+            if tracksRequest { Telemetry.shared.track(.aiSummaryCompleted(provider)) }
+            return notes
         } catch {
+            if tracksRequest {
+                Telemetry.shared.track(.aiSummaryFailed(provider, .invalidResponse))
+            }
             throw MeetingAIError.invalidStructuredResponse
         }
     }
@@ -71,5 +87,27 @@ enum MeetingAIService {
             configuration: try settings.configuration(),
             progress: progress
         )
+    }
+
+    private static func telemetryFailure(for error: Error) -> TelemetryFailure {
+        if error is DecodingError {
+            return .invalidResponse
+        }
+        if let providerError = error as? AIProviderError {
+            switch providerError {
+            case let .httpStatus(status, _):
+                if status == 401 || status == 403 { return .authentication }
+                if status == 429 { return .rateLimit }
+                return .provider
+            case .invalidResponse, .emptyResponse, .truncatedResponse:
+                return .invalidResponse
+            case .ollamaUnavailable:
+                return .network
+            case .missingModel, .missingAPIKey, .unsupportedProvider:
+                return .provider
+            }
+        }
+        if error is URLError { return .network }
+        return .other
     }
 }

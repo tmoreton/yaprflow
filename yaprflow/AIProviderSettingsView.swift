@@ -17,7 +17,7 @@ struct AIProviderSettingsView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("AI provider")
                         .font(.callout.weight(.medium))
-                    Text("Choose what runs AI Summary and transcript titles.")
+                    Text("Choose what creates meeting summaries and transcript titles.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -36,7 +36,7 @@ struct AIProviderSettingsView: View {
 
             switch settings.provider {
             case .appleIntelligence:
-                Text("Runs on supported Macs with Apple Intelligence enabled. Transcripts stay on this device for AI Summary and automatic archive titles.")
+                Text("Runs on supported Macs with Apple Intelligence enabled. Meeting transcripts stay on this device when creating summaries and automatic archive titles.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             case .openAI, .openRouter:
@@ -119,7 +119,7 @@ struct AIProviderSettingsView: View {
             .font(.caption)
             .foregroundStyle(.secondary)
 
-            Text("Running AI Summary sends the selected transcript and prompt to \(settings.provider.displayName). Your provider may charge for requests. Yaprflow does not receive your key or transcript.")
+            Text("Generating meeting notes sends that meeting's transcript and notes to \(settings.provider.displayName). Your provider may charge for requests. Yaprflow does not receive your key or transcript.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

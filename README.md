@@ -10,9 +10,9 @@
 Yaprflow is the voice and AI productivity app planned for a privacy-first
 software bundle. The Mac app records microphone input, transcribes speech locally,
 copies the finished text to the clipboard, and keeps a local Markdown
-archive. Long-form dictation can be turned into summaries, structured notes,
-or other useful text with Apple's on-device model, your own OpenAI or
-OpenRouter key, or Ollama running on your Mac.
+archive. Meeting Notes turns conversations into structured summaries with
+Apple's on-device model, your own OpenAI or OpenRouter key, or Ollama running
+on your Mac.
 
 Meeting Notes is a separate Mac workflow that captures microphone and system
 audio without a meeting bot, transcribes both locally as Me and Them, combines
@@ -51,10 +51,10 @@ licensed noncommercial builds.
   wording more closely.
 - **Local vocabulary**: deterministic phrase replacements for names, acronyms,
   product terms, and preferred spellings.
-- **AI Summary**: summarize, rewrite, structure, or transform the latest or
-  any saved transcript with a custom prompt. Use Apple Intelligence on a
-  supported Mac, your own OpenAI or OpenRouter key, or local Ollama. Long
-  transcripts are divided and recombined automatically.
+- **Integrated meeting summaries**: finished meetings become one clean document
+  with key points, decisions, action items, personal notes, evidence links, and
+  a collapsed transcript. Use Apple Intelligence on a supported Mac, your own
+  OpenAI or OpenRouter key, or local Ollama.
 - **Smart Markdown archive**: each completed Mac transcript is saved locally;
   Apple Intelligence can add a title, topic, and description on supported Macs.
   Automatic titles with another provider require a separate opt-in.
@@ -101,8 +101,8 @@ Yaprflow runs as a menu-bar app. Click the waveform icon to open the menu.
 - **Choose speech language**: Settings defaults to English (United States) for
   more consistent English dictation. Choose any other supported locale, or
   Automatic when a recording may use different languages.
-- **AI Summary, History, and Settings** opens a single tabbed window for
-  transforming transcripts, browsing local history, and changing settings.
+- **History and Settings** opens a single tabbed window for browsing local
+  dictation history and changing settings.
 - **Meeting Notes** opens the calendar-aware meeting workspace. It supports
   one-click join and record, typed notes, live Me/Them transcription, seven
   templates, editable generated notes, evidence jumps, local search, and
@@ -134,11 +134,12 @@ with `#` are ignored.
 ## Privacy and local data
 
 At runtime, Yaprflow does not contact a Yaprflow-operated service, download
-speech models, upload audio, or require a login. Mac AI Summary uses Apple's
-on-device model by default. If you select OpenAI or OpenRouter, the selected
-transcript and prompt go directly to that provider using your own key. Ollama
-uses its service on your Mac; Ollama cloud models may contact Ollama's cloud.
-Automatic titles with these providers are a separate opt-in. See the published
+speech models, upload audio, or require a login. Mac meeting summaries use
+Apple's on-device model by default. If you select OpenAI or OpenRouter, the
+meeting transcript, personal notes, and summary instructions go directly to
+that provider using your own key. Ollama uses its service on your Mac; Ollama
+cloud models may contact Ollama's cloud. Automatic titles with these providers
+are a separate opt-in. See the published
 [Privacy Policy](https://yaprflow.com/privacy.html) for the full disclosure.
 
 The Mac telemetry switch sends fixed usage and failure events to
@@ -187,8 +188,8 @@ detection. The full FluidAudio package is not linked into the apps.
    (United States) is the default, and Automatic detection remains available.
 5. Yaprflow applies local cleanup and vocabulary replacements.
 6. Final text is copied to the clipboard and saved as Markdown.
-7. The selected AI provider can summarize or restructure transcript text.
-   Apple Intelligence is on-device; cloud providers receive a transcript only
+7. The selected AI provider creates structured notes for finished meetings.
+   Apple Intelligence is on-device; cloud providers receive meeting text only
    when used, and automatic cloud archive titles require opt-in.
 
 The complete Nemotron 3.5 ASR and Silero VAD models are bundled in official

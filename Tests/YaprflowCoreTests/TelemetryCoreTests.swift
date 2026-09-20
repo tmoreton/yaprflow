@@ -22,6 +22,8 @@ struct TelemetryCoreTests {
                 == ["duration": "1_to_4m"])
         #expect(TelemetryEvent.dictationFailed(.microphone).properties
                 == ["reason": "microphone"])
+        #expect(TelemetryEvent.featureOpened(.meetingNotes).properties
+                == ["feature": "meeting_notes"])
         #expect(TelemetryEvent.aiSummaryFailed(.openRouter, .provider).properties
                 == ["provider": "openRouter", "reason": "provider"])
         #expect(TelemetryEvent.aiSummaryFailed(.openAI, .rateLimit).properties

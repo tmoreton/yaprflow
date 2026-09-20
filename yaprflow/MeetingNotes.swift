@@ -42,11 +42,6 @@ private enum MeetingNotesMode: String, CaseIterable {
     case ask = "Ask"
 }
 
-private enum MeetingWorkspaceSection: String, CaseIterable {
-    case capture = "Notes & transcript"
-    case summary = "Summary"
-}
-
 struct MeetingNotesView: View {
     @ObservedObject private var store = MeetingStore.shared
     @ObservedObject private var session = MeetingSessionController.shared
@@ -261,43 +256,32 @@ private struct SavedMeetingRow: View {
 
 private struct LiveMeetingWorkspace: View {
     @ObservedObject var session: MeetingSessionController
-    @State private var section: MeetingWorkspaceSection = .capture
+    @State private var selectedEvidenceID: UUID?
 
     var body: some View {
         VStack(spacing: 0) {
             controls
-
-            if session.meeting.generatedNotes != nil {
-                Divider()
-                Picker("Meeting workspace", selection: $section) {
-                    ForEach(MeetingWorkspaceSection.allCases, id: \.self) { item in
-                        Text(item.rawValue).tag(item)
-                    }
-                }
-                .labelsHidden()
-                .pickerStyle(.segmented)
-                .frame(width: 270)
-                .padding(.vertical, 10)
-            }
-
             Divider()
 
-            switch section {
-            case .capture:
+            if showsMeetingDocument {
+                MeetingDocumentView(
+                    meeting: session.meeting,
+                    notes: Binding(
+                        get: { session.meeting.rawNotes },
+                        set: session.updateRawNotes
+                    ),
+                    selectedEvidenceID: $selectedEvidenceID,
+                    isGenerating: isGenerating,
+                    generationMessage: generationMessage,
+                    generationError: generationError,
+                    onGenerate: session.regenerateNotes
+                )
+            } else {
                 captureWorkspace
-            case .summary:
-                GeneratedNotesView(meeting: session.meeting) { session.regenerateNotes() }
-                    .padding(16)
-                .frame(maxHeight: .infinity)
-            }
-        }
-        .onChange(of: session.phase) { _, phase in
-            if phase == .complete, session.meeting.generatedNotes != nil {
-                section = .summary
             }
         }
         .onChange(of: session.meeting.id) { _, _ in
-            section = .capture
+            selectedEvidenceID = nil
         }
     }
 
@@ -327,7 +311,7 @@ private struct LiveMeetingWorkspace: View {
                         .buttonStyle(.borderedProminent)
                         .tint(.red)
                         .keyboardShortcut(.return, modifiers: [.command])
-                } else {
+                } else if session.meeting.endedAt == nil {
                     Button("Start") { session.start() }
                         .buttonStyle(.borderedProminent)
                         .disabled(isBusy)
@@ -488,6 +472,25 @@ private struct LiveMeetingWorkspace: View {
         return false
     }
 
+    private var showsMeetingDocument: Bool {
+        session.meeting.endedAt != nil && !session.phase.isCapturing
+    }
+
+    private var isGenerating: Bool {
+        if case .finalizing = session.phase { return session.meeting.endedAt != nil }
+        return false
+    }
+
+    private var generationMessage: String? {
+        guard case let .finalizing(message) = session.phase, session.meeting.endedAt != nil else { return nil }
+        return message
+    }
+
+    private var generationError: String? {
+        guard case let .failed(message) = session.phase, session.meeting.endedAt != nil else { return nil }
+        return message
+    }
+
     private var duration: String {
         let seconds = Int(session.elapsed)
         return String(format: "%02d:%02d", seconds / 60, seconds % 60)
@@ -506,6 +509,9 @@ private struct SavedMeetingView: View {
     @State private var selectedEvidenceID: UUID?
     @State private var isEditing = false
     @State private var didCopy = false
+    @State private var isGenerating = false
+    @State private var generationMessage: String?
+    @State private var generationError: String?
 
     init(initialMeeting: MeetingRecord, initialEvidenceID: UUID? = nil) {
         _meeting = State(initialValue: initialMeeting)
@@ -546,42 +552,14 @@ private struct SavedMeetingView: View {
 
             Divider()
 
-            HSplitView {
-                GeneratedNotesView(meeting: meeting) { regenerate() } onEvidence: { id in
-                    selectedEvidenceID = id
-                }
-                .padding(16)
-                .frame(minWidth: 330, maxHeight: .infinity)
-
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Transcript")
-                        .font(.headline)
-
-                    if meeting.transcript.isEmpty {
-                        ContentUnavailableView("No transcript", systemImage: "waveform.slash")
-                    } else {
-                        ScrollViewReader { proxy in
-                            ScrollView {
-                                LazyVStack(alignment: .leading, spacing: 7) {
-                                    ForEach(meeting.transcript) { segment in
-                                        TranscriptSegmentRow(
-                                            segment: segment,
-                                            isHighlighted: selectedEvidenceID == segment.id
-                                        )
-                                        .id(segment.id)
-                                    }
-                                }
-                            }
-                            .onChange(of: selectedEvidenceID) { _, id in
-                                guard let id else { return }
-                                withAnimation { proxy.scrollTo(id, anchor: .center) }
-                            }
-                        }
-                    }
-                }
-                .padding(16)
-                .frame(minWidth: 330, maxHeight: .infinity)
-            }
+            MeetingDocumentView(
+                meeting: meeting,
+                selectedEvidenceID: $selectedEvidenceID,
+                isGenerating: isGenerating,
+                generationMessage: generationMessage,
+                generationError: generationError,
+                onGenerate: regenerate
+            )
         }
         .sheet(isPresented: $isEditing) {
             SavedMeetingEditor(meeting: $meeting) {
@@ -592,10 +570,24 @@ private struct SavedMeetingView: View {
     }
 
     private func regenerate() {
+        guard !isGenerating, !meeting.transcript.isEmpty else { return }
+        isGenerating = true
+        generationMessage = "Preparing meeting summary…"
+        generationError = nil
         Task {
-            if let notes = try? await MeetingAIService.generateNotes(for: meeting, progress: { _ in }) {
+            defer {
+                isGenerating = false
+                generationMessage = nil
+            }
+            do {
+                let notes = try await MeetingAIService.generateNotes(
+                    for: meeting,
+                    progress: { generationMessage = $0 }
+                )
                 meeting.generatedNotes = notes
-                _ = try? MeetingStore.shared.save(meeting)
+                try MeetingStore.shared.save(meeting)
+            } catch {
+                generationError = error.localizedDescription
             }
         }
     }
@@ -677,91 +669,268 @@ private struct SavedMeetingEditor: View {
     }
 }
 
+private struct MeetingDocumentView: View {
+    let meeting: MeetingRecord
+    var notes: Binding<String>?
+    @Binding var selectedEvidenceID: UUID?
+    let isGenerating: Bool
+    let generationMessage: String?
+    let generationError: String?
+    let onGenerate: () -> Void
+    @State private var isTranscriptExpanded: Bool
+
+    init(
+        meeting: MeetingRecord,
+        notes: Binding<String>? = nil,
+        selectedEvidenceID: Binding<UUID?>,
+        isGenerating: Bool = false,
+        generationMessage: String? = nil,
+        generationError: String? = nil,
+        onGenerate: @escaping () -> Void
+    ) {
+        self.meeting = meeting
+        self.notes = notes
+        _selectedEvidenceID = selectedEvidenceID
+        self.isGenerating = isGenerating
+        self.generationMessage = generationMessage
+        self.generationError = generationError
+        self.onGenerate = onGenerate
+        _isTranscriptExpanded = State(initialValue: selectedEvidenceID.wrappedValue != nil)
+    }
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 22) {
+                    GeneratedNotesView(
+                        meeting: meeting,
+                        isGenerating: isGenerating,
+                        progressMessage: generationMessage,
+                        errorMessage: generationError,
+                        onRegenerate: onGenerate,
+                        onEvidence: { evidenceID in
+                            isTranscriptExpanded = true
+                            selectedEvidenceID = evidenceID
+                        }
+                    )
+
+                    Divider()
+
+                    personalNotes
+
+                    Divider()
+
+                    transcript
+                }
+                .padding(20)
+                .frame(maxWidth: 760, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .center)
+            }
+            .onAppear {
+                guard selectedEvidenceID != nil else { return }
+                isTranscriptExpanded = true
+                scrollToEvidence(using: proxy)
+            }
+            .onChange(of: selectedEvidenceID) { _, evidenceID in
+                guard evidenceID != nil else { return }
+                isTranscriptExpanded = true
+                scrollToEvidence(using: proxy)
+            }
+        }
+    }
+
+    private var personalNotes: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Your notes")
+                    .font(.headline)
+                Spacer()
+                Text("Included in the summary")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            if let notes {
+                ZStack(alignment: .topLeading) {
+                    if notes.wrappedValue.isEmpty {
+                        Text("Add context or details you want reflected in the summary…")
+                            .foregroundStyle(.tertiary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 11)
+                            .allowsHitTesting(false)
+                    }
+                    TextEditor(text: notes)
+                        .font(.body)
+                        .scrollContentBackground(.hidden)
+                        .padding(6)
+                        .frame(minHeight: 92, maxHeight: 150)
+                        .accessibilityLabel("My meeting notes")
+                }
+                .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(nsColor: .separatorColor).opacity(0.45), lineWidth: 1)
+                }
+            } else if meeting.rawNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Text("No personal notes.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text(meeting.rawNotes)
+                    .font(.callout)
+                    .textSelection(.enabled)
+            }
+        }
+    }
+
+    private var transcript: some View {
+        DisclosureGroup(isExpanded: $isTranscriptExpanded) {
+            if meeting.transcript.isEmpty {
+                Text("No transcript was captured.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 8)
+            } else {
+                LazyVStack(alignment: .leading, spacing: 7) {
+                    ForEach(meeting.transcript) { segment in
+                        TranscriptSegmentRow(
+                            segment: segment,
+                            isHighlighted: selectedEvidenceID == segment.id
+                        )
+                        .id(segment.id)
+                    }
+                }
+                .padding(.top, 8)
+            }
+        } label: {
+            HStack {
+                Text("Transcript")
+                    .font(.headline)
+                Spacer()
+                Text("\(meeting.transcript.count) segments")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .contentShape(Rectangle())
+        }
+    }
+
+    private func scrollToEvidence(using proxy: ScrollViewProxy) {
+        guard let selectedEvidenceID else { return }
+        Task { @MainActor in
+            await Task.yield()
+            withAnimation { proxy.scrollTo(selectedEvidenceID, anchor: .center) }
+        }
+    }
+}
+
 private struct GeneratedNotesView: View {
     let meeting: MeetingRecord
+    var isGenerating = false
+    var progressMessage: String?
+    var errorMessage: String?
     let onRegenerate: () -> Void
     var onEvidence: (UUID) -> Void = { _ in }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Meeting summary")
-                            .font(.headline)
-                        Text(MeetingTemplateCatalog.template(id: meeting.templateID).name)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Button("Regenerate", systemImage: "arrow.clockwise", action: onRegenerate)
-                        .controlSize(.small)
-                        .disabled(meeting.transcript.isEmpty)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Summary")
+                        .font(.headline)
+                    Text(MeetingTemplateCatalog.template(id: meeting.templateID).name)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
-                if let notes = meeting.generatedNotes {
-                    Text(notes.overview)
-                        .font(.callout)
-                        .textSelection(.enabled)
-                        .padding(10)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8))
-                    ForEach(MeetingInsightKind.allCases, id: \.self) { kind in
-                        let items = notes.insights.filter { $0.kind == kind }
-                        if !items.isEmpty {
-                            Text(kind.displayName).font(.headline)
-                            ForEach(items) { insight in
-                                HStack(alignment: .firstTextBaseline, spacing: 7) {
-                                    Image(systemName: kind == .actionItem ? "checkmark.circle" : "circle.fill")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        Text(insight.text).textSelection(.enabled)
-                                        if insight.owner != nil || insight.dueDate != nil {
-                                            Text([insight.owner.map { "Owner: \($0)" }, insight.dueDate.map { "Due: \($0)" }]
-                                                .compactMap { $0 }.joined(separator: " · "))
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                        }
+                Spacer()
+                Button(
+                    isGenerating ? "Generating…" : (meeting.generatedNotes == nil ? "Generate" : "Regenerate"),
+                    systemImage: meeting.generatedNotes == nil ? "sparkles" : "arrow.clockwise",
+                    action: onRegenerate
+                )
+                .controlSize(.small)
+                .disabled(meeting.transcript.isEmpty || isGenerating)
+            }
+
+            if isGenerating {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text(progressMessage ?? "Generating meeting summary…")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if let errorMessage {
+                Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .textSelection(.enabled)
+            }
+
+            if let notes = meeting.generatedNotes {
+                Text(notes.overview)
+                    .font(.callout)
+                    .textSelection(.enabled)
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8))
+                ForEach(MeetingInsightKind.allCases, id: \.self) { kind in
+                    let items = notes.insights.filter { $0.kind == kind }
+                    if !items.isEmpty {
+                        Text(kind.displayName).font(.headline)
+                        ForEach(items) { insight in
+                            HStack(alignment: .firstTextBaseline, spacing: 7) {
+                                Image(systemName: kind == .actionItem ? "checkmark.circle" : "circle.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(insight.text).textSelection(.enabled)
+                                    if insight.owner != nil || insight.dueDate != nil {
+                                        Text([insight.owner.map { "Owner: \($0)" }, insight.dueDate.map { "Due: \($0)" }]
+                                            .compactMap { $0 }.joined(separator: " · "))
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
                                     }
-                                    Spacer()
-                                    if let evidence = insight.citationSegmentIDs.first {
-                                        Button { onEvidence(evidence) } label: {
-                                            Image(systemName: "text.magnifyingglass")
-                                        }
-                                        .buttonStyle(.plain)
-                                        .help("Show transcript evidence")
+                                }
+                                Spacer()
+                                if let evidence = insight.citationSegmentIDs.first {
+                                    Button { onEvidence(evidence) } label: {
+                                        Image(systemName: "text.magnifyingglass")
                                     }
+                                    .buttonStyle(.plain)
+                                    .help("Show transcript evidence")
                                 }
                             }
                         }
                     }
-                    if !notes.followUpEmail.isEmpty {
-                        Text("Follow-up email").font(.headline)
-                        Text(notes.followUpEmail)
-                            .textSelection(.enabled)
-                            .padding(10)
-                            .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
-                    }
-                } else {
-                    VStack(spacing: 8) {
-                        Image(systemName: meeting.transcript.isEmpty ? "sparkles" : "sparkles.rectangle.stack")
-                            .font(.title2)
-                            .foregroundStyle(.tertiary)
-                        Text(meeting.transcript.isEmpty ? "Summary appears after the meeting" : "No summary generated yet")
-                            .font(.callout.weight(.medium))
-                        Text(meeting.transcript.isEmpty
-                            ? "Yaprflow turns the transcript and your notes into decisions, actions, and evidence-linked notes."
-                            : "Use Regenerate after configuring an AI provider in Settings.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 28)
                 }
+                if !notes.followUpEmail.isEmpty {
+                    Text("Follow-up email").font(.headline)
+                    Text(notes.followUpEmail)
+                        .textSelection(.enabled)
+                        .padding(10)
+                        .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
+                }
+            } else if !isGenerating {
+                VStack(spacing: 8) {
+                    Image(systemName: meeting.transcript.isEmpty ? "sparkles" : "sparkles.rectangle.stack")
+                        .font(.title2)
+                        .foregroundStyle(.tertiary)
+                    Text(meeting.transcript.isEmpty ? "Summary appears after the meeting" : "Ready to summarize")
+                        .font(.callout.weight(.medium))
+                    Text(meeting.transcript.isEmpty
+                        ? "Yaprflow uses the transcript and your notes to create a concise meeting summary."
+                        : "Generate key points, decisions, and action items from this meeting.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 22)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -899,6 +1068,7 @@ enum MeetingNotesWindowController {
         if let calendarMeeting {
             MeetingSessionController.shared.prepare(calendarMeeting: calendarMeeting)
         }
+        Telemetry.shared.track(.featureOpened(.meetingNotes))
         window.show()
     }
 

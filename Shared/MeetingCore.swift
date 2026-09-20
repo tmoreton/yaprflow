@@ -66,7 +66,7 @@ public enum MeetingInsightKind: String, Codable, CaseIterable, Sendable {
 
     public var displayName: String {
         switch self {
-        case .summary: "Summary"
+        case .summary: "Key points"
         case .decision: "Decisions"
         case .actionItem: "Action items"
         case .openQuestion: "Open questions"

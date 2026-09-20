@@ -47,7 +47,7 @@ enum AIProviderError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .missingModel:
-            "Choose a model in Settings before running AI Summary."
+            "Choose a model in Settings before using AI features."
         case .missingAPIKey:
             "Save an API key for the selected provider in Settings."
         case .unsupportedProvider:

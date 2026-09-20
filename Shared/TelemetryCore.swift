@@ -1,7 +1,7 @@
 import Foundation
 
 enum TelemetryFeature: String, Sendable {
-    case aiSummary = "ai_summary"
+    case meetingNotes = "meeting_notes"
     case history
     case settings
     case feedback

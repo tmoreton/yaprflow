@@ -139,7 +139,7 @@ final class AppState: ObservableObject {
     }
 
     /// Most recent finalized transcript. Persisted so it survives restarts and
-    /// remains available in History and AI Summary.
+    /// remains available in History.
     @Published var lastTranscript: String {
         didSet {
             UserDefaults.standard.set(lastTranscript, forKey: Self.lastTranscriptKey)

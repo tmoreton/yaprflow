@@ -329,16 +329,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         menu.addItem(NSMenuItem.separator())
 
-        let aiItem = NSMenuItem()
-        aiItem.view = IconActionMenuItemView(
-            symbolName: "sparkles",
-            title: "AI Summary",
-            target: self,
-            action: #selector(showAIActions),
-            isEnabled: { true }
-        )
-        menu.addItem(aiItem)
-
         let historyItem = NSMenuItem()
         historyItem.view = IconActionMenuItemView(
             symbolName: "clock.arrow.circlepath",
@@ -365,10 +355,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func toggleTranscription() {
         log.info("Quick Dictation menu action activated")
         TranscriptionController.shared.toggle()
-    }
-
-    @objc private func showAIActions() {
-        AppPanelWindowController.show(.aiSummary)
     }
 
     @objc private func showMeetingNotes() {

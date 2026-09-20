@@ -3,14 +3,13 @@ import Combine
 import SwiftUI
 
 enum AppPanelTab: Hashable {
-    case aiSummary
     case history
     case settings
 }
 
 @MainActor
 private final class AppPanelSelection: ObservableObject {
-    @Published var selectedTab: AppPanelTab = .aiSummary
+    @Published var selectedTab: AppPanelTab = .history
 }
 
 private struct AppPanelView: View {
@@ -19,12 +18,6 @@ private struct AppPanelView: View {
 
     var body: some View {
         TabView(selection: $selection.selectedTab) {
-            TranscriptAIView()
-                .tabItem {
-                    Label("AI Summary", systemImage: "sparkles")
-                }
-                .tag(AppPanelTab.aiSummary)
-
             HistoryView()
                 .tabItem {
                     Label("History", systemImage: "clock.arrow.circlepath")
@@ -52,7 +45,6 @@ private struct AppPanelView: View {
 
     private func telemetryFeature(for tab: AppPanelTab) -> TelemetryFeature {
         switch tab {
-        case .aiSummary: .aiSummary
         case .history: .history
         case .settings: .settings
         }
