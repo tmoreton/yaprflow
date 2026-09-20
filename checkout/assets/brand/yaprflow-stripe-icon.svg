@@ -2,5 +2,12 @@
   <title>Yaprflow Stripe icon</title>
   <desc>The centered Yaprflow waveform in black on a solid edge-to-edge red-orange background.</desc>
   <rect width="1024" height="1024" fill="#ff4b2b"/>
-  <path transform="translate(212 224) scale(24)" d="M4 12h3m2-5v10m3-14v18m3-14v10m3-7v4m2-2h1" fill="none" stroke="#11110f" stroke-width="2.4" stroke-linecap="square"/>
+  <g fill="#11110f">
+    <rect x="279" y="483" width="130" height="58"/>
+    <rect x="399" y="363" width="58" height="298"/>
+    <rect x="471" y="267" width="58" height="490"/>
+    <rect x="543" y="363" width="58" height="298"/>
+    <rect x="615" y="435" width="58" height="154"/>
+    <rect x="663" y="483" width="82" height="58"/>
+  </g>
 </svg>
