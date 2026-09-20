@@ -21,6 +21,76 @@ struct MeetingCoreTests {
         #expect(meeting.plainTranscript == "[01:05] Me: Let's ship the smaller scope.")
     }
 
+    @Test("System playback is removed from overlapping microphone text")
+    func systemAudioEchoReconciliation() {
+        let systemText = "Jalen you are surgical on that final drive just what allows you to stay so poised in those situations"
+        let segments = [
+            MeetingTranscriptSegment(
+                speaker: .me,
+                startTime: 0,
+                endTime: 25,
+                text: "Hello hello hello how you doing today my name is Tim \(systemText)"
+            ),
+            MeetingTranscriptSegment(
+                speaker: .them,
+                startTime: 1,
+                endTime: 24,
+                text: systemText
+            ),
+        ]
+
+        let reconciled = MeetingTranscriptReconciler.reconcile(segments)
+
+        #expect(reconciled.count == 2)
+        #expect(reconciled.first { $0.speaker == .me }?.text == "Hello hello hello how you doing today my name is Tim")
+        #expect(reconciled.first { $0.speaker == .them }?.text == systemText)
+    }
+
+    @Test("Distinct or non-overlapping speech is preserved")
+    func preservesDistinctSpeech() {
+        let microphone = MeetingTranscriptSegment(
+            speaker: .me,
+            startTime: 0,
+            endTime: 5,
+            text: "We should review the launch plan tomorrow morning"
+        )
+        let laterSystemAudio = MeetingTranscriptSegment(
+            speaker: .them,
+            startTime: 20,
+            endTime: 25,
+            text: "We should review the launch plan tomorrow morning"
+        )
+
+        let reconciled = MeetingTranscriptReconciler.reconcile([microphone, laterSystemAudio])
+
+        #expect(reconciled.map(\.text) == [microphone.text, laterSystemAudio.text])
+    }
+
+    @Test("Transcript display puts the most recent speech first")
+    func newestTranscriptFirst() {
+        let older = MeetingTranscriptSegment(
+            speaker: .them,
+            startTime: 4,
+            endTime: 8,
+            text: "Older message"
+        )
+        let newer = MeetingTranscriptSegment(
+            speaker: .me,
+            startTime: 40,
+            endTime: 44,
+            text: "Newer message"
+        )
+
+        #expect(MeetingTranscriptReconciler.newestFirst([older, newer]).map(\.id) == [newer.id, older.id])
+    }
+
+    @Test("Long meeting timestamps retain hours")
+    func timestampFormatting() {
+        #expect(MeetingTranscriptTimestamp.string(for: 0) == "00:00")
+        #expect(MeetingTranscriptTimestamp.string(for: 65.9) == "01:05")
+        #expect(MeetingTranscriptTimestamp.string(for: 3_661) == "1:01:01")
+    }
+
     @Test("Search favors titles and returns exact evidence segments")
     func search() {
         let evidence = MeetingTranscriptSegment(

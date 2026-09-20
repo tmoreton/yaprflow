@@ -45,6 +45,133 @@ public struct MeetingTranscriptSegment: Codable, Identifiable, Hashable, Sendabl
     }
 }
 
+public enum MeetingTranscriptTimestamp {
+    public static func string(for interval: TimeInterval) -> String {
+        let seconds = max(0, Int(interval.rounded(.down)))
+        let hours = seconds / 3_600
+        let minutes = (seconds % 3_600) / 60
+        let remainingSeconds = seconds % 60
+        if hours > 0 {
+            return String(format: "%d:%02d:%02d", hours, minutes, remainingSeconds)
+        }
+        return String(format: "%02d:%02d", minutes, remainingSeconds)
+    }
+}
+
+/// Removes Mac playback that the microphone hears a second time and keeps the
+/// persisted transcript chronological. System audio is the authoritative copy
+/// when the same words occur in overlapping `Me` and `Them` segments.
+public enum MeetingTranscriptReconciler {
+    public static func reconcile(_ segments: [MeetingTranscriptSegment]) -> [MeetingTranscriptSegment] {
+        var result = segments.sorted(by: isEarlier)
+        let systemSegments = result.filter { $0.speaker == .them }
+
+        for systemSegment in systemSegments {
+            for index in result.indices where result[index].speaker == .me {
+                guard overlaps(result[index], systemSegment) else { continue }
+                result[index].text = removingSystemEcho(
+                    systemSegment.text,
+                    from: result[index].text
+                )
+            }
+        }
+
+        return result
+            .filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            .sorted(by: isEarlier)
+    }
+
+    public static func newestFirst(_ segments: [MeetingTranscriptSegment]) -> [MeetingTranscriptSegment] {
+        segments.sorted {
+            if $0.startTime != $1.startTime { return $0.startTime > $1.startTime }
+            if $0.endTime != $1.endTime { return $0.endTime > $1.endTime }
+            return $0.speaker.rawValue < $1.speaker.rawValue
+        }
+    }
+
+    private struct WordToken {
+        let value: String
+        let range: Range<String.Index>
+    }
+
+    private static func isEarlier(
+        _ lhs: MeetingTranscriptSegment,
+        _ rhs: MeetingTranscriptSegment
+    ) -> Bool {
+        if lhs.startTime != rhs.startTime { return lhs.startTime < rhs.startTime }
+        if lhs.endTime != rhs.endTime { return lhs.endTime < rhs.endTime }
+        return lhs.speaker.rawValue < rhs.speaker.rawValue
+    }
+
+    private static func overlaps(
+        _ lhs: MeetingTranscriptSegment,
+        _ rhs: MeetingTranscriptSegment
+    ) -> Bool {
+        let tolerance: TimeInterval = 2
+        return lhs.startTime <= rhs.endTime + tolerance
+            && rhs.startTime <= lhs.endTime + tolerance
+    }
+
+    private static func removingSystemEcho(_ systemText: String, from microphoneText: String) -> String {
+        let microphoneTokens = tokens(in: microphoneText)
+        let systemTokens = tokens(in: systemText)
+        guard microphoneTokens.count >= 3, systemTokens.count >= 3 else { return microphoneText }
+
+        var previous = [Int](repeating: 0, count: systemTokens.count + 1)
+        var bestLength = 0
+        var bestMicrophoneEnd = 0
+
+        for microphoneIndex in 1...microphoneTokens.count {
+            var current = [Int](repeating: 0, count: systemTokens.count + 1)
+            for systemIndex in 1...systemTokens.count
+            where microphoneTokens[microphoneIndex - 1].value == systemTokens[systemIndex - 1].value {
+                current[systemIndex] = previous[systemIndex - 1] + 1
+                if current[systemIndex] > bestLength {
+                    bestLength = current[systemIndex]
+                    bestMicrophoneEnd = microphoneIndex
+                }
+            }
+            previous = current
+        }
+
+        let shorterCount = min(microphoneTokens.count, systemTokens.count)
+        let isExactShortPhrase = shorterCount >= 3
+            && bestLength == shorterCount
+            && microphoneTokens[bestMicrophoneEnd - bestLength..<bestMicrophoneEnd]
+                .map(\.value)
+                .joined()
+                .count >= 15
+        let substantialMatch = bestLength >= max(6, Int(ceil(Double(shorterCount) * 0.65)))
+        guard isExactShortPhrase || substantialMatch else { return microphoneText }
+
+        let firstToken = microphoneTokens[bestMicrophoneEnd - bestLength]
+        let lastToken = microphoneTokens[bestMicrophoneEnd - 1]
+        let trimming = CharacterSet.whitespacesAndNewlines.union(.punctuationCharacters)
+        let prefix = String(microphoneText[..<firstToken.range.lowerBound])
+            .trimmingCharacters(in: trimming)
+        let suffix = String(microphoneText[lastToken.range.upperBound...])
+            .trimmingCharacters(in: trimming)
+        let remainder = [prefix, suffix].filter { !$0.isEmpty }.joined(separator: " ")
+        return TranscriptSegments.capitalizingFirstLetter(in: remainder)
+    }
+
+    private static func tokens(in text: String) -> [WordToken] {
+        let tokenizer = NLTokenizer(unit: .word)
+        tokenizer.string = text
+        var result: [WordToken] = []
+        tokenizer.enumerateTokens(in: text.startIndex..<text.endIndex) { range, _ in
+            let normalized = String(text[range])
+                .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+                .filter { $0.isLetter || $0.isNumber || $0 == "'" }
+            if !normalized.isEmpty {
+                result.append(WordToken(value: normalized, range: range))
+            }
+            return true
+        }
+        return result
+    }
+}
+
 public struct MeetingAttendee: Codable, Identifiable, Hashable, Sendable {
     public let id: UUID
     public var name: String
@@ -178,7 +305,7 @@ public struct MeetingRecord: Codable, Identifiable, Hashable, Sendable {
 
     public var plainTranscript: String {
         transcript.map { segment in
-            "[\(Self.timestamp(segment.startTime))] \(segment.displaySpeaker): \(segment.text)"
+            "[\(MeetingTranscriptTimestamp.string(for: segment.startTime))] \(segment.displaySpeaker): \(segment.text)"
         }.joined(separator: "\n")
     }
 
@@ -189,10 +316,6 @@ public struct MeetingRecord: Codable, Identifiable, Hashable, Sendable {
         return normalized.isEmpty || normalized == "new meeting" || normalized == "untitled meeting"
     }
 
-    private static func timestamp(_ interval: TimeInterval) -> String {
-        let seconds = max(0, Int(interval.rounded(.down)))
-        return String(format: "%02d:%02d", seconds / 60, seconds % 60)
-    }
 }
 
 public struct MeetingTemplate: Codable, Identifiable, Hashable, Sendable {
@@ -1031,13 +1154,8 @@ public enum MeetingMarkdownRenderer {
 
         sections.append(contentsOf: ["", "## Transcript", ""])
         for segment in meeting.transcript {
-            sections.append("- [\(timestamp(segment.startTime))] **\(segment.displaySpeaker):** \(segment.text) {#\(segment.id.uuidString)}")
+            sections.append("- [\(MeetingTranscriptTimestamp.string(for: segment.startTime))] **\(segment.displaySpeaker):** \(segment.text) {#\(segment.id.uuidString)}")
         }
         return sections.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines) + "\n"
-    }
-
-    private static func timestamp(_ interval: TimeInterval) -> String {
-        let seconds = max(0, Int(interval.rounded(.down)))
-        return String(format: "%02d:%02d", seconds / 60, seconds % 60)
     }
 }

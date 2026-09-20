@@ -39,9 +39,10 @@ final class MeetingStore: ObservableObject {
             meetings = urls.compactMap { url in
                 guard url.pathExtension == "json",
                       let data = try? Data(contentsOf: url),
-                      let meeting = try? decoder.decode(MeetingRecord.self, from: data) else {
+                      var meeting = try? decoder.decode(MeetingRecord.self, from: data) else {
                     return nil
                 }
+                meeting.transcript = MeetingTranscriptReconciler.reconcile(meeting.transcript)
                 return meeting
             }.sorted { $0.startedAt > $1.startedAt }
             errorMessage = nil
@@ -57,6 +58,8 @@ final class MeetingStore: ObservableObject {
 
     @discardableResult
     func save(_ meeting: MeetingRecord) throws -> URL {
+        var meeting = meeting
+        meeting.transcript = MeetingTranscriptReconciler.reconcile(meeting.transcript)
         let directory = try meetingsDirectory()
         let jsonURL = directory.appendingPathComponent(meeting.id.uuidString).appendingPathExtension("json")
         let data = try encoder.encode(meeting)

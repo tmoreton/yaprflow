@@ -517,7 +517,17 @@ private struct SavedMeetingRow: View {
     }
 }
 
+private struct TranscriptDisplayItem: Identifiable {
+    let segment: MeetingTranscriptSegment
+    let isLive: Bool
+
+    var id: UUID { segment.id }
+}
+
 private struct LiveMeetingWorkspace: View {
+    private static let liveMeID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+    private static let liveThemID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+
     @ObservedObject var session: MeetingSessionController
     let onOpenSettings: () -> Void
     @State private var selectedEvidenceID: UUID?
@@ -703,22 +713,8 @@ private struct LiveMeetingWorkspace: View {
             if hasTranscript {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 7) {
-                        ForEach(session.meeting.transcript) { TranscriptSegmentRow(segment: $0) }
-                        if !session.liveThem.isEmpty {
-                            TranscriptSegmentRow(segment: MeetingTranscriptSegment(
-                                speaker: .them,
-                                startTime: session.elapsed,
-                                endTime: session.elapsed,
-                                text: session.liveThem
-                            ), isLive: true)
-                        }
-                        if !session.liveMe.isEmpty {
-                            TranscriptSegmentRow(segment: MeetingTranscriptSegment(
-                                speaker: .me,
-                                startTime: session.elapsed,
-                                endTime: session.elapsed,
-                                text: session.liveMe
-                            ), isLive: true)
+                        ForEach(displayedTranscript) { item in
+                            TranscriptSegmentRow(segment: item.segment, isLive: item.isLive)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -739,6 +735,36 @@ private struct LiveMeetingWorkspace: View {
 
     private var hasTranscript: Bool {
         !session.meeting.transcript.isEmpty || !session.liveMe.isEmpty || !session.liveThem.isEmpty
+    }
+
+    private var displayedTranscript: [TranscriptDisplayItem] {
+        var segments = session.meeting.transcript
+        var liveIDs: Set<UUID> = []
+
+        if !session.liveThem.isEmpty {
+            liveIDs.insert(Self.liveThemID)
+            segments.append(MeetingTranscriptSegment(
+                id: Self.liveThemID,
+                speaker: .them,
+                startTime: session.liveThemStartTime ?? session.elapsed,
+                endTime: session.elapsed,
+                text: session.liveThem
+            ))
+        }
+        if !session.liveMe.isEmpty {
+            liveIDs.insert(Self.liveMeID)
+            segments.append(MeetingTranscriptSegment(
+                id: Self.liveMeID,
+                speaker: .me,
+                startTime: session.liveMeStartTime ?? session.elapsed,
+                endTime: session.elapsed,
+                text: session.liveMe
+            ))
+        }
+
+        return MeetingTranscriptReconciler
+            .newestFirst(MeetingTranscriptReconciler.reconcile(segments))
+            .map { TranscriptDisplayItem(segment: $0, isLive: liveIDs.contains($0.id)) }
     }
 
     private var isBusy: Bool {
@@ -1070,7 +1096,7 @@ private struct MeetingDocumentView: View {
                     .padding(.top, 8)
             } else {
                 LazyVStack(alignment: .leading, spacing: 7) {
-                    ForEach(meeting.transcript) { segment in
+                    ForEach(MeetingTranscriptReconciler.newestFirst(meeting.transcript)) { segment in
                         TranscriptSegmentRow(
                             segment: segment,
                             isHighlighted: selectedEvidenceID == segment.id
@@ -1214,7 +1240,7 @@ private struct TranscriptSegmentRow: View {
             Text(timestamp)
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
-                .frame(width: 38, alignment: .leading)
+                .frame(minWidth: 42, alignment: .leading)
             VStack(alignment: .leading, spacing: 2) {
                 Text(segment.displaySpeaker)
                     .font(.caption.weight(.semibold))
@@ -1229,8 +1255,7 @@ private struct TranscriptSegmentRow: View {
     }
 
     private var timestamp: String {
-        let seconds = Int(segment.startTime)
-        return String(format: "%02d:%02d", seconds / 60, seconds % 60)
+        MeetingTranscriptTimestamp.string(for: segment.startTime)
     }
 }
 

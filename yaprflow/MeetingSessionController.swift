@@ -27,10 +27,17 @@ private final class MeetingRecognitionPipeline {
     private let converter = StreamingAudioConverter()
     private let language: SpeechLanguage
     private var segmentStartSample = 0
+    private var segmentFirstAudibleSample: Int?
     private var segmentSampleCount = 0
     private var totalSampleCount = 0
     private(set) var liveText = ""
     private(set) var recentlyHadAudio = false
+
+    var liveStartTime: TimeInterval? {
+        guard !liveText.isEmpty else { return nil }
+        let sample = segmentFirstAudibleSample ?? segmentStartSample
+        return Double(sample) / Double(NemotronStreamingRecognizer.sampleRate)
+    }
 
     init(
         speaker: MeetingSpeaker,
@@ -45,6 +52,7 @@ private final class MeetingRecognitionPipeline {
     func start() async {
         converter.reset()
         segmentStartSample = 0
+        segmentFirstAudibleSample = nil
         segmentSampleCount = 0
         totalSampleCount = 0
         liveText = ""
@@ -66,18 +74,21 @@ private final class MeetingRecognitionPipeline {
     }
 
     private func consume(samples: [Float]) async throws -> [MeetingTranscriptSegment] {
-        if samples.isEmpty {
-            recentlyHadAudio = false
-        } else {
-            let meanSquare = samples.reduce(0.0) { $0 + Double($1 * $1) } / Double(samples.count)
-            recentlyHadAudio = meanSquare > 0.000_025
-        }
         var completed: [MeetingTranscriptSegment] = []
         var offset = 0
+        var hadAudibleAudio = false
         while offset < samples.count {
             let remaining = Self.maximumSegmentSamples - segmentSampleCount
             let count = min(remaining, samples.count - offset)
             let part = Array(samples[offset..<(offset + count)])
+            let meanSquare = part.reduce(0.0) { $0 + Double($1 * $1) } / Double(part.count)
+            let isAudible = meanSquare > 0.000_025
+            if isAudible {
+                hadAudibleAudio = true
+                if segmentFirstAudibleSample == nil {
+                    segmentFirstAudibleSample = totalSampleCount
+                }
+            }
             liveText = await recognizer.accept(part)
             segmentSampleCount += count
             totalSampleCount += count
@@ -87,11 +98,13 @@ private final class MeetingRecognitionPipeline {
                 let text = await recognizer.finishStream()
                 if let segment = makeSegment(text: text) { completed.append(segment) }
                 segmentStartSample = totalSampleCount
+                segmentFirstAudibleSample = nil
                 segmentSampleCount = 0
                 liveText = ""
                 await recognizer.beginStream(language: language)
             }
         }
+        recentlyHadAudio = hadAudibleAudio
         return completed
     }
 
@@ -100,7 +113,8 @@ private final class MeetingRecognitionPipeline {
         guard !polished.isEmpty else { return nil }
         return MeetingTranscriptSegment(
             speaker: speaker,
-            startTime: Double(segmentStartSample) / Double(NemotronStreamingRecognizer.sampleRate),
+            startTime: Double(segmentFirstAudibleSample ?? segmentStartSample)
+                / Double(NemotronStreamingRecognizer.sampleRate),
             endTime: Double(totalSampleCount) / Double(NemotronStreamingRecognizer.sampleRate),
             text: TranscriptSegments.capitalizingFirstLetter(in: polished)
         )
@@ -115,6 +129,8 @@ final class MeetingSessionController: ObservableObject {
     @Published var meeting = MeetingRecord(title: "New meeting")
     @Published private(set) var liveMe = ""
     @Published private(set) var liveThem = ""
+    @Published private(set) var liveMeStartTime: TimeInterval?
+    @Published private(set) var liveThemStartTime: TimeInterval?
     @Published private(set) var elapsed: TimeInterval = 0
 
     private var mePipeline: MeetingRecognitionPipeline?
@@ -171,6 +187,8 @@ final class MeetingSessionController: ObservableObject {
         phase = .idle
         liveMe = ""
         liveThem = ""
+        liveMeStartTime = nil
+        liveThemStartTime = nil
         elapsed = 0
     }
 
@@ -327,14 +345,12 @@ final class MeetingSessionController: ObservableObject {
 
         let meSegments = await mePipeline?.finish() ?? []
         let themSegments = await themPipeline?.finish() ?? []
-        meeting.transcript.append(contentsOf: meSegments + themSegments)
-        meeting.transcript.sort {
-            if $0.startTime == $1.startTime { return $0.speaker.rawValue < $1.speaker.rawValue }
-            return $0.startTime < $1.startTime
-        }
+        appendTranscriptSegments(meSegments + themSegments)
         meeting.endedAt = Date()
         liveMe = ""
         liveThem = ""
+        liveMeStartTime = nil
+        liveThemStartTime = nil
         mePipeline = nil
         themPipeline = nil
 
@@ -384,9 +400,10 @@ final class MeetingSessionController: ObservableObject {
     private func consumeMicrophone(_ buffer: AVAudioPCMBuffer) async {
         guard acceptsAudio, let pipeline = mePipeline else { return }
         do {
-            meeting.transcript.append(contentsOf: try await pipeline.consume(buffer))
+            appendTranscriptSegments(try await pipeline.consume(buffer))
             if pipeline.recentlyHadAudio { lastAudioActivityAt = Date() }
             liveMe = pipeline.liveText
+            liveMeStartTime = pipeline.liveStartTime
         } catch {
             await stop(reason: "Microphone transcription failed: \(error.localizedDescription)")
         }
@@ -396,12 +413,18 @@ final class MeetingSessionController: ObservableObject {
         guard acceptsAudio, let pipeline = themPipeline else { return }
         do {
             let buffer = try MeetingSystemAudioCapture.pcmBuffer(from: captured)
-            meeting.transcript.append(contentsOf: try await pipeline.consume(buffer))
+            appendTranscriptSegments(try await pipeline.consume(buffer))
             if pipeline.recentlyHadAudio { lastAudioActivityAt = Date() }
             liveThem = pipeline.liveText
+            liveThemStartTime = pipeline.liveStartTime
         } catch {
             await stop(reason: "System-audio transcription failed: \(error.localizedDescription)")
         }
+    }
+
+    private func appendTranscriptSegments(_ segments: [MeetingTranscriptSegment]) {
+        guard !segments.isEmpty else { return }
+        meeting.transcript = MeetingTranscriptReconciler.reconcile(meeting.transcript + segments)
     }
 
     private func startElapsedTimer() {
