@@ -24,6 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let isRecordingSmokeTest = arguments.contains("--smoke-test-recording")
         let isMeetingNotesSmokeTest = arguments.contains("--smoke-test-meeting-notes")
         let isMeetingAudioSmokeTest = arguments.contains("--smoke-test-meeting-audio")
+        let isEditMenuSmokeTest = arguments.contains("--smoke-test-edit-menu")
         let isMeetingSmokeTest = isMeetingNotesSmokeTest || isMeetingAudioSmokeTest
 
         // AppKit finishes its window-restoration bookkeeping after this
@@ -33,6 +34,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         ProcessInfo.processInfo.automaticTerminationSupportEnabled = true
         scheduleAutomaticTerminationOptOut()
 
+        installApplicationMenus()
+        if isEditMenuSmokeTest {
+            let passed = validateEditMenuForSmokeTest()
+            let output = "YAPRFLOW_EDIT_MENU_SMOKE_TEST=\(passed ? "PASS" : "FAIL")\n"
+            FileHandle.standardOutput.write(Data(output.utf8))
+            NSApp.terminate(nil)
+            return
+        }
         installStatusItem()
         UNUserNotificationCenter.current().delegate = self
         if !isPreviewSmokeTest {
@@ -187,6 +196,95 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             isAutomaticTerminationDisabled = true
             residencyTask = nil
             log.info("Disabled automatic termination for menu-bar residency")
+        }
+    }
+
+    /// Yaprflow manages AppKit directly instead of using SwiftUI's App scene,
+    /// so macOS does not synthesize the standard responder-chain menus for us.
+    /// Text fields rely on these nil-target actions for Command-X/C/V/A/Z.
+    private func installApplicationMenus() {
+        let mainMenu = NSMenu(title: "Main Menu")
+
+        let applicationItem = NSMenuItem()
+        let applicationMenu = NSMenu(title: "Yaprflow")
+        applicationMenu.addItem(
+            withTitle: "About Yaprflow",
+            action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)),
+            keyEquivalent: ""
+        )
+        applicationMenu.addItem(.separator())
+        applicationMenu.addItem(
+            withTitle: "Hide Yaprflow",
+            action: #selector(NSApplication.hide(_:)),
+            keyEquivalent: "h"
+        )
+        applicationMenu.addItem(.separator())
+        applicationMenu.addItem(
+            withTitle: "Quit Yaprflow",
+            action: #selector(NSApplication.terminate(_:)),
+            keyEquivalent: "q"
+        )
+        applicationItem.submenu = applicationMenu
+        mainMenu.addItem(applicationItem)
+
+        let editItem = NSMenuItem()
+        let editMenu = NSMenu(title: "Edit")
+        editMenu.addItem(responderMenuItem("Undo", action: Selector(("undo:")), key: "z"))
+        editMenu.addItem(
+            responderMenuItem(
+                "Redo",
+                action: Selector(("redo:")),
+                key: "z",
+                modifiers: [.command, .shift]
+            )
+        )
+        editMenu.addItem(.separator())
+        editMenu.addItem(responderMenuItem("Cut", action: #selector(NSText.cut(_:)), key: "x"))
+        editMenu.addItem(responderMenuItem("Copy", action: #selector(NSText.copy(_:)), key: "c"))
+        editMenu.addItem(responderMenuItem("Paste", action: #selector(NSText.paste(_:)), key: "v"))
+        editMenu.addItem(.separator())
+        editMenu.addItem(
+            responderMenuItem("Select All", action: #selector(NSText.selectAll(_:)), key: "a")
+        )
+        editItem.submenu = editMenu
+        mainMenu.addItem(editItem)
+
+        NSApp.mainMenu = mainMenu
+    }
+
+    private func responderMenuItem(
+        _ title: String,
+        action: Selector,
+        key: String,
+        modifiers: NSEvent.ModifierFlags = [.command]
+    ) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
+        item.keyEquivalentModifierMask = modifiers
+        item.target = nil
+        return item
+    }
+
+    private func validateEditMenuForSmokeTest() -> Bool {
+        guard let editMenu = NSApp.mainMenu?.items
+            .compactMap(\.submenu)
+            .first(where: { $0.title == "Edit" }) else { return false }
+
+        let expected: [(title: String, key: String, action: Selector)] = [
+            ("Undo", "z", Selector(("undo:"))),
+            ("Redo", "z", Selector(("redo:"))),
+            ("Cut", "x", #selector(NSText.cut(_:))),
+            ("Copy", "c", #selector(NSText.copy(_:))),
+            ("Paste", "v", #selector(NSText.paste(_:))),
+            ("Select All", "a", #selector(NSText.selectAll(_:))),
+        ]
+        return expected.allSatisfy { expectedItem in
+            editMenu.items.contains { item in
+                item.title == expectedItem.title
+                    && item.keyEquivalent == expectedItem.key
+                    && item.action == expectedItem.action
+                    && item.target == nil
+                    && item.keyEquivalentModifierMask.contains(.command)
+            }
         }
     }
 
