@@ -58,7 +58,11 @@ final class MeetingStore: ObservableObject {
                 }
                 meeting.transcript = MeetingTranscriptReconciler.reconcile(meeting.transcript)
                 if let notes = meeting.generatedNotes {
-                    meeting.generatedNotes = MeetingGeneratedNotesGrounder.grounded(notes, in: meeting)
+                    let repaired = MeetingGeneratedNotesParser.repairingEmbeddedPayload(
+                        in: notes,
+                        validSegmentIDs: Set(meeting.transcript.map(\.id))
+                    )
+                    meeting.generatedNotes = MeetingGeneratedNotesGrounder.grounded(repaired, in: meeting)
                 }
                 return meeting
             }.sorted { $0.startedAt > $1.startedAt }
@@ -78,7 +82,11 @@ final class MeetingStore: ObservableObject {
         var meeting = meeting
         meeting.transcript = MeetingTranscriptReconciler.reconcile(meeting.transcript)
         if let notes = meeting.generatedNotes {
-            meeting.generatedNotes = MeetingGeneratedNotesGrounder.grounded(notes, in: meeting)
+            let repaired = MeetingGeneratedNotesParser.repairingEmbeddedPayload(
+                in: notes,
+                validSegmentIDs: Set(meeting.transcript.map(\.id))
+            )
+            meeting.generatedNotes = MeetingGeneratedNotesGrounder.grounded(repaired, in: meeting)
         }
         let directory = try meetingsDirectory()
         let jsonURL = directory.appendingPathComponent(meeting.id.uuidString).appendingPathExtension("json")

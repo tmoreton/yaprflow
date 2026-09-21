@@ -192,6 +192,83 @@ struct MeetingCoreTests {
         #expect(notes.followUpEmail.isEmpty)
     }
 
+    @Test("Generated notes repair truncated model JSON instead of displaying it")
+    func generatedNotesTruncatedJSONRepair() throws {
+        let validID = UUID()
+        let response = """
+        ```json
+        {
+          "title": "Campaign planning",
+          "overview": "The team aligned on upcoming campaign work.",
+          "insights": [
+            {
+              "kind": "actionItem",
+              "text": "Fill in the influencer details.",
+              "owner": "Marto",
+              "dueDate": null,
+              "citationSegmentIDs": ["\(validID)"]
+            },
+            {
+              "kind": "decision",
+              "text": "Coordinate the launch plan
+        """
+
+        let notes = try MeetingGeneratedNotesParser.parse(
+            response,
+            validSegmentIDs: [validID]
+        )
+
+        #expect(notes.suggestedTitle == "Campaign planning")
+        #expect(notes.overview == "The team aligned on upcoming campaign work.")
+        let actionItem = notes.insights.first { $0.kind == .actionItem }
+        #expect(actionItem?.text == "Fill in the influencer details.")
+        #expect(actionItem?.owner == "Marto")
+        #expect(actionItem?.citationSegmentIDs == [validID])
+        #expect(notes.insights.contains {
+            $0.kind == .decision && $0.text == "Coordinate the launch plan"
+        })
+        #expect(!notes.overview.contains("\"insights\""))
+    }
+
+    @Test("Generated notes accept unescaped line breaks inside JSON strings")
+    func generatedNotesUnescapedJSONStringLineBreaks() throws {
+        let response = """
+        {
+          "title": "Launch planning",
+          "overview": "First outcome.
+        Second outcome.",
+          "insights": [],
+          "followUpEmail": ""
+        }
+        """
+
+        let notes = try MeetingGeneratedNotesParser.parse(response, validSegmentIDs: [])
+
+        #expect(notes.overview == "First outcome.\nSecond outcome.")
+    }
+
+    @Test("Saved raw JSON summaries are repaired when records are reopened")
+    func savedRawJSONSummaryRepair() {
+        let validID = UUID()
+        let stored = MeetingGeneratedNotes(
+            overview: """
+            {"title":"Campaign planning","overview":"The plan is ready.","insights":[{"kind":"actionItem","text":"Send the brief.","owner":"Tim","dueDate":null,"citationSegmentIDs":["\(validID)"]}],"followUpEmail":""}
+            """,
+            generatedAt: Date(timeIntervalSince1970: 123)
+        )
+
+        let repaired = MeetingGeneratedNotesParser.repairingEmbeddedPayload(
+            in: stored,
+            validSegmentIDs: [validID]
+        )
+
+        #expect(repaired.suggestedTitle == "Campaign planning")
+        #expect(repaired.overview == "The plan is ready.")
+        #expect(repaired.insights.first?.text == "Send the brief.")
+        #expect(repaired.insights.first?.citationSegmentIDs == [validID])
+        #expect(repaired.generatedAt == stored.generatedAt)
+    }
+
     @Test("Generated notes preserve useful Markdown when a model ignores JSON")
     func generatedNotesMarkdownFallback() throws {
         let validID = UUID()

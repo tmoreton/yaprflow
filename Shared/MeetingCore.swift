@@ -1130,6 +1130,7 @@ public enum MeetingGeneratedNotesGrounder {
 public enum MeetingGeneratedNotesParser {
     private enum ParseError: Error {
         case emptyResponse
+        case malformedStructuredResponse
     }
 
     private struct Payload: Decodable {
@@ -1166,15 +1167,55 @@ public enum MeetingGeneratedNotesParser {
         // Some local and smaller models honor the requested sections but return
         // Markdown instead of JSON. The content is still useful, so retain it as
         // readable notes rather than discarding a successfully saved transcript.
+        guard !looksLikeStructuredJSON(trimmed) else {
+            throw ParseError.malformedStructuredResponse
+        }
         return plainTextNotes(from: trimmed, validSegmentIDs: validSegmentIDs)
+    }
+
+    public static func repairingEmbeddedPayload(
+        in notes: MeetingGeneratedNotes,
+        validSegmentIDs: Set<UUID>
+    ) -> MeetingGeneratedNotes {
+        guard looksLikeStructuredJSON(notes.overview),
+              var repaired = try? parse(notes.overview, validSegmentIDs: validSegmentIDs) else {
+            return notes
+        }
+        repaired.generatedAt = notes.generatedAt
+        return repaired
     }
 
     private static func extractedJSONObject(from response: String) -> String {
         let trimmed = response.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let first = trimmed.firstIndex(of: "{"),
-              let last = trimmed.lastIndex(of: "}"),
-              first <= last else { return trimmed }
-        return String(trimmed[first...last])
+        guard let first = trimmed.firstIndex(of: "{") else { return trimmed }
+
+        var depth = 0
+        var isInsideString = false
+        var isEscaped = false
+        for index in trimmed.indices[first...] {
+            let character = trimmed[index]
+            if isInsideString {
+                if isEscaped {
+                    isEscaped = false
+                } else if character == "\\" {
+                    isEscaped = true
+                } else if character == "\"" {
+                    isInsideString = false
+                }
+                continue
+            }
+            if character == "\"" {
+                isInsideString = true
+            } else if character == "{" {
+                depth += 1
+            } else if character == "}" {
+                depth -= 1
+                if depth == 0 {
+                    return String(trimmed[first...index])
+                }
+            }
+        }
+        return String(trimmed[first...])
     }
 
     private static func jsonCandidates(from json: String) -> [String] {
@@ -1183,12 +1224,160 @@ public enum MeetingGeneratedNotesParser {
             .replacingOccurrences(of: "”", with: "\"")
             .replacingOccurrences(of: "‘", with: "'")
             .replacingOccurrences(of: "’", with: "'")
-        let withoutTrailingCommas = normalizedQuotes.replacingOccurrences(
+        let escapedControls = escapingControlCharactersInsideStrings(normalizedQuotes)
+        let withoutTrailingCommas = escapedControls.replacingOccurrences(
             of: #",\s*([}\]])"#,
             with: "$1",
             options: .regularExpression
         )
-        return withoutTrailingCommas == json ? [json] : [json, withoutTrailingCommas]
+
+        var candidates: [String] = []
+        var seen: Set<String> = []
+        func append(_ candidate: String) {
+            guard !candidate.isEmpty, seen.insert(candidate).inserted else { return }
+            candidates.append(candidate)
+        }
+
+        append(json)
+        append(normalizedQuotes)
+        append(escapedControls)
+        append(withoutTrailingCommas)
+        for candidate in [withoutTrailingCommas, escapedControls] {
+            repairedJSONCandidates(from: candidate).forEach(append)
+        }
+        return candidates
+    }
+
+    /// Foundation Models can stop after producing useful fields but before the
+    /// final JSON delimiters. Keep completed content by closing an unfinished
+    /// string/container, or by dropping only the final incomplete property.
+    private static func repairedJSONCandidates(from json: String) -> [String] {
+        var fragment = json.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let fence = fragment.range(of: "```") {
+            fragment = String(fragment[..<fence.lowerBound])
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        guard fragment.first == "{" || fragment.first == "[" else { return [] }
+
+        var cutPoints: [String.Index] = []
+        var isInsideString = false
+        var isEscaped = false
+        for index in fragment.indices {
+            let character = fragment[index]
+            if isInsideString {
+                if isEscaped {
+                    isEscaped = false
+                } else if character == "\\" {
+                    isEscaped = true
+                } else if character == "\"" {
+                    isInsideString = false
+                }
+                continue
+            }
+            if character == "\"" {
+                isInsideString = true
+            } else if character == "," || character == "}" || character == "]" {
+                cutPoints.append(fragment.index(after: index))
+            }
+        }
+
+        var repaired: [String] = []
+        var seen: Set<String> = []
+        let fragments = [fragment] + cutPoints.reversed().prefix(80).map { String(fragment[..<$0]) }
+        for candidate in fragments {
+            guard let balanced = balancedJSONCandidate(from: candidate),
+                  seen.insert(balanced).inserted else { continue }
+            repaired.append(balanced)
+        }
+        return repaired
+    }
+
+    private static func balancedJSONCandidate(from fragment: String) -> String? {
+        var candidate = fragment.trimmingCharacters(in: .whitespacesAndNewlines)
+        while candidate.last == "," {
+            candidate.removeLast()
+            candidate = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        guard !candidate.isEmpty, candidate.last != ":" else { return nil }
+
+        var closers: [Character] = []
+        var isInsideString = false
+        var isEscaped = false
+        for character in candidate {
+            if isInsideString {
+                if isEscaped {
+                    isEscaped = false
+                } else if character == "\\" {
+                    isEscaped = true
+                } else if character == "\"" {
+                    isInsideString = false
+                }
+                continue
+            }
+
+            switch character {
+            case "\"": isInsideString = true
+            case "{": closers.append("}")
+            case "[": closers.append("]")
+            case "}", "]":
+                guard closers.last == character else { return nil }
+                closers.removeLast()
+            default: break
+            }
+        }
+
+        if isInsideString {
+            if isEscaped { candidate.append("\\") }
+            candidate.append("\"")
+        }
+        for closer in closers.reversed() {
+            candidate.append(closer)
+        }
+        return candidate
+    }
+
+    private static func escapingControlCharactersInsideStrings(_ json: String) -> String {
+        var result = ""
+        result.reserveCapacity(json.count)
+        var isInsideString = false
+        var isEscaped = false
+
+        for character in json {
+            if isInsideString {
+                if isEscaped {
+                    result.append(character)
+                    isEscaped = false
+                    continue
+                }
+                if character == "\\" {
+                    result.append(character)
+                    isEscaped = true
+                } else if character == "\"" {
+                    result.append(character)
+                    isInsideString = false
+                } else if character == "\n" {
+                    result.append("\\n")
+                } else if character == "\r" {
+                    result.append("\\r")
+                } else if character == "\t" {
+                    result.append("\\t")
+                } else {
+                    result.append(character)
+                }
+            } else {
+                result.append(character)
+                if character == "\"" { isInsideString = true }
+            }
+        }
+        return result
+    }
+
+    private static func looksLikeStructuredJSON(_ response: String) -> Bool {
+        let cleaned = response
+            .replacingOccurrences(of: "```json", with: "", options: .caseInsensitive)
+            .replacingOccurrences(of: "```", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return cleaned.first == "{" || cleaned.first == "["
     }
 
     private static func notes(from payload: Payload, validSegmentIDs: Set<UUID>) -> MeetingGeneratedNotes {
