@@ -3,6 +3,7 @@ import test from 'node:test';
 import { createHash } from 'node:crypto';
 import { createHandlers } from '../lib/handlers.js';
 import { checkoutSettings } from '../lib/settings.js';
+import { issueDownloadLinkToken } from '../lib/download-link.js';
 
 const sessionId = 'cs_test_1234567890abcdef';
 const privateUrl = 'https://example.private.blob.vercel-storage.com/releases/yaprflow.dmg?signature=private';
@@ -14,6 +15,11 @@ const environment = {
   CHECKOUT_BASE_URL: 'https://checkout.example.com',
   BLOB_PATHNAME: 'releases/yaprflow.dmg',
   BLOB_READ_WRITE_TOKEN: 'not-a-real-blob-token',
+  STRIPE_WEBHOOK_SECRET: 'whsec_notARealWebhookSecret',
+  DOWNLOAD_LINK_SECRET: 'not-a-real-download-link-secret-32-bytes',
+  RESEND_API_KEY: 're_notARealApiKey',
+  PURCHASE_EMAIL_FROM: 'Yaprflow <downloads@yaprflow.com>',
+  RESEND_NEWSLETTER_SEGMENT_ID: 'newsletter-buyers',
 };
 const paidSession = {
   id: sessionId, livemode: false, mode: 'payment', status: 'complete', payment_status: 'paid',
@@ -39,8 +45,11 @@ function livePaidSession({ currency = 'usd', total = 864, tax = 65, discount = 0
   };
 }
 
-function fixture({ env = {}, session = paidSession, price = currentPrice, checkoutUrl, retrieveError, priceError, downloadUrl = privateUrl } = {}) {
-  const calls = { prices: [], sessions: [], creates: [], tokens: [], urls: [] };
+function fixture({
+  env = {}, session = paidSession, price = currentPrice, checkoutUrl, retrieveError,
+  priceError, downloadUrl = privateUrl, event, webhookError, fulfillError,
+} = {}) {
+  const calls = { prices: [], sessions: [], creates: [], updates: [], tokens: [], urls: [], webhooks: [], fulfillments: [] };
   const configured = { ...environment, ...env };
   const handlers = createHandlers({
     environment: () => configured,
@@ -52,6 +61,14 @@ function fixture({ env = {}, session = paidSession, price = currentPrice, checko
           if (priceError) throw priceError;
           return price;
         } },
+        webhooks: { constructEvent: (...args) => {
+          calls.webhooks.push(args);
+          if (webhookError) throw webhookError;
+          return event ?? {
+            type: 'checkout.session.completed',
+            data: { object: { id: session.id, metadata: { product: 'yaprflow-mac' } } },
+          };
+        } },
         checkout: { sessions: {
           create: async (options) => {
             calls.creates.push(options);
@@ -62,6 +79,7 @@ function fixture({ env = {}, session = paidSession, price = currentPrice, checko
             if (retrieveError) throw retrieveError;
             return session;
           },
+          update: async (...args) => { calls.updates.push(args); return session; },
         } },
       };
     },
@@ -69,6 +87,11 @@ function fixture({ env = {}, session = paidSession, price = currentPrice, checko
     signUrl: async (...args) => { calls.urls.push(args); return { presignedUrl: downloadUrl }; },
     now: () => 1000,
     logger: { error() {} },
+    fulfillPurchase: async (options) => {
+      calls.fulfillments.push(options);
+      if (fulfillError) throw fulfillError;
+      return { emailSent: true, newsletterSaved: false };
+    },
   });
   return { ...handlers, calls };
 }
@@ -118,12 +141,27 @@ test('voice demo availability exposes only a boolean and remains independent of 
   assert.equal((await response.json()).voiceDemoAvailable, true);
 });
 
-test('sales require an available private download and an explicit enable switch', async () => {
-  for (const env of [{ CHECKOUT_ENABLED: 'false' }, { BLOB_READ_WRITE_TOKEN: '' }, { BLOB_PATHNAME: '../private.dmg' }]) {
+test('sales require private delivery and an explicit enable switch', async () => {
+  for (const env of [
+    { CHECKOUT_ENABLED: 'false' }, { BLOB_READ_WRITE_TOKEN: '' }, { BLOB_PATHNAME: '../private.dmg' },
+  ]) {
     const api = fixture({ env });
     assert.equal((await (await api.config()).json()).enabled, false);
     assert.equal((await api.checkout()).status, 503);
     assert.equal(api.calls.creates.length, 0);
+  }
+});
+
+test('email fulfillment readiness never disables the paid browser download', async () => {
+  for (const env of [
+    { STRIPE_WEBHOOK_SECRET: '' }, { RESEND_API_KEY: '' }, { DOWNLOAD_LINK_SECRET: 'too-short' },
+    { PURCHASE_EMAIL_FROM: '' }, { RESEND_NEWSLETTER_SEGMENT_ID: '' },
+  ]) {
+    const settings = checkoutSettings({ ...environment, ...env });
+    assert.equal(settings.enabled, true);
+    assert.equal(settings.fulfillmentReady, false);
+    const api = fixture({ env });
+    assert.equal((await (await api.config()).json()).enabled, true);
   }
 });
 
@@ -168,42 +206,38 @@ test('checkout redirects only to Stripe and uses the configured one-time price a
   assert.deepEqual(api.calls.creates[0], {
     mode: 'payment', line_items: [{ price: 'price_current123', quantity: 1 }],
     customer_creation: 'always',
+    consent_collection: { promotions: 'auto' },
     success_url: 'https://checkout.example.com/api/complete?session_id={CHECKOUT_SESSION_ID}',
     cancel_url: 'https://checkout.example.com/?checkout=cancelled',
     metadata: {
       product: 'yaprflow-mac',
-      terms_version: '2026-09-19',
-      terms_acceptance: 'website-checkbox',
     },
   });
   assert.equal('payment_method_types' in api.calls.creates[0], false, 'Stripe controls payment methods, including Managed Payments');
   assert.equal('managed_payments' in api.calls.creates[0], false, 'preserve the account default');
 });
 
-test('production checkout requires same-origin acceptance of the published terms', async () => {
+test('production checkout requires a same-origin request without requiring terms fields', async () => {
   const api = fixture({ env: { NODE_ENV: 'production' } });
   assert.equal((await api.checkout()).status, 400);
   assert.equal((await api.checkout(new Request('https://checkout.example.com/api/checkout', {
     method: 'POST',
-    headers: { Origin: 'https://evil.example', 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: 'terms=accepted',
+    headers: { Origin: 'https://evil.example' },
   }))).status, 400);
   assert.equal((await api.checkout(new Request('https://checkout.example.com/api/checkout', {
     method: 'POST',
-    headers: { Origin: 'https://checkout.example.com', 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: 'terms=accepted',
+    headers: { Origin: 'https://checkout.example.com' },
   }))).status, 303);
   for (const origin of [undefined, 'null']) {
-    const headers = { 'Sec-Fetch-Site': 'same-origin', 'Content-Type': 'application/x-www-form-urlencoded' };
+    const headers = { 'Sec-Fetch-Site': 'same-origin' };
     if (origin) headers.Origin = origin;
     assert.equal((await api.checkout(new Request('https://checkout.example.com/api/checkout', {
-      method: 'POST', headers, body: 'terms=accepted',
+      method: 'POST', headers,
     }))).status, 303);
   }
   assert.equal((await api.checkout(new Request('https://checkout.example.com/api/checkout', {
     method: 'POST',
-    headers: { 'Sec-Fetch-Site': 'cross-site', 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: 'terms=accepted',
+    headers: { 'Sec-Fetch-Site': 'cross-site' },
   }))).status, 400);
   assert.equal(api.calls.creates.length, 3);
 });
@@ -545,4 +579,89 @@ test('only local development can capture a non-Secure cookie, using a separate c
     assert.equal(result.status, 403);
     assert.equal(result.headers.get('Set-Cookie'), null);
   }
+});
+
+test('a signed emailed link restores a paid purchase on another browser without exposing the installer', async () => {
+  const api = fixture();
+  const token = issueDownloadLinkToken(sessionId, environment.DOWNLOAD_LINK_SECRET);
+  const response = await api.redeem(new Request(`https://checkout.example.com/api/redeem?token=${token}`));
+  assert.equal(response.status, 303);
+  assert.equal(response.headers.get('Location'), '/confirmation.html');
+  assert.equal(response.headers.get('Set-Cookie'), `__Host-yaprflow-purchase=${sessionId}; Path=/; Max-Age=2592000; HttpOnly; SameSite=Lax; Secure`);
+  assert.equal(api.calls.sessions.length, 1);
+  assert.equal(api.calls.tokens.length, 0, 'recovery does not create a Blob URL until the download endpoint is used');
+});
+
+test('recovery links reject tampering, duplication, mode mismatches and unpaid purchases', async () => {
+  const token = issueDownloadLinkToken(sessionId, environment.DOWNLOAD_LINK_SECRET);
+  for (const query of [
+    '', `?token=${token}x`, `?token=${token}&token=${token}`,
+    `?token=${issueDownloadLinkToken(liveSessionId, environment.DOWNLOAD_LINK_SECRET)}`,
+  ]) {
+    const api = fixture();
+    assert.equal((await api.redeem(new Request(`https://checkout.example.com/api/redeem${query}`))).status, 403);
+    assert.equal(api.calls.sessions.length, 0);
+  }
+  const pending = fixture({ session: { ...paidSession, payment_status: 'unpaid' } });
+  assert.equal((await pending.redeem(new Request(`https://checkout.example.com/api/redeem?token=${token}`))).status, 403);
+  assert.equal(pending.calls.sessions.length, 1);
+});
+
+function webhookRequest(body = '{"event":"body"}', signature = 'test-signature') {
+  return new Request('https://checkout.example.com/api/webhook', {
+    method: 'POST', body, headers: signature ? { 'Stripe-Signature': signature } : {},
+  });
+}
+
+test('the Stripe webhook verifies the raw signed body before fulfilling a paid purchase', async () => {
+  const api = fixture();
+  const response = await api.webhook(webhookRequest('exact-raw-body'));
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { received: true });
+  assert.deepEqual(api.calls.webhooks, [['exact-raw-body', 'test-signature', environment.STRIPE_WEBHOOK_SECRET]]);
+  assert.equal(api.calls.sessions.length, 1);
+  assert.equal(api.calls.fulfillments.length, 1);
+  assert.equal(api.calls.fulfillments[0].session, paidSession);
+});
+
+test('the webhook rejects missing or invalid signatures without fulfilling anything', async () => {
+  const missing = fixture();
+  assert.equal((await missing.webhook(webhookRequest('body', null))).status, 400);
+  assert.equal(missing.calls.webhooks.length, 0);
+  assert.equal(missing.calls.fulfillments.length, 0);
+
+  const invalid = fixture({ webhookError: new Error('invalid signature') });
+  assert.equal((await invalid.webhook(webhookRequest())).status, 400);
+  assert.equal(invalid.calls.sessions.length, 0);
+  assert.equal(invalid.calls.fulfillments.length, 0);
+
+  const missingSecret = fixture({ env: { STRIPE_WEBHOOK_SECRET: '' } });
+  assert.equal((await missingSecret.webhook(webhookRequest())).status, 503);
+  assert.equal(missingSecret.calls.webhooks.length, 0);
+});
+
+test('the webhook ignores unrelated events and waits for delayed payments to become paid', async () => {
+  const unrelated = fixture({ event: { type: 'customer.created', data: { object: {} } } });
+  assert.equal((await unrelated.webhook(webhookRequest())).status, 200);
+  assert.equal(unrelated.calls.sessions.length, 0);
+  assert.equal(unrelated.calls.fulfillments.length, 0);
+
+  const otherProduct = fixture({
+    event: { type: 'checkout.session.completed', data: { object: { id: sessionId, metadata: { product: 'other' } } } },
+  });
+  assert.equal((await otherProduct.webhook(webhookRequest())).status, 200);
+  assert.equal(otherProduct.calls.sessions.length, 0);
+
+  const pending = fixture({ session: { ...paidSession, payment_status: 'unpaid' } });
+  assert.equal((await pending.webhook(webhookRequest())).status, 200);
+  assert.equal(pending.calls.sessions.length, 1);
+  assert.equal(pending.calls.fulfillments.length, 0);
+});
+
+test('fulfillment failures return a retryable webhook response', async () => {
+  const api = fixture({ fulfillError: new Error('email provider unavailable') });
+  const response = await api.webhook(webhookRequest());
+  assert.equal(response.status, 503);
+  assert.match(await response.text(), /temporarily unavailable/i);
+  assert.equal(api.calls.fulfillments.length, 1);
 });

@@ -78,6 +78,10 @@ struct SettingsView: View {
                     AIProviderSettingsView()
                 }
 
+                settingsGroup("Outputs") {
+                    PromptPresetSettingsView()
+                }
+
                 settingsGroup("Privacy") {
                     VStack(alignment: .leading, spacing: 7) {
                         HStack(spacing: 12) {
@@ -118,9 +122,6 @@ struct SettingsView: View {
                     .buttonStyle(.link)
 
                     Spacer()
-
-                    Text("Version \(appVersion)")
-                        .foregroundStyle(.secondary)
                 }
                 .font(.caption)
             }
@@ -161,8 +162,21 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var updateSettings: some View {
-        #if DIRECT_DISTRIBUTION
         VStack(spacing: 0) {
+            HStack {
+                Text("Installed version")
+                    .font(.callout.weight(.medium))
+                Spacer()
+                Text(appVersion)
+                    .font(.callout.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel("Installed version \(appVersion)")
+            }
+            .padding(.vertical, 7)
+
+            Divider()
+
+        #if DIRECT_DISTRIBUTION
             HStack {
                 Text("Check for updates")
                     .font(.callout.weight(.medium))
@@ -183,19 +197,19 @@ struct SettingsView: View {
             Toggle("Download automatically", isOn: automaticUpdateDownloadsBinding)
                 .padding(.vertical, 9)
                 .disabled(!updater.automaticallyChecksForUpdates)
-        }
         #else
-        HStack {
-            Text("Updates are installed automatically through the Mac App Store.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-            Spacer()
-            Text("Mac App Store")
-                .font(.caption.weight(.medium))
-                .foregroundStyle(.secondary)
-        }
-        .padding(.vertical, 7)
+            HStack {
+                Text("Updates are installed automatically through the Mac App Store.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text("Mac App Store")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.vertical, 7)
         #endif
+        }
     }
 
     private var appVersion: String {
@@ -244,6 +258,86 @@ struct SettingsView: View {
         default:
             "Keep recognition in the selected language."
         }
+    }
+}
+
+private struct PromptPresetSettingsView: View {
+    @State private var selectedPresetID = LibraryPromptCatalog.structuredBrief.id
+    @State private var prompt = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Output prompts")
+                        .font(.callout.weight(.medium))
+                    Text("Used for both meeting notes and dictations.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 16)
+                Picker("Output prompt", selection: $selectedPresetID) {
+                    ForEach(LibraryPromptCatalog.itemPresets) { preset in
+                        Label(preset.title, systemImage: preset.systemImage).tag(preset.id)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .frame(width: 190)
+            }
+
+            TextEditor(text: promptBinding)
+                .font(.callout)
+                .scrollContentBackground(.hidden)
+                .padding(7)
+                .frame(minHeight: 130, maxHeight: 180)
+                .background(.background, in: RoundedRectangle(cornerRadius: 7))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 7)
+                        .stroke(.separator, lineWidth: 1)
+                }
+                .accessibilityLabel("\(selectedPreset.title) prompt")
+
+            HStack {
+                Text("Changes save automatically.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("Reset to Default") {
+                    LibraryPromptPreferences.reset(presetID: selectedPreset.id)
+                    prompt = selectedPreset.prompt
+                    notifyPromptChange()
+                }
+            }
+        }
+        .padding(.vertical, 5)
+        .onAppear(perform: loadPrompt)
+        .onChange(of: selectedPresetID) { _, _ in loadPrompt() }
+    }
+
+    private var selectedPreset: LibraryPromptPreset {
+        LibraryPromptCatalog.itemPreset(id: selectedPresetID)
+    }
+
+    private var promptBinding: Binding<String> {
+        Binding(
+            get: { prompt },
+            set: { newValue in
+                prompt = newValue
+                LibraryPromptPreferences.setPrompt(newValue, for: selectedPreset.id)
+                notifyPromptChange()
+            }
+        )
+    }
+
+    private func loadPrompt() {
+        let preset = LibraryPromptCatalog.itemPreset(id: selectedPresetID)
+        selectedPresetID = preset.id
+        prompt = LibraryPromptPreferences.prompt(for: preset.id)
+    }
+
+    private func notifyPromptChange() {
+        NotificationCenter.default.post(name: .yaprflowPromptPresetsChanged, object: nil)
     }
 }
 

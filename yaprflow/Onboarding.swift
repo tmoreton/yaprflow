@@ -10,11 +10,13 @@ private enum OnboardingStep {
 
 struct OnboardingView: View {
     let onComplete: () -> Void
+    let onRestart: () -> Void
 
     @State private var step: OnboardingStep = .welcome
     @State private var micStatus: AVAuthorizationStatus = AVCaptureDevice.authorizationStatus(for: .audio)
     @State private var screenCaptureGranted = CGPreflightScreenCaptureAccess()
     @State private var hasRequestedScreenCapture = false
+    @State private var screenCaptureRequiresRestart = false
 
     var body: some View {
         ZStack {
@@ -120,6 +122,9 @@ struct OnboardingView: View {
     }
 
     private var primaryButtonTitle: String {
+        if screenCaptureRequiresRestart {
+            return "Restart Yaprflow"
+        }
         if micStatus != .authorized {
             switch micStatus {
             case .denied, .restricted: return "Open Microphone Settings"
@@ -143,6 +148,10 @@ struct OnboardingView: View {
     }
 
     private func handlePrimaryAction() {
+        if screenCaptureRequiresRestart {
+            onRestart()
+            return
+        }
         if micStatus != .authorized {
             switch micStatus {
             case .authorized:
@@ -169,6 +178,7 @@ struct OnboardingView: View {
         } else {
             hasRequestedScreenCapture = true
             screenCaptureGranted = CGRequestScreenCaptureAccess()
+            screenCaptureRequiresRestart = screenCaptureGranted
         }
     }
 
@@ -205,7 +215,11 @@ struct OnboardingView: View {
 
     private func refreshPermissionStatuses() {
         micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+        let wasGranted = screenCaptureGranted
         screenCaptureGranted = CGPreflightScreenCaptureAccess()
+        if hasRequestedScreenCapture, !wasGranted, screenCaptureGranted {
+            screenCaptureRequiresRestart = true
+        }
     }
 
     private func openPrivacySettings(pane: String) {
@@ -247,9 +261,10 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
             return
         }
 
-        let rootView = OnboardingView { [weak self] in
-            self?.complete()
-        }
+        let rootView = OnboardingView(
+            onComplete: { [weak self] in self?.complete() },
+            onRestart: { [weak self] in self?.restart() }
+        )
 
         let hosting = NSHostingController(rootView: rootView)
         let newWindow = NSWindow(contentViewController: hosting)
@@ -274,14 +289,29 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
     }
 
     private func complete() {
+        UserDefaults.standard.set(true, forKey: Self.defaultsKey)
         window?.close() // windowWillClose will finish the cleanup.
+    }
+
+    private func restart() {
+        complete()
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.createsNewApplicationInstance = true
+        NSWorkspace.shared.openApplication(
+            at: Bundle.main.bundleURL,
+            configuration: configuration
+        ) { _, error in
+            guard error == nil else { return }
+            DispatchQueue.main.async {
+                NSApp.terminate(nil)
+            }
+        }
     }
 
     // MARK: - NSWindowDelegate
 
     nonisolated func windowWillClose(_ notification: Notification) {
         Task { @MainActor in
-            UserDefaults.standard.set(true, forKey: Self.defaultsKey)
             self.window = nil
             NSApp.setActivationPolicy(.accessory)
         }

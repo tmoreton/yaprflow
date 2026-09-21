@@ -4,6 +4,8 @@ import { checkoutSettings, loadCheckoutPrice } from './settings.js';
 import { stripeClient } from './stripe.js';
 import { purchaseAnalytics } from './purchase-analytics.js';
 import { purchaseCookieHeader, requestedPurchaseSessionId } from './purchase-identity.js';
+import { verifyDownloadLinkToken } from './download-link.js';
+import { fulfillPaidPurchase, resendClient } from './purchase-email.js';
 
 function json(body, status = 200, headers = {}) {
   return privateResponse(JSON.stringify(body), {
@@ -18,27 +20,19 @@ export function createHandlers({
   signUrl = presignUrl,
   now = Date.now,
   logger = console,
+  fulfillPurchase = fulfillPaidPurchase,
+  resendFactory = resendClient,
 } = {}) {
   const report = (message, error) => logger.error(message, error?.type || error?.name || 'unknown');
 
-  async function acceptedPurchaseTerms(request, settings, env) {
+  function isTrustedCheckoutRequest(request, settings, env) {
     if (!request && env.NODE_ENV === 'test') return true;
     if (!request || request.method !== 'POST') return false;
     const origin = request.headers.get('Origin');
     const fetchSite = request.headers.get('Sec-Fetch-Site');
     const requestOrigin = new URL(request.url).origin;
-    const trustedOrigin = origin === settings.baseUrl?.origin ||
+    return origin === settings.baseUrl?.origin ||
       ((!origin || origin === 'null') && fetchSite === 'same-origin' && requestOrigin === settings.baseUrl?.origin);
-    if (!trustedOrigin) return false;
-    const contentType = request.headers.get('Content-Type') || '';
-    if (!contentType.toLowerCase().startsWith('application/x-www-form-urlencoded')) return false;
-    try {
-      const form = await request.formData();
-      const values = form.getAll('terms');
-      return values.length === 1 && values[0] === 'accepted';
-    } catch {
-      return false;
-    }
   }
 
   return {
@@ -65,8 +59,8 @@ export function createHandlers({
       const env = environment();
       const settings = checkoutSettings(env);
       if (!settings.enabled) return privateResponse('Checkout is not ready.', { status: 503 });
-      if (!await acceptedPurchaseTerms(request, settings, env)) {
-        return privateResponse('Accept the purchase terms before continuing.', { status: 400 });
+      if (!isTrustedCheckoutRequest(request, settings, env)) {
+        return privateResponse('Checkout request could not be verified.', { status: 400 });
       }
       try {
         const stripe = stripeFactory(env);
@@ -77,12 +71,11 @@ export function createHandlers({
           mode: 'payment',
           line_items: [{ price: settings.priceId, quantity: 1 }],
           customer_creation: 'always',
+          consent_collection: { promotions: 'auto' },
           success_url: new URL('/api/complete?session_id={CHECKOUT_SESSION_ID}', settings.baseUrl).href,
           cancel_url: new URL('/?checkout=cancelled', settings.baseUrl).href,
           metadata: {
             product: checkoutProductMarker(),
-            terms_version: '2026-09-19',
-            terms_acceptance: 'website-checkbox',
           },
         });
         const url = new URL(session.url);
@@ -113,6 +106,68 @@ export function createHandlers({
         status: 303,
         headers: { Location: '/confirmation.html', 'Set-Cookie': cookie },
       });
+    },
+
+    async redeem(request) {
+      const env = environment();
+      const { mode } = checkoutSettings(env);
+      if (!mode) return privateResponse('Purchase recovery is not ready.', { status: 503 });
+      const tokens = new URL(request.url).searchParams.getAll('token');
+      const sessionId = tokens.length === 1
+        ? verifyDownloadLinkToken(tokens[0], env.DOWNLOAD_LINK_SECRET, mode) : null;
+      if (!sessionId) return privateResponse('This download link could not be verified.', { status: 403 });
+      try {
+        const session = await loadPaidMacPurchase(stripeFactory(env), sessionId, allowedPriceIds(env), mode);
+        if (!session) return privateResponse('Purchase could not be verified.', { status: 403 });
+        const cookie = purchaseCookieHeader(request, sessionId, mode, env);
+        if (!cookie) return privateResponse('This download link could not be verified.', { status: 403 });
+        return privateResponse(null, {
+          status: 303,
+          headers: { Location: '/confirmation.html', 'Set-Cookie': cookie },
+        });
+      } catch (error) {
+        report('Purchase recovery failed:', error);
+        return privateResponse('The download is temporarily unavailable.', { status: 502 });
+      }
+    },
+
+    async webhook(request) {
+      const env = environment();
+      const settings = checkoutSettings(env);
+      const webhookSecret = env.STRIPE_WEBHOOK_SECRET?.trim();
+      const signature = request?.headers.get('Stripe-Signature');
+      if (!settings.mode || !webhookSecret?.startsWith('whsec_')) {
+        return privateResponse('Payment fulfillment is not configured.', { status: 503 });
+      }
+      if (!signature) return privateResponse('Missing Stripe signature.', { status: 400 });
+
+      let stripe;
+      let event;
+      try {
+        stripe = stripeFactory(env);
+        event = stripe.webhooks.constructEvent(await request.text(), signature, webhookSecret);
+      } catch (error) {
+        report('Stripe webhook verification failed:', error);
+        return privateResponse('Invalid Stripe signature.', { status: 400 });
+      }
+
+      if (!['checkout.session.completed', 'checkout.session.async_payment_succeeded'].includes(event.type)) {
+        return json({ received: true });
+      }
+      const checkout = event.data?.object;
+      if (checkout?.metadata?.product !== checkoutProductMarker()) return json({ received: true });
+
+      try {
+        const prices = allowedPriceIds(env);
+        if (prices.size === 0) return privateResponse('Payment fulfillment is not configured.', { status: 503 });
+        const session = await loadMacPurchase(stripe, checkout.id, prices, settings.mode);
+        if (!isPaidMacPurchase(session, prices)) return json({ received: true });
+        await fulfillPurchase({ session, stripe, environment: env, resendFactory });
+        return json({ received: true });
+      } catch (error) {
+        report('Paid purchase fulfillment failed:', error);
+        return privateResponse('Payment fulfillment is temporarily unavailable.', { status: 503 });
+      }
     },
 
     async status(request) {

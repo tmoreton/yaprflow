@@ -102,6 +102,34 @@ final class TranscriptHistoryModel: ObservableObject {
         }
     }
 
+    /// Moves a transcript archive to the Trash and updates the in-memory
+    /// library immediately. The Trash keeps accidental deletions recoverable.
+    @discardableResult
+    func delete(_ item: TranscriptHistoryItem) -> Bool {
+        do {
+            if FileManager.default.fileExists(atPath: item.url.path) {
+                var resultingURL: NSURL?
+                try FileManager.default.trashItem(
+                    at: item.url,
+                    resultingItemURL: &resultingURL
+                )
+            }
+            items.removeAll { $0.id == item.id }
+            if selection == item.id {
+                selection = items.first?.id
+            }
+            errorMessage = nil
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func clearError() {
+        errorMessage = nil
+    }
+
     func handleArchiveChange(_ notification: Notification) {
         if let change = notification.object as? TranscriptArchiveChange,
            selection == change.oldURL {

@@ -24,9 +24,18 @@ export function checkoutSettings(environment = process.env) {
   const priceId = /^price_[A-Za-z0-9]+$/.test(environment.STRIPE_PRICE_ID || '')
     ? environment.STRIPE_PRICE_ID : null;
   const mode = stripeMode(environment);
+  const emailFrom = environment.PURCHASE_EMAIL_FROM;
+  const fulfillmentReady = environment.STRIPE_WEBHOOK_SECRET?.startsWith('whsec_') &&
+    environment.RESEND_API_KEY?.startsWith('re_') &&
+    typeof environment.DOWNLOAD_LINK_SECRET === 'string' &&
+    Buffer.byteLength(environment.DOWNLOAD_LINK_SECRET, 'utf8') >= 32 &&
+    typeof emailFrom === 'string' && emailFrom.includes('@') && !/[\r\n]/.test(emailFrom) &&
+    typeof environment.RESEND_NEWSLETTER_SEGMENT_ID === 'string' &&
+    Boolean(environment.RESEND_NEWSLETTER_SEGMENT_ID.trim());
   return {
-    baseUrl, priceId, mode, pathname, downloadReady,
-    enabled: environment.CHECKOUT_ENABLED === 'true' && Boolean(baseUrl && priceId && mode && downloadReady),
+    baseUrl, priceId, mode, pathname, downloadReady, fulfillmentReady: Boolean(fulfillmentReady),
+    enabled: environment.CHECKOUT_ENABLED === 'true' &&
+      Boolean(baseUrl && priceId && mode && downloadReady),
   };
 }
 

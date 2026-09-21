@@ -79,8 +79,7 @@ final class FeatureWindowController: NSObject, NSWindowDelegate {
 
     func show() {
         if let window {
-            window.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
+            present(window)
             return
         }
 
@@ -98,12 +97,18 @@ final class FeatureWindowController: NSObject, NSWindowDelegate {
         newWindow.center()
 
         window = newWindow
-        NSApp.setActivationPolicy(.regular)
-        newWindow.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        present(newWindow)
     }
 
     var isVisibleForSmokeTest: Bool { window?.isVisible == true }
+    var isKeyForSmokeTest: Bool { window?.isKeyWindow == true }
+
+    private func present(_ window: NSWindow) {
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
+    }
 
     nonisolated func windowWillClose(_ notification: Notification) {
         Task { @MainActor in

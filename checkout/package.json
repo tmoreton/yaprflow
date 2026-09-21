@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@vercel/blob": "2.8.0",
+    "resend": "6.28.1",
     "stripe": "22.6.2"
   }
 }

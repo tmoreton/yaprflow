@@ -13,6 +13,46 @@ enum MeetingWorkspaceSelection: Hashable {
     case dictation(URL)
 }
 
+private enum WorkspaceDeletionTarget {
+    case meeting(MeetingRecord)
+    case dictation(TranscriptHistoryItem)
+}
+
+private enum WorkspaceSidebarItem: Identifiable {
+    enum ID: Hashable {
+        case liveMeeting
+        case meeting(UUID)
+        case dictation(URL)
+    }
+
+    case liveMeeting(MeetingRecord)
+    case meeting(MeetingRecord)
+    case dictation(TranscriptHistoryItem)
+
+    var id: ID {
+        switch self {
+        case .liveMeeting: .liveMeeting
+        case let .meeting(meeting): .meeting(meeting.id)
+        case let .dictation(item): .dictation(item.id)
+        }
+    }
+
+    var date: Date {
+        switch self {
+        case let .liveMeeting(meeting), let .meeting(meeting): meeting.startedAt
+        case let .dictation(item): item.recordedAt
+        }
+    }
+
+    var stableSortKey: String {
+        switch self {
+        case .liveMeeting: "0-live-meeting"
+        case let .meeting(meeting): "1-\(meeting.id.uuidString)"
+        case let .dictation(item): "2-\(item.id.absoluteString)"
+        }
+    }
+}
+
 @MainActor
 private final class MeetingNotesNavigation: ObservableObject {
     static let shared = MeetingNotesNavigation()
@@ -28,7 +68,7 @@ struct MeetingNotesView: View {
     @StateObject private var history = TranscriptHistoryModel()
     @State private var search = ""
     @State private var selectedEvidenceID: UUID?
-    @State private var meetingPendingDeletion: MeetingRecord?
+    @State private var pendingDeletion: WorkspaceDeletionTarget?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -83,33 +123,40 @@ struct MeetingNotesView: View {
             Telemetry.shared.track(.featureOpened(telemetryFeature(for: destination)))
         }
         .confirmationDialog(
-            "Delete this meeting?",
+            deletionTitle,
             isPresented: Binding(
-                get: { meetingPendingDeletion != nil },
-                set: { if !$0 { meetingPendingDeletion = nil } }
+                get: { pendingDeletion != nil },
+                set: { if !$0 { pendingDeletion = nil } }
             )
         ) {
-            Button("Delete Meeting", role: .destructive) {
-                if let meetingPendingDeletion {
-                    delete(meetingPendingDeletion)
+            if let pendingDeletion {
+                switch pendingDeletion {
+                case let .meeting(meeting):
+                    Button("Delete Meeting", role: .destructive) {
+                        delete(meeting)
+                    }
+                case let .dictation(item):
+                    Button("Delete Dictation", role: .destructive) {
+                        delete(item)
+                    }
                 }
             }
             Button("Cancel", role: .cancel) {
-                meetingPendingDeletion = nil
+                pendingDeletion = nil
             }
         } message: {
-            Text("The transcript, notes, and summary will be moved to the Trash.")
+            Text(deletionMessage)
         }
         .alert(
-            "Couldn’t delete meeting",
+            "Couldn’t delete item",
             isPresented: Binding(
-                get: { store.errorMessage != nil },
-                set: { if !$0 { store.clearError() } }
+                get: { deletionErrorMessage != nil },
+                set: { if !$0 { clearDeletionError() } }
             )
         ) {
-            Button("OK") { store.clearError() }
+            Button("OK") { clearDeletionError() }
         } message: {
-            Text(store.errorMessage ?? "Please try again.")
+            Text(deletionErrorMessage ?? "Please try again.")
         }
     }
 
@@ -185,54 +232,43 @@ struct MeetingNotesView: View {
 
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 4) {
-                    if showsCurrentMeeting {
-                        sourceButton(selection: .liveMeeting) {
-                            HStack(spacing: 9) {
-                                Image(systemName: session.phase.isCapturing ? "record.circle.fill" : "person.2.wave.2")
-                                    .foregroundStyle(session.phase.isCapturing ? .red : .blue)
-                                    .frame(width: 20)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(currentMeetingLabel)
-                                        .font(.callout.weight(.medium))
-                                    Text(session.meeting.title)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(1)
-                                }
+                    ForEach(filteredSidebarItems) { item in
+                        switch item {
+                        case let .liveMeeting(meeting):
+                            sourceButton(selection: .liveMeeting) {
+                                MeetingSidebarRow(
+                                    meeting: meeting,
+                                    activity: currentMeetingActivity
+                                )
                             }
-                        }
-                    }
+                            .accessibilityLabel("Open current meeting, \(meeting.title)")
 
-                    if !filteredMeetings.isEmpty {
-                        sectionLabel("Meetings", count: filteredMeetings.count)
-                        ForEach(filteredMeetings) { meeting in
+                        case let .meeting(meeting):
                             sourceButton(selection: .meeting(meeting.id)) {
-                                SavedMeetingRow(meeting: meeting)
+                                MeetingSidebarRow(meeting: meeting)
                             }
                             .accessibilityLabel("Open \(meeting.title)")
                             .contextMenu {
                                 Button("Delete Meeting", systemImage: "trash", role: .destructive) {
-                                    meetingPendingDeletion = meeting
+                                    pendingDeletion = .meeting(meeting)
                                 }
                             }
-                        }
-                    }
 
-                    if !filteredDictations.isEmpty {
-                        sectionLabel("Dictations", count: filteredDictations.count)
-                        ForEach(filteredDictations) { item in
-                            sourceButton(selection: .dictation(item.id)) {
-                                DictationRow(item: item)
+                        case let .dictation(dictation):
+                            sourceButton(selection: .dictation(dictation.id)) {
+                                DictationRow(item: dictation)
                             }
+                            .accessibilityLabel("Open dictation, \(dictation.title)")
                             .contextMenu {
                                 Button("Copy Transcript", systemImage: "doc.on.clipboard") {
-                                    copyDictation(item)
-                                }
-                                Button("Open in Default App", systemImage: "arrow.up.forward.app") {
-                                    NSWorkspace.shared.open(item.url)
+                                    copyDictation(dictation)
                                 }
                                 Button("Reveal in Finder", systemImage: "folder") {
-                                    NSWorkspace.shared.activateFileViewerSelecting([item.url])
+                                    NSWorkspace.shared.activateFileViewerSelecting([dictation.url])
+                                }
+                                Divider()
+                                Button("Delete Dictation", systemImage: "trash", role: .destructive) {
+                                    pendingDeletion = .dictation(dictation)
                                 }
                             }
                         }
@@ -296,18 +332,6 @@ struct MeetingNotesView: View {
         .buttonStyle(.plain)
     }
 
-    private func sectionLabel(_ title: String, count: Int) -> some View {
-        HStack {
-            Text(title.uppercased())
-            Spacer()
-            Text("\(count)")
-        }
-        .font(.caption2.weight(.semibold))
-        .foregroundStyle(.tertiary)
-        .padding(.horizontal, 8)
-        .padding(.top, 10)
-    }
-
     @ViewBuilder
     private var detail: some View {
         switch navigation.selection {
@@ -321,7 +345,7 @@ struct MeetingNotesView: View {
                 SavedMeetingView(
                     initialMeeting: meeting,
                     initialEvidenceID: selectedEvidenceID,
-                    onDelete: { meetingPendingDeletion = $0 },
+                    onDelete: { pendingDeletion = .meeting($0) },
                     onOpenSettings: { navigation.destination = .settings }
                 )
                 .id(meeting.id)
@@ -336,6 +360,7 @@ struct MeetingNotesView: View {
             if let item = history.items.first(where: { $0.id == url }) {
                 DictationWorkspace(
                     item: item,
+                    onDelete: { pendingDeletion = .dictation($0) },
                     onOpenSettings: { navigation.destination = .settings }
                 )
                 .id(item.id)
@@ -384,6 +409,18 @@ struct MeetingNotesView: View {
         }
     }
 
+    private var filteredSidebarItems: [WorkspaceSidebarItem] {
+        var items = filteredMeetings.map(WorkspaceSidebarItem.meeting)
+        items.append(contentsOf: filteredDictations.map(WorkspaceSidebarItem.dictation))
+        if showsCurrentMeeting {
+            items.append(.liveMeeting(session.meeting))
+        }
+        return items.sorted { lhs, rhs in
+            if lhs.date != rhs.date { return lhs.date > rhs.date }
+            return lhs.stableSortKey < rhs.stableSortKey
+        }
+    }
+
     private var normalizedSearch: String {
         search.trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -409,16 +446,18 @@ struct MeetingNotesView: View {
             || session.meeting.generatedNotes?.overview.localizedCaseInsensitiveContains(query) == true
     }
 
-    private var currentMeetingLabel: String {
+    private var currentMeetingActivity: MeetingSidebarActivity? {
         switch session.phase {
-        case .preparing, .recording, .paused:
-            "Live meeting"
+        case .preparing:
+            .preparing
+        case .recording:
+            .recording
+        case .paused:
+            .paused
         case .finalizing:
-            "Finishing meeting"
-        case .complete, .failed:
-            "Recent meeting"
-        case .idle:
-            "New meeting"
+            .finishing
+        case .complete, .failed, .idle:
+            nil
         }
     }
 
@@ -444,12 +483,49 @@ struct MeetingNotesView: View {
     }
 
     private func delete(_ meeting: MeetingRecord) {
-        meetingPendingDeletion = nil
+        pendingDeletion = nil
         guard store.delete(meeting) else { return }
         if navigation.selection == .meeting(meeting.id) {
             selectedEvidenceID = nil
             navigation.selection = .liveMeeting
         }
+    }
+
+    private func delete(_ item: TranscriptHistoryItem) {
+        pendingDeletion = nil
+        guard history.delete(item) else { return }
+        if navigation.selection == .dictation(item.id) {
+            selectedEvidenceID = nil
+            navigation.selection = .liveMeeting
+        }
+    }
+
+    private var deletionTitle: String {
+        switch pendingDeletion {
+        case .meeting: "Delete this meeting?"
+        case .dictation: "Delete this dictation?"
+        case nil: "Delete this item?"
+        }
+    }
+
+    private var deletionMessage: String {
+        switch pendingDeletion {
+        case .meeting:
+            "The transcript, notes, and summary will be moved to the Trash."
+        case .dictation:
+            "The transcript will be moved to the Trash."
+        case nil:
+            "This item will be moved to the Trash."
+        }
+    }
+
+    private var deletionErrorMessage: String? {
+        store.errorMessage ?? history.errorMessage
+    }
+
+    private func clearDeletionError() {
+        store.clearError()
+        history.clearError()
     }
 }
 
@@ -457,54 +533,100 @@ private struct DictationRow: View {
     let item: TranscriptHistoryItem
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Image(systemName: "waveform")
+        HStack(alignment: .top, spacing: 9) {
+            sidebarIcon("waveform", color: .orange)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(item.title)
+                        .font(.callout.weight(.medium))
+                        .lineLimit(1)
+                    Spacer(minLength: 4)
+                    Text(item.recordedAt.formatted(date: .omitted, time: .shortened))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                HStack(spacing: 5) {
+                    Text("DICTATION")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.orange)
+                    Text("·")
+                        .foregroundStyle(.tertiary)
+                    Text(item.recordedAt.formatted(date: .abbreviated, time: .omitted))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                Text(item.preview)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
-                    .frame(width: 18)
-                Text(item.title)
-                    .font(.callout.weight(.medium))
-                    .lineLimit(1)
-                Spacer(minLength: 4)
-                Text(item.recordedAt.formatted(date: .omitted, time: .shortened))
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
             }
-            Text(item.recordedAt.formatted(date: .abbreviated, time: .omitted))
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-            Text(item.preview)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
         }
     }
 }
 
-private struct SavedMeetingRow: View {
+private enum MeetingSidebarActivity {
+    case preparing
+    case recording
+    case paused
+    case finishing
+
+    var label: String {
+        switch self {
+        case .preparing: "STARTING"
+        case .recording: "RECORDING"
+        case .paused: "PAUSED"
+        case .finishing: "FINISHING"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .preparing, .finishing: .secondary
+        case .recording: .red
+        case .paused: .orange
+        }
+    }
+}
+
+private struct MeetingSidebarRow: View {
     let meeting: MeetingRecord
+    var activity: MeetingSidebarActivity? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Image(systemName: "person.2")
+        HStack(alignment: .top, spacing: 9) {
+            sidebarIcon("person.2.fill", color: .blue)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(meeting.title)
+                        .font(.callout.weight(.medium))
+                        .lineLimit(1)
+                    Spacer(minLength: 4)
+                    Text(meeting.startedAt.formatted(date: .omitted, time: .shortened))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                HStack(spacing: 5) {
+                    Text("MEETING")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.blue)
+                    if let activity {
+                        Text("·")
+                            .foregroundStyle(.tertiary)
+                        Text(activity.label)
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(activity.color)
+                    }
+                    Text("·")
+                        .foregroundStyle(.tertiary)
+                    Text(meeting.startedAt.formatted(date: .abbreviated, time: .omitted))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                Text(preview)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
-                    .frame(width: 18)
-                Text(meeting.title)
-                    .font(.callout.weight(.medium))
-                    .lineLimit(1)
-                Spacer(minLength: 4)
-                Text(meeting.startedAt.formatted(date: .omitted, time: .shortened))
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
             }
-            Text(meeting.startedAt.formatted(date: .abbreviated, time: .omitted))
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-            Text(preview)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -517,17 +639,16 @@ private struct SavedMeetingRow: View {
     }
 }
 
-private struct TranscriptDisplayItem: Identifiable {
-    let segment: MeetingTranscriptSegment
-    let isLive: Bool
-
-    var id: UUID { segment.id }
+private func sidebarIcon(_ systemName: String, color: Color) -> some View {
+    Image(systemName: systemName)
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(color)
+        .frame(width: 24, height: 24)
+        .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
+        .accessibilityHidden(true)
 }
 
 private struct LiveMeetingWorkspace: View {
-    private static let liveMeID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
-    private static let liveThemID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
-
     @ObservedObject var session: MeetingSessionController
     let onOpenSettings: () -> Void
     @State private var selectedEvidenceID: UUID?
@@ -556,6 +677,7 @@ private struct LiveMeetingWorkspace: View {
                         meeting: session.meeting,
                         onOpenEvidence: { selectedEvidenceID = $0 },
                         onSummaryGenerated: session.saveGeneratedNotes,
+                        onSelectOutput: session.selectTemplate,
                         onOpenSettings: onOpenSettings
                     )
                 }
@@ -602,24 +724,37 @@ private struct LiveMeetingWorkspace: View {
                 }
             }
 
-            HStack(spacing: 10) {
-                Picker("Template", selection: Binding(
-                    get: { session.meeting.templateID },
-                    set: session.selectTemplate
-                )) {
-                    ForEach(MeetingTemplateCatalog.builtIns) { template in
-                        Text(template.name).tag(template.id)
+            if !showsMeetingDocument {
+                HStack(spacing: 10) {
+                    Text("Meeting output")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Picker("Meeting output", selection: Binding(
+                        get: { MeetingTemplateCatalog.template(id: session.meeting.templateID).id },
+                        set: session.selectTemplate
+                    )) {
+                        ForEach(MeetingTemplateCatalog.builtIns) { template in
+                            Label(template.name, systemImage: template.systemImage).tag(template.id)
+                        }
                     }
+                    .labelsHidden()
+                    .frame(width: 190)
+                    .help("Choose the notes this meeting will produce")
+
+                    Spacer()
+
+                    Label("Audio isn’t saved", systemImage: "lock.fill")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
-                .labelsHidden()
-                .frame(width: 175)
-                .help("Meeting notes template")
-
-                Spacer()
-
-                Label("Audio isn’t saved", systemImage: "lock.fill")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            } else {
+                HStack {
+                    Spacer()
+                    Label("Audio isn’t saved", systemImage: "lock.fill")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             statusLine
@@ -713,8 +848,8 @@ private struct LiveMeetingWorkspace: View {
             if hasTranscript {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 7) {
-                        ForEach(displayedTranscript) { item in
-                            TranscriptSegmentRow(segment: item.segment, isLive: item.isLive)
+                        ForEach(displayedTranscript) { segment in
+                            TranscriptSegmentRow(segment: segment)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -724,7 +859,9 @@ private struct LiveMeetingWorkspace: View {
                     Image(systemName: "waveform")
                         .font(.title2)
                         .foregroundStyle(.tertiary)
-                    Text("Transcript appears here")
+                    Text(session.phase.isCapturing
+                        ? "Finalized transcript appears here"
+                        : "Transcript appears here")
                         .font(.callout.weight(.medium))
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -734,37 +871,11 @@ private struct LiveMeetingWorkspace: View {
     }
 
     private var hasTranscript: Bool {
-        !session.meeting.transcript.isEmpty || !session.liveMe.isEmpty || !session.liveThem.isEmpty
+        !session.meeting.transcript.isEmpty
     }
 
-    private var displayedTranscript: [TranscriptDisplayItem] {
-        var segments = session.meeting.transcript
-        var liveIDs: Set<UUID> = []
-
-        if !session.liveThem.isEmpty {
-            liveIDs.insert(Self.liveThemID)
-            segments.append(MeetingTranscriptSegment(
-                id: Self.liveThemID,
-                speaker: .them,
-                startTime: session.liveThemStartTime ?? session.elapsed,
-                endTime: session.elapsed,
-                text: session.liveThem
-            ))
-        }
-        if !session.liveMe.isEmpty {
-            liveIDs.insert(Self.liveMeID)
-            segments.append(MeetingTranscriptSegment(
-                id: Self.liveMeID,
-                speaker: .me,
-                startTime: session.liveMeStartTime ?? session.elapsed,
-                endTime: session.elapsed,
-                text: session.liveMe
-            ))
-        }
-
-        return MeetingTranscriptReconciler
-            .newestFirst(MeetingTranscriptReconciler.reconcile(segments))
-            .map { TranscriptDisplayItem(segment: $0, isLive: liveIDs.contains($0.id)) }
+    private var displayedTranscript: [MeetingTranscriptSegment] {
+        MeetingTranscriptReconciler.newestFirst(session.meeting.transcript)
     }
 
     private var isBusy: Bool {
@@ -800,10 +911,10 @@ private struct LiveMeetingWorkspace: View {
     }
 
     private func openScreenCaptureSettings() {
-        guard let url = URL(
-            string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
-        ) else { return }
-        NSWorkspace.shared.open(url)
+        _ = MeetingSystemAudioCapture.requestAuthorizationIfNeeded()
+        if !MeetingSystemAudioCapture.isAuthorized {
+            MeetingSystemAudioCapture.openPrivacySettings()
+        }
     }
 }
 
@@ -845,10 +956,20 @@ private struct SavedMeetingView: View {
                     .foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 12)
-                Button("Edit", systemImage: "pencil") { isEditing = true }
-                Button(didCopy ? "Copied" : "Copy", systemImage: didCopy ? "checkmark" : "doc.on.doc") {
-                    copyMarkdown()
+                Button {
+                    isEditing = true
+                } label: {
+                    Image(systemName: "pencil")
                 }
+                .help("Edit meeting")
+                .accessibilityLabel("Edit meeting")
+                Button {
+                    copyMarkdown()
+                } label: {
+                    Image(systemName: didCopy ? "checkmark" : "doc.on.doc")
+                }
+                .help(didCopy ? "Copied" : "Copy meeting")
+                .accessibilityLabel(didCopy ? "Meeting copied" : "Copy meeting")
                 Button {
                     reveal()
                 } label: {
@@ -881,6 +1002,7 @@ private struct SavedMeetingView: View {
                     selectedEvidenceID = segmentID
                 },
                 onSummaryGenerated: saveGeneratedSummary,
+                onSelectOutput: selectOutput,
                 onOpenSettings: onOpenSettings
             )
         }
@@ -896,6 +1018,14 @@ private struct SavedMeetingView: View {
         meeting.generatedNotes = notes
         if meeting.needsGeneratedTitle, let suggestedTitle = notes.suggestedTitle {
             meeting.title = suggestedTitle
+        }
+        _ = try? MeetingStore.shared.save(meeting)
+    }
+
+    private func selectOutput(_ id: String) {
+        meeting.templateID = id
+        if let notes = meeting.generatedNotes {
+            meeting.generatedNotes = MeetingGeneratedNotesGrounder.grounded(notes, in: meeting)
         }
         _ = try? MeetingStore.shared.save(meeting)
     }
@@ -1232,7 +1362,6 @@ private struct GeneratedNotesView: View {
 
 private struct TranscriptSegmentRow: View {
     let segment: MeetingTranscriptSegment
-    var isLive = false
     var isHighlighted = false
 
     var body: some View {
@@ -1246,7 +1375,7 @@ private struct TranscriptSegmentRow: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(segment.speaker == .me ? .blue : .purple)
                 Text(segment.text)
-                    .foregroundStyle(isLive ? .secondary : .primary)
+                    .foregroundStyle(.primary)
                     .textSelection(.enabled)
             }
         }
@@ -1286,6 +1415,7 @@ enum MeetingNotesWindowController {
     }
 
     static var isVisibleForSmokeTest: Bool { window.isVisibleForSmokeTest }
+    static var isKeyForSmokeTest: Bool { window.isKeyForSmokeTest }
     static var destinationForSmokeTest: MeetingNotesDestination { MeetingNotesNavigation.shared.destination }
     static var selectionForSmokeTest: MeetingWorkspaceSelection { MeetingNotesNavigation.shared.selection }
 }

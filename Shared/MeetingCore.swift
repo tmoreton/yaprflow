@@ -94,6 +94,11 @@ public enum MeetingTranscriptReconciler {
         let range: Range<String.Index>
     }
 
+    private struct TokenMatch {
+        let microphoneIndex: Int
+        let systemIndex: Int
+    }
+
     private static func isEarlier(
         _ lhs: MeetingTranscriptSegment,
         _ rhs: MeetingTranscriptSegment
@@ -117,42 +122,122 @@ public enum MeetingTranscriptReconciler {
         let systemTokens = tokens(in: systemText)
         guard microphoneTokens.count >= 3, systemTokens.count >= 3 else { return microphoneText }
 
-        var previous = [Int](repeating: 0, count: systemTokens.count + 1)
-        var bestLength = 0
-        var bestMicrophoneEnd = 0
+        let matches = fuzzyOrderedMatches(microphoneTokens, systemTokens)
+        let groups = matchGroups(matches)
+        let echoRanges = groups.compactMap { group -> Range<String.Index>? in
+            guard let firstMatch = group.first, let lastMatch = group.last else { return nil }
+            let microphoneSpan = lastMatch.microphoneIndex - firstMatch.microphoneIndex + 1
+            let matchedCharacters = group.reduce(into: 0) { count, match in
+                count += microphoneTokens[match.microphoneIndex].value.count
+            }
+            let coverage = Double(group.count) / Double(microphoneSpan)
+            guard group.count >= 4, matchedCharacters >= 15, coverage >= 0.6 else { return nil }
+            return microphoneTokens[firstMatch.microphoneIndex].range.lowerBound
+                ..< microphoneTokens[lastMatch.microphoneIndex].range.upperBound
+        }
+        guard !echoRanges.isEmpty else { return microphoneText }
 
+        var cleaned = microphoneText
+        for range in echoRanges.reversed() {
+            cleaned.removeSubrange(range)
+        }
+        let trimming = CharacterSet.whitespacesAndNewlines.union(.punctuationCharacters)
+        let remainder = cleaned
+            .split(whereSeparator: \Character.isWhitespace)
+            .filter { !$0.trimmingCharacters(in: .punctuationCharacters).isEmpty }
+            .joined(separator: " ")
+            .trimmingCharacters(in: trimming)
+        return TranscriptSegments.capitalizingFirstLetter(in: remainder)
+    }
+
+    /// Finds an ordered token alignment while tolerating the small spelling
+    /// changes and omissions produced when two recognizers hear the same audio.
+    private static func fuzzyOrderedMatches(
+        _ microphoneTokens: [WordToken],
+        _ systemTokens: [WordToken]
+    ) -> [TokenMatch] {
+        var lengths = Array(
+            repeating: [Int](repeating: 0, count: systemTokens.count + 1),
+            count: microphoneTokens.count + 1
+        )
         for microphoneIndex in 1...microphoneTokens.count {
-            var current = [Int](repeating: 0, count: systemTokens.count + 1)
-            for systemIndex in 1...systemTokens.count
-            where microphoneTokens[microphoneIndex - 1].value == systemTokens[systemIndex - 1].value {
-                current[systemIndex] = previous[systemIndex - 1] + 1
-                if current[systemIndex] > bestLength {
-                    bestLength = current[systemIndex]
-                    bestMicrophoneEnd = microphoneIndex
+            for systemIndex in 1...systemTokens.count {
+                if tokensAreSimilar(
+                    microphoneTokens[microphoneIndex - 1].value,
+                    systemTokens[systemIndex - 1].value
+                ) {
+                    lengths[microphoneIndex][systemIndex] = lengths[microphoneIndex - 1][systemIndex - 1] + 1
+                } else {
+                    lengths[microphoneIndex][systemIndex] = max(
+                        lengths[microphoneIndex - 1][systemIndex],
+                        lengths[microphoneIndex][systemIndex - 1]
+                    )
                 }
+            }
+        }
+
+        var microphoneIndex = microphoneTokens.count
+        var systemIndex = systemTokens.count
+        var matches: [TokenMatch] = []
+        while microphoneIndex > 0, systemIndex > 0 {
+            if tokensAreSimilar(
+                microphoneTokens[microphoneIndex - 1].value,
+                systemTokens[systemIndex - 1].value
+            ), lengths[microphoneIndex][systemIndex] == lengths[microphoneIndex - 1][systemIndex - 1] + 1 {
+                matches.append(TokenMatch(
+                    microphoneIndex: microphoneIndex - 1,
+                    systemIndex: systemIndex - 1
+                ))
+                microphoneIndex -= 1
+                systemIndex -= 1
+            } else if lengths[microphoneIndex - 1][systemIndex] >= lengths[microphoneIndex][systemIndex - 1] {
+                microphoneIndex -= 1
+            } else {
+                systemIndex -= 1
+            }
+        }
+        return matches.reversed()
+    }
+
+    /// Echo words should occupy a dense span in the microphone transcript.
+    /// A gap of more than three microphone words starts a separate candidate,
+    /// preventing unrelated words elsewhere in the segment from being removed.
+    private static func matchGroups(_ matches: [TokenMatch]) -> [[TokenMatch]] {
+        matches.reduce(into: [[TokenMatch]]()) { groups, match in
+            if let previous = groups.last?.last,
+               match.microphoneIndex - previous.microphoneIndex <= 3 {
+                groups[groups.count - 1].append(match)
+            } else {
+                groups.append([match])
+            }
+        }
+    }
+
+    private static func tokensAreSimilar(_ lhs: String, _ rhs: String) -> Bool {
+        if lhs == rhs { return lhs.count >= 3 }
+        let minimumLength = min(lhs.count, rhs.count)
+        guard minimumLength >= 4 else { return false }
+        if lhs.commonPrefix(with: rhs).count >= 4 { return true }
+        guard lhs.first == rhs.first else { return false }
+        return editDistance(lhs, rhs) <= 2
+    }
+
+    private static func editDistance(_ lhs: String, _ rhs: String) -> Int {
+        let left = Array(lhs)
+        let right = Array(rhs)
+        var previous = Array(0...right.count)
+        for (leftIndex, leftCharacter) in left.enumerated() {
+            var current = [leftIndex + 1] + [Int](repeating: 0, count: right.count)
+            for (rightIndex, rightCharacter) in right.enumerated() {
+                current[rightIndex + 1] = min(
+                    current[rightIndex] + 1,
+                    previous[rightIndex + 1] + 1,
+                    previous[rightIndex] + (leftCharacter == rightCharacter ? 0 : 1)
+                )
             }
             previous = current
         }
-
-        let shorterCount = min(microphoneTokens.count, systemTokens.count)
-        let isExactShortPhrase = shorterCount >= 3
-            && bestLength == shorterCount
-            && microphoneTokens[bestMicrophoneEnd - bestLength..<bestMicrophoneEnd]
-                .map(\.value)
-                .joined()
-                .count >= 15
-        let substantialMatch = bestLength >= max(6, Int(ceil(Double(shorterCount) * 0.65)))
-        guard isExactShortPhrase || substantialMatch else { return microphoneText }
-
-        let firstToken = microphoneTokens[bestMicrophoneEnd - bestLength]
-        let lastToken = microphoneTokens[bestMicrophoneEnd - 1]
-        let trimming = CharacterSet.whitespacesAndNewlines.union(.punctuationCharacters)
-        let prefix = String(microphoneText[..<firstToken.range.lowerBound])
-            .trimmingCharacters(in: trimming)
-        let suffix = String(microphoneText[lastToken.range.upperBound...])
-            .trimmingCharacters(in: trimming)
-        let remainder = [prefix, suffix].filter { !$0.isEmpty }.joined(separator: " ")
-        return TranscriptSegments.capitalizingFirstLetter(in: remainder)
+        return previous[right.count]
     }
 
     private static func tokens(in text: String) -> [WordToken] {
@@ -323,65 +408,57 @@ public struct MeetingTemplate: Codable, Identifiable, Hashable, Sendable {
     public var name: String
     public var systemImage: String
     public var instructions: String
+    public var includesFollowUpDraft: Bool
 
-    public init(id: String, name: String, systemImage: String, instructions: String) {
+    public init(
+        id: String,
+        name: String,
+        systemImage: String,
+        instructions: String,
+        includesFollowUpDraft: Bool = false
+    ) {
         self.id = id
         self.name = name
         self.systemImage = systemImage
         self.instructions = instructions
+        self.includesFollowUpDraft = includesFollowUpDraft
     }
 }
 
 public enum MeetingTemplateCatalog {
-    public static let generalID = "general"
+    public static let generalID = "structured-brief"
 
-    public static let builtIns: [MeetingTemplate] = [
-        MeetingTemplate(
-            id: generalID,
-            name: "General meeting",
-            systemImage: "person.2",
-            instructions: "Capture the main points, decisions, action items, key details, and unresolved questions."
-        ),
-        MeetingTemplate(
-            id: "one-to-one",
-            name: "1:1",
-            systemImage: "person.line.dotted.person",
-            instructions: "Emphasize updates, feedback, coaching topics, commitments, and topics to revisit next time."
-        ),
-        MeetingTemplate(
-            id: "interview",
-            name: "Interview",
-            systemImage: "person.crop.rectangle",
-            instructions: "Organize evidence by question, strengths, concerns, concrete examples, and recommended next step."
-        ),
-        MeetingTemplate(
-            id: "user-research",
-            name: "User research",
-            systemImage: "quote.bubble",
-            instructions: "Capture user goals, current workflow, pain points, verbatim evidence, feature requests, and opportunities."
-        ),
-        MeetingTemplate(
-            id: "sales",
-            name: "Sales call",
-            systemImage: "chart.line.uptrend.xyaxis",
-            instructions: "Capture needs, qualification signals, objections, stakeholders, timing, pricing discussion, and next steps."
-        ),
-        MeetingTemplate(
-            id: "standup",
-            name: "Standup",
-            systemImage: "figure.stand",
-            instructions: "Organize updates by person or workstream, then list blockers, decisions, and today's commitments."
-        ),
-        MeetingTemplate(
-            id: "project-review",
-            name: "Project review",
-            systemImage: "checklist",
-            instructions: "Capture status, milestones, risks, dependencies, decisions, owners, and target dates."
-        ),
-    ]
+    /// Meetings and dictations intentionally share one output catalog.
+    /// The prompt is resolved when the menu is shown or generation begins so
+    /// edits made in Settings take effect without restarting the app.
+    public static var builtIns: [MeetingTemplate] {
+        LibraryPromptCatalog.itemPresets.map { preset in
+            MeetingTemplate(
+                id: preset.id,
+                name: preset.title,
+                systemImage: preset.systemImage,
+                instructions: LibraryPromptPreferences.prompt(for: preset.id),
+                includesFollowUpDraft: [
+                    LibraryPromptCatalog.salesFollowUp.id,
+                    LibraryPromptCatalog.followUpEmail.id,
+                ].contains(preset.id)
+            )
+        }
+    }
 
     public static func template(id: String) -> MeetingTemplate {
-        builtIns.first { $0.id == id } ?? builtIns[0]
+        let normalizedID: String
+        switch id {
+        case "project-review":
+            normalizedID = LibraryPromptCatalog.actionPlan.id
+        case "detailed-notes":
+            normalizedID = LibraryPromptCatalog.detailedNotes.id
+        case "general":
+            normalizedID = generalID
+        default:
+            normalizedID = id
+        }
+        return builtIns.first { $0.id == normalizedID } ?? builtIns[0]
     }
 }
 
@@ -402,7 +479,7 @@ public struct LibraryPromptPreset: Identifiable, Hashable, Sendable {
 public enum LibraryPromptCatalog {
     public static let structuredBrief = LibraryPromptPreset(
         id: "structured-brief",
-        title: "Structured Brief",
+        title: "General Summary",
         systemImage: "doc.text",
         prompt: """
         Turn this source into a concise, trustworthy brief. Use only information in the source. Do not invent or infer missing facts, owners, dates, decisions, or intent. Preserve important names, numbers, dates, and commitments, and distinguish confirmed decisions from ideas or proposals.
@@ -425,6 +502,114 @@ public enum LibraryPromptCatalog {
 
         ## Important details
         Retain exact names, figures, dates, links, constraints, and dependencies that matter later.
+        """
+    )
+
+    public static let oneToOneNotes = LibraryPromptPreset(
+        id: "one-to-one",
+        title: "1:1 Notes",
+        systemImage: "person.line.dotted.person",
+        prompt: """
+        Organize this source into useful 1:1 notes. Use only what was actually discussed and never invent feedback, intent, commitments, owners, dates, or personal context. Preserve nuance and distinguish direct feedback from suggestions or observations.
+
+        Use these sections, omitting empty sections:
+        ## Check-in and context
+        Capture meaningful updates, priorities, and changes since the last conversation.
+        ## Feedback and coaching
+        Separate feedback that was given from topics that were merely explored.
+        ## Goals and development
+        Record stated goals, growth areas, support requested, and agreed next steps.
+        ## Commitments
+        Format each item as: - [ ] Action — Owner: name or Not stated — Due: date or Not stated
+        ## Topics to revisit
+        List unresolved questions, concerns, and items for the next 1:1.
+        """
+    )
+
+    public static let interviewNotes = LibraryPromptPreset(
+        id: "interview",
+        title: "Interview Notes",
+        systemImage: "person.crop.rectangle",
+        prompt: """
+        Turn this source into evidence-based interview notes. Use only statements and examples in the source. Never invent qualifications, sentiment, scores, answers, or a hiring recommendation. Keep interviewer commentary distinct from candidate evidence.
+
+        Use these sections, omitting empty sections:
+        ## Interview context
+        State the role, stage, and interview focus only when provided.
+        ## Evidence by topic or question
+        Group concrete answers and examples under descriptive headings.
+        ## Demonstrated strengths
+        Include the supporting example for every strength.
+        ## Concerns and missing evidence
+        Separate an observed concern from an area that simply was not covered.
+        ## Candidate questions
+        Preserve questions the candidate asked and any answers given.
+        ## Recommended next step
+        Include only a recommendation explicitly stated in the source; otherwise write Not stated.
+        """
+    )
+
+    public static let researchSynthesis = LibraryPromptPreset(
+        id: "user-research",
+        title: "Research Synthesis",
+        systemImage: "quote.bubble",
+        prompt: """
+        Synthesize this source into trustworthy user-research notes. Use only observed or stated evidence and never invent user needs, frequency, severity, quotes, consensus, or product conclusions. Clearly distinguish evidence from interpretation and proposed opportunities.
+
+        Use these sections, omitting empty sections:
+        ## Participant goals and context
+        ## Current workflow
+        Describe the steps, tools, workarounds, and constraints the participant actually mentioned.
+        ## Pain points
+        Pair each pain point with its supporting behavior, example, or quotation.
+        ## Needs and requests
+        Separate explicit requests from inferred opportunities.
+        ## Notable evidence
+        Preserve short verbatim quotes only when they appear in the source; do not fabricate quotes.
+        ## Opportunities and open questions
+        Label opportunities as hypotheses and list what still needs validation.
+        """
+    )
+
+    public static let salesFollowUp = LibraryPromptPreset(
+        id: "sales",
+        title: "Sales Follow-up",
+        systemImage: "chart.line.uptrend.xyaxis",
+        prompt: """
+        Create a grounded sales-call summary and a concise follow-up draft. Use only facts in the source. Never invent a recipient, email address, stakeholder, need, budget, timeline, objection, decision, promise, or next step.
+
+        Organize the notes as follows, omitting empty sections:
+        ## Customer goals and needs
+        ## Current situation and impact
+        ## Qualification signals
+        Capture stated stakeholders, timing, budget, evaluation process, and success criteria only when provided.
+        ## Questions and objections
+        ## Decisions and next steps
+        Format actions as: - [ ] Action — Owner: name or Not stated — Due: date or Not stated
+        ## Follow-up email
+        Draft a warm, direct email with a specific subject, confirmed context, agreed next steps, and open items. Do not add a recipient or contact detail unless it appears verbatim in the source.
+        """
+    )
+
+    public static let standupUpdate = LibraryPromptPreset(
+        id: "standup",
+        title: "Standup Update",
+        systemImage: "figure.stand",
+        prompt: """
+        Turn this source into a concise standup update. Use only stated information and never invent progress, completion status, owners, dates, blockers, or priorities. Keep proposed work separate from committed work.
+
+        Use these sections, omitting empty sections:
+        ## Updates by person or workstream
+        For each person or workstream, capture completed work, work in progress, and the next stated step.
+        ## Blockers
+        List active blockers and who or what is needed to unblock them.
+        ## Dependencies and handoffs
+        ## Decisions
+        Include only decisions explicitly made.
+        ## Today’s commitments
+        Format each item as: - [ ] Action — Owner: name or Not stated — Due: date or Not stated
+        ## Parking lot
+        Capture topics deferred for a longer discussion.
         """
     )
 
@@ -596,10 +781,61 @@ public enum LibraryPromptCatalog {
         """
     )
 
-    public static let itemPresets = [structuredBrief, actionPlan, followUpEmail, detailedNotes]
+    public static let itemPresets = [
+        structuredBrief,
+        oneToOneNotes,
+        interviewNotes,
+        researchSynthesis,
+        salesFollowUp,
+        standupUpdate,
+        actionPlan,
+        followUpEmail,
+        detailedNotes,
+    ]
     public static let allMeetingPresets = [executiveBrief, actionTracker, decisionLog, followUpQueue]
     public static let itemDefaultPrompt = structuredBrief.prompt
     public static let allMeetingsDefaultPrompt = executiveBrief.prompt
+
+    public static func itemPreset(id: String) -> LibraryPromptPreset {
+        itemPresets.first { $0.id == id } ?? structuredBrief
+    }
+}
+
+public enum LibraryPromptPreferences {
+    private static let keyPrefix = "yaprflow.output-prompt."
+
+    public static func prompt(
+        for presetID: String,
+        defaults: UserDefaults = .standard
+    ) -> String {
+        let preset = LibraryPromptCatalog.itemPreset(id: presetID)
+        let stored = defaults.string(forKey: keyPrefix + preset.id)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if let stored, !stored.isEmpty { return stored }
+        return preset.prompt
+    }
+
+    public static func setPrompt(
+        _ prompt: String,
+        for presetID: String,
+        defaults: UserDefaults = .standard
+    ) {
+        let preset = LibraryPromptCatalog.itemPreset(id: presetID)
+        let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty || trimmed == preset.prompt {
+            defaults.removeObject(forKey: keyPrefix + preset.id)
+        } else {
+            defaults.set(trimmed, forKey: keyPrefix + preset.id)
+        }
+    }
+
+    public static func reset(
+        presetID: String,
+        defaults: UserDefaults = .standard
+    ) {
+        let preset = LibraryPromptCatalog.itemPreset(id: presetID)
+        defaults.removeObject(forKey: keyPrefix + preset.id)
+    }
 }
 
 public struct MeetingSearchHit: Identifiable, Hashable, Sendable {
@@ -740,11 +976,19 @@ public enum MeetingPromptBuilder {
     }
 
     public static func generationInstructions(for meeting: MeetingRecord, template: MeetingTemplate) -> String {
-        let attendeeList = meeting.attendees.map(\.name).joined(separator: ", ")
+        let attendeeList = meeting.attendees.map { attendee in
+            let email = attendee.email?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return email.isEmpty ? attendee.name : "\(attendee.name) <\(email)>"
+        }.joined(separator: ", ")
+        let followUpRule = template.includesFollowUpDraft
+            ? "Draft a follow-up body, but include a recipient or contact detail only when it appears verbatim in the source."
+            : "Set followUpEmail to an empty string. This output does not request a follow-up draft."
         return """
         Create trustworthy meeting notes and a specific, natural title of 3 to 8 words using the template guidance below.
-        Never invent a fact, owner, date, or decision. Prefer the user's raw notes when they emphasize a topic.
+        Never invent a fact, owner, date, decision, recipient, email address, phone number, URL, or other contact detail. Do not create example or placeholder contact information.
+        Prefer the user's raw notes when they emphasize a topic. Copy contact details only when they appear verbatim in the supplied title, attendees, raw notes, or transcript.
         Every insight must cite one or more exact transcript segment UUIDs.
+        \(followUpRule)
 
         Template: \(template.name)
         Guidance: \(template.instructions)
@@ -776,6 +1020,110 @@ public enum MeetingPromptBuilder {
         \(context)
         </meeting-excerpts>
         """
+    }
+}
+
+/// Enforces source grounding for contact details after generation. Prompt rules
+/// improve model behavior, but generated output is not trusted on its own.
+public enum MeetingGeneratedNotesGrounder {
+    public static func grounded(
+        _ notes: MeetingGeneratedNotes,
+        in meeting: MeetingRecord,
+        allowsFollowUpDraft: Bool? = nil
+    ) -> MeetingGeneratedNotes {
+        let trustedEmails = emailAddresses(in: trustedSource(for: meeting))
+        let allowsFollowUp = allowsFollowUpDraft
+            ?? MeetingTemplateCatalog.template(id: meeting.templateID).includesFollowUpDraft
+
+        let title = notes.suggestedTitle.flatMap { value -> String? in
+            containsUnsupportedEmail(in: value, trustedEmails: trustedEmails) ? nil : value
+        }
+        let overview = replacingUnsupportedEmails(
+            in: notes.overview,
+            trustedEmails: trustedEmails
+        )
+        let insights = notes.insights.compactMap { insight -> MeetingInsight? in
+            var groundedInsight = insight
+            groundedInsight.text = replacingUnsupportedEmails(
+                in: insight.text,
+                trustedEmails: trustedEmails
+            )
+            groundedInsight.owner = insight.owner.flatMap {
+                containsUnsupportedEmail(in: $0, trustedEmails: trustedEmails) ? nil : $0
+            }
+            groundedInsight.dueDate = insight.dueDate.flatMap {
+                containsUnsupportedEmail(in: $0, trustedEmails: trustedEmails) ? nil : $0
+            }
+            return groundedInsight.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? nil
+                : groundedInsight
+        }
+
+        let followUpEmail: String
+        if allowsFollowUp,
+           !containsUnsupportedEmail(in: notes.followUpEmail, trustedEmails: trustedEmails) {
+            followUpEmail = notes.followUpEmail
+        } else {
+            followUpEmail = ""
+        }
+
+        return MeetingGeneratedNotes(
+            suggestedTitle: title,
+            overview: overview,
+            insights: insights,
+            followUpEmail: followUpEmail,
+            generatedAt: notes.generatedAt
+        )
+    }
+
+    private static func trustedSource(for meeting: MeetingRecord) -> String {
+        var values = [meeting.title, meeting.rawNotes]
+        values.append(contentsOf: meeting.attendees.flatMap { attendee in
+            [attendee.name, attendee.email ?? ""]
+        })
+        values.append(contentsOf: meeting.transcript.flatMap { segment in
+            [segment.displaySpeaker, segment.text]
+        })
+        return values.joined(separator: "\n")
+    }
+
+    private static func containsUnsupportedEmail(
+        in text: String,
+        trustedEmails: Set<String>
+    ) -> Bool {
+        !emailAddresses(in: text).isSubset(of: trustedEmails)
+    }
+
+    private static func replacingUnsupportedEmails(
+        in text: String,
+        trustedEmails: Set<String>
+    ) -> String {
+        guard let expression = emailExpression() else { return text }
+        let range = NSRange(text.startIndex..., in: text)
+        let matches = expression.matches(in: text, range: range).reversed()
+        var result = text
+        for match in matches {
+            guard let swiftRange = Range(match.range, in: result) else { continue }
+            let email = result[swiftRange].lowercased()
+            guard !trustedEmails.contains(email) else { continue }
+            result.replaceSubrange(swiftRange, with: "contact not provided")
+        }
+        return result.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func emailAddresses(in text: String) -> Set<String> {
+        guard let expression = emailExpression() else { return [] }
+        let range = NSRange(text.startIndex..., in: text)
+        return Set(expression.matches(in: text, range: range).compactMap { match in
+            Range(match.range, in: text).map { text[$0].lowercased() }
+        })
+    }
+
+    private static func emailExpression() -> NSRegularExpression? {
+        try? NSRegularExpression(
+            pattern: #"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}"#,
+            options: [.caseInsensitive]
+        )
     }
 }
 

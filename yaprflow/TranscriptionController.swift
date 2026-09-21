@@ -173,6 +173,7 @@ final class TranscriptionController {
         return false
     }
     private var startRequested = false
+    private var suppressTranscriptSideEffectsForSmokeTest = false
     private var autoHideTask: Task<Void, Never>?
 
     private static let sampleRate = NemotronStreamingRecognizer.sampleRate
@@ -302,6 +303,8 @@ final class TranscriptionController {
                 message: "A recording was already active."
             )
         }
+        suppressTranscriptSideEffectsForSmokeTest = true
+        defer { suppressTranscriptSideEffectsForSmokeTest = false }
 
         if let startAction {
             startAction()
@@ -317,8 +320,18 @@ final class TranscriptionController {
         }
 
         do {
-            try await Task.sleep(for: .seconds(2))
+            try await Task.sleep(for: .seconds(1))
+            let phrase = "Violet rockets travel beyond the quiet forest. This sentence tests quick dictation capture."
+            guard try await Self.playRecordingSmokeTestPhrase(phrase) else {
+                await stop()
+                return RecordingSmokeTestResult(
+                    succeeded: false,
+                    message: "The Quick Dictation test phrase could not be played."
+                )
+            }
+            try await Task.sleep(for: .seconds(4))
         } catch {
+            await stop()
             return RecordingSmokeTestResult(succeeded: false, message: "The recording test was interrupted.")
         }
 
@@ -328,10 +341,29 @@ final class TranscriptionController {
         } else {
             await stop()
         }
-        return RecordingSmokeTestResult(
-            succeeded: !isActive,
-            message: "Quick Dictation and the microphone capture engine started and stopped successfully."
+        let markerWords = Set([
+            "violet", "rockets", "quiet", "forest",
+            "sentence", "tests", "quick", "dictation", "capture",
+        ])
+        let recognizedWords = Set(
+            confirmedText.lowercased().split { !$0.isLetter }.map(String.init)
         )
+        let markerCount = recognizedWords.intersection(markerWords).count
+        return RecordingSmokeTestResult(
+            succeeded: !isActive && markerCount >= 4,
+            message: "Quick Dictation captured \(markerCount) test markers and stopped successfully."
+        )
+    }
+
+    private static func playRecordingSmokeTestPhrase(_ phrase: String) async throws -> Bool {
+        let speaker = Process()
+        speaker.executableURL = URL(fileURLWithPath: "/usr/bin/say")
+        speaker.arguments = ["-r", "150", phrase]
+        try speaker.run()
+        while speaker.isRunning {
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        return speaker.terminationStatus == 0
     }
 
     private func waitForRecordingToStart() async {
@@ -558,7 +590,16 @@ final class TranscriptionController {
         lastFinalizedAudioEnd = 0
         recognizerStreamHasLeadingOverlap = false
 
-        if !finalText.isEmpty {
+        if suppressTranscriptSideEffectsForSmokeTest {
+            if finalText.isEmpty {
+                state.status = .error("No speech detected")
+                telemetryFailure = .noSpeech
+                log.info("The Quick Dictation smoke test did not recognize its microphone signal")
+            } else {
+                state.status = .copied
+                log.info("The Quick Dictation smoke test recognized its microphone signal")
+            }
+        } else if !finalText.isEmpty {
             let pb = NSPasteboard.general
             pb.clearContents()
             if pb.setString(finalText, forType: .string) {

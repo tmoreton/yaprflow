@@ -6,11 +6,11 @@ The redesigned website and enabled live Stripe checkout are published at `https:
 
 ## Current setup — September 19, 2026
 
-Production deployment `dpl_Co8YMpdaBRCKt9YrkuGbFTmk5waL` is READY at `https://yaprflow-checkout-hy1z98fi4-tmoretons-projects.vercel.app` and aliased to `yaprflow.com`. It publishes the channel-specific purchase and update disclosure: direct purchases receive the private Stripe download and Sparkle updates, while Mac App Store purchases and updates are handled by Apple. Checkout-specific purchase and license terms open in an on-page modal and include the 14-day refund policy. The signed empty Sparkle feed is available for the direct edition, and the OpenAI Realtime microphone demo remains enabled.
+Production deployment `dpl_Co8YMpdaBRCKt9YrkuGbFTmk5waL` is READY at `https://yaprflow-checkout-hy1z98fi4-tmoretons-projects.vercel.app` and aliased to `yaprflow.com`. It publishes the channel-specific purchase and update disclosure: direct purchases receive the private Stripe download and Sparkle updates, while Mac App Store purchases and updates are handled by Apple. The checkout links to the published purchase and license terms, including the 14-day refund policy, without requiring a separate acceptance checkbox. The signed empty Sparkle feed is available for the direct edition, and the OpenAI Realtime microphone demo remains enabled.
 
 Live Production settings are `CHECKOUT_ENABLED=true`, `CHECKOUT_BASE_URL=https://yaprflow.com`, and `BLOB_PATHNAME=releases/yaprflow-5.1.4.dmg`. Public `/api/config` verifies `enabled: true`, `mode: "live"`, price `{amount: 799, currency: "usd", formatted: "$7.99"}`, `downloadReady: true`, and `voiceDemoAvailable: true`. The live product is `prod_VHf8LJ6S6B1Rk6`, and the live Price ID is `price_1UH5oDAlzJZxFihrxO8VSy8p`.
 
-Production checks passed for enabled live price/configuration, version 5.1.4 metadata, the signed feed, the published purchase terms, the private confirmation and cookie flow, and unauthorized download denial. A same-origin accepted checkout request returned HTTP 303 to `checkout.stripe.com`. No personal or card details were entered, and no payment was submitted. Paid live delivery and vendor analytics dashboard receipt remain unverified.
+Production checks passed for enabled live price/configuration, version 5.1.4 metadata, the signed feed, the published purchase terms, the private confirmation and cookie flow, and unauthorized download denial. A same-origin checkout request returned HTTP 303 to `checkout.stripe.com`. No personal or card details were entered, and no payment was submitted. Paid live delivery and vendor analytics dashboard receipt remain unverified.
 
 The local prebuilt Production build passed. It generated six Node.js 24 API functions with zero environment-override keys, the correct project and Production target, the intended canonical www redirect, and public output excluding credentials and installers. The latest full suite passed 80 website tests and 33 shared app tests. Universal optimized Release builds passed for both Mac schemes; bundle inspection confirmed that only the direct edition contains and links Sparkle.
 
@@ -36,7 +36,7 @@ A $7.99 sandbox purchase completed through Stripe Managed Payments on the earlie
 
 On the latest Preview, Chrome followed that paid sandbox purchase's legacy confirmation link through a server redirect to clean `/confirmation.html` before HTML loaded. The page verified the paid test purchase and exposed only `/api/download`, without a query, as its download link. Declining optional cookies and returning to the clean confirmation page preserved purchase access. Direct deployed API checks passed: missing purchase cookie returned status 403; the completion route returned 303 to exactly `/confirmation.html` with the expected secure 30-day cookie; that cookie returned paid test status 200 without analytics data, and download returned 303 to the expected signed private Blob host. The new signed URL was not followed; the complete-file checksum result above is from the earlier verification.
 
-Chrome automation showed a blocked navigation when following the file link in the earlier file test; file delivery was independently verified through the same paid endpoint. Browser tooling also blocked access to Chrome's internal downloads page, so a normal manual browser download remains a final release check. See `VERIFICATION.md` for details. The user confirmed the US $7.99 one-time live price, plus applicable tax. The direct-purchase license and 14-day refund policy are published and require explicit acceptance before checkout. Stripe's dashboard previously showed email verification and Activate products as Complete, while the Managed Payments setup guide showed Not Started; those observations alone do not establish complete merchant setup.
+Chrome automation showed a blocked navigation when following the file link in the earlier file test; file delivery was independently verified through the same paid endpoint. Browser tooling also blocked access to Chrome's internal downloads page, so a normal manual browser download remains a final release check. See `VERIFICATION.md` for details. The user confirmed the US $7.99 one-time live price, plus applicable tax. The direct-purchase license and 14-day refund policy are published and linked from checkout without a mandatory checkbox. Stripe's dashboard previously showed email verification and Activate products as Complete, while the Managed Payments setup guide showed Not Started; those observations alone do not establish complete merchant setup.
 
 The optional browser microphone demo has a hidden Production `OPENAI_API_KEY` and streams through OpenAI Realtime with `gpt-4o-transcribe`. A synthetic-microphone browser check reached “Live — speak naturally” without recording room audio. The session stops automatically after ten seconds. The prerecorded video and the native app's local dictation do not need this credential.
 
@@ -52,7 +52,7 @@ npm start
 
 `.env.local` is ignored by Git. Fill it with test credentials only when testing payments locally. The development server in `scripts/dev.mjs` serves the website and API handlers at `http://127.0.0.1:4173`; `PORT` can select another port. Set `CHECKOUT_BASE_URL` to the matching local origin if you change the port.
 
-With credentials absent, the landing page still loads and displays checkout as unavailable. The purchase button becomes available only after `/api/config` confirms a valid active one-time Stripe price, payment mode, checkout origin, and private-download configuration. Displayed prices are updated from Stripe, and test checkout is clearly labeled.
+With checkout credentials absent, the landing page still loads and displays checkout as unavailable. The purchase button becomes available only after `/api/config` confirms a valid active one-time Stripe price, payment mode, checkout origin, and private-download configuration. Email fulfillment is additive: missing webhook or email-provider settings never disables the paid browser download. Displayed prices are updated from Stripe, and test checkout is clearly labeled.
 
 ## Build and public files
 
@@ -80,15 +80,17 @@ Public pages use `yaprflow.com` canonical URLs. `robots.txt` allows the website,
 
 1. `GET /api/config` reports checkout availability, test/live mode, the configured Stripe price, and browser-demo availability.
 2. The landing page submits `POST /api/checkout`. The server creates a one-time Stripe Checkout Session for one copy of that price.
-3. Stripe returns to `/api/complete?session_id={CHECKOUT_SESSION_ID}`. The server stores the private checkout reference in a purchase cookie and redirects to clean `/confirmation.html` before any page tags can load. Legacy confirmation URLs containing a session query are redirected through the same server flow before HTML is served.
-4. `GET /api/status` uses the purchase cookie and checks the session with Stripe, including its payment mode, product marker, quantity, allowed Price ID, completion, and paid status.
-5. `GET /api/download` repeats the purchase verification, then redirects to a URL valid for five minutes for the fixed installer in a **private** Vercel Blob store.
+3. Stripe sends a signed `checkout.session.completed` webhook to `POST /api/webhook`. After verifying the signature and paid product, the server emails a private recovery link through Resend. Stripe’s optional promotional-email consent adds opted-in purchasers to the configured Resend newsletter segment; other purchasers are not subscribed.
+4. Stripe returns the browser to `/api/complete?session_id={CHECKOUT_SESSION_ID}`. The server stores the private checkout reference in a purchase cookie and redirects to clean `/confirmation.html` before any page tags can load. Legacy confirmation URLs containing a session query are redirected through the same server flow before HTML is served.
+5. The emailed `/api/redeem?token=...` link validates its HMAC signature, re-verifies the paid purchase with Stripe, sets the same purchase cookie, and redirects to the clean confirmation page. The token is a private bearer credential and should not be shared.
+6. `GET /api/status` uses the purchase cookie and checks the session with Stripe, including its payment mode, product marker, quantity, allowed Price ID, completion, and paid status.
+7. `GET /api/download` repeats the purchase verification, then redirects to a URL valid for five minutes for the fixed installer in a **private** Vercel Blob store.
 
 The integration follows the account’s Managed Payments defaults; it does not override payment methods, tax handling, or merchant settings. The sandbox product has an eligible software category; review the live product category and merchant setup before launch. Delayed payment methods remain pending and cannot download until Stripe reports paid.
 
 The production cookie is `__Host-yaprflow-purchase`: host-only, `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`, and a 30-day maximum age. It holds the private Stripe checkout reference, which remains inaccessible to browser JavaScript; payment status and download access are rechecked with Stripe. Status and download calls use the cookie, so the clean confirmation page and its download link do not expose session references or presigned Blob URLs to tags. Local HTTP development uses the separate `yaprflow-purchase-dev` cookie only on loopback dev/test origins.
 
-The cookie lets the purchaser return to `/confirmation.html` in the same browser for 30 days. If it expires, is cleared, or the customer changes browser or host, support at `tim@yaprflow.com` can help using the email from checkout. Optional consent changes leave this necessary purchase cookie intact. Its expiry does not limit use of the installed app. The page and API responses use `no-store` and `no-referrer`; the page is excluded from indexing. Stripe retains the payment record; no Yaprflow account or in-app sign-in is needed.
+The cookie lets the purchaser return to `/confirmation.html` in the same browser for 30 days. The transactional purchase email lets the purchaser restore that access on another device. If the email is unavailable, support at `tim@yaprflow.com` can help using the address from checkout. Optional marketing consent changes leave this necessary purchase flow intact. Its expiry does not limit use of the installed app. The page and API responses use `no-store` and `no-referrer`; the page is excluded from indexing. Stripe retains the payment record; no Yaprflow account or in-app sign-in is needed.
 
 The cookie delivery flow and Meta integration are included in Preview and Production. The paid-purchase checks were performed in the sandbox Preview: browser checks verified the legacy-link redirect, clean confirmation address, paid test status, query-free download link, and purchase access after optional consent was declined. Preview API checks verified the cookie attributes, exact clean redirect, `no-store`/`no-referrer` response headers, cookie-based paid status, and signed private-download redirect. The redirected file was not downloaded again; the earlier full-file checksum test used the previous session-query flow. Production checkout is now enabled, and public smoke checks pass for confirmation routing/cookies and unauthorized access denial. No paid live purchase or download has been performed.
 
@@ -96,15 +98,26 @@ The cookie delivery flow and Meta integration are included in Preview and Produc
 
 Configure Preview and Production separately and redeploy after changes.
 
+The purchase-email flow remains inactive until its webhook, Resend, link-signing,
+sender, and newsletter-segment settings are all configured. This is deliberately
+separate from checkout availability so an email-provider configuration problem
+cannot interrupt paid browser delivery.
+
 | Variable | Purpose |
 | --- | --- |
 | `STRIPE_SECRET_KEY` | Stripe test key in Preview; a verified live key in Production when sales are approved. Store as a Vercel Secret. |
 | `STRIPE_PRICE_ID` | The active one-time Price ID used for new sessions. It must belong to the same Stripe mode as the key. |
+| `STRIPE_WEBHOOK_SECRET` | Signing secret for the public Stripe webhook endpoint at `/api/webhook`. Configure separate secrets for Preview/test and Production/live. |
 | `CHECKOUT_ENABLED` | Exactly `true` enables new checkout sessions when all other settings and the Stripe price are valid. Unset or `false` keeps checkout disabled. |
 | `STRIPE_ALLOWED_PRICE_IDS` | Optional comma-separated previous Price IDs whose paid purchasers should retain access. The current Price ID is always included. |
 | `CHECKOUT_BASE_URL` | Canonical HTTPS origin for checkout redirects. Required in Production; use the actual origin that serves these handlers. Local development permits HTTP on localhost. |
 | `BLOB_PATHNAME` | Fixed private installer path. Active Production uses the verified `releases/yaprflow-5.1.4.dmg`. |
 | `BLOB_READ_WRITE_TOKEN` | Token for the private Blob store. Keep server-side and never commit it. |
+| `DOWNLOAD_LINK_SECRET` | Stable random secret of at least 32 characters used to sign cross-device purchase links. Rotating it invalidates links already emailed. |
+| `RESEND_API_KEY` | Server-only Resend credential used for transactional purchase delivery and opted-in newsletter contacts. |
+| `PURCHASE_EMAIL_FROM` | Verified Resend sender, for example `Yaprflow <downloads@yaprflow.com>`. |
+| `PURCHASE_EMAIL_REPLY_TO` | Optional support reply address. Defaults to `tim@yaprflow.com`. |
+| `RESEND_NEWSLETTER_SEGMENT_ID` | Resend segment that receives only purchasers whose Stripe Checkout promotional consent is `opt_in`. |
 | `OPENAI_API_KEY` | Server credential for the website microphone demo. Configured as a hidden Production secret; unrelated to customers' native-app AI provider keys. |
 
 In Vercel Preview, leave `CHECKOUT_BASE_URL` unset to use the deployment-specific `https://${VERCEL_URL}` automatically. The fallback accepts a validated `*.vercel.app` hostname only when `VERCEL_ENV=preview`. It does not replace the explicit Production origin. An explicit `CHECKOUT_BASE_URL` overrides the Preview fallback.
@@ -180,12 +193,14 @@ For each release, complete the browser flow in a Preview deployment using Stripe
 - Confirm the page shows test mode and the Stripe price.
 - Verify an unpaid or invalid session cannot download the installer.
 - Complete test checkout, return to the confirmation page, and download the app.
+- Confirm the signed webhook sends exactly one download email, the emailed link restores access in a separate browser, and Stripe webhook retries remain successful.
+- Test both promotional-consent choices. Only the explicit opt-in should create or attach a contact in the Resend newsletter segment.
 - Compare the downloaded SHA-256 with the value above; check installation guidance.
 - Check cancellation, unavailable checkout, and payment-status retry behavior.
 
 Do not promote the sandbox deployment to Production: deployments retain their environment configuration. Create a fresh Production deployment with verified live credentials instead.
 
-Production is READY and publicly aliased. Direct buyers must accept the published customer license and 14-day refund policy before the server creates a Stripe Checkout Session. The Mac 5.1.4 private artifact is fully checksum-verified and configured for delivery. No customer payment or paid live download was performed, and actual GA/Meta dashboard event receipt remains unverified. The website's offer and metadata reflect US $7.99 plus applicable tax; update those alongside Stripe if the public price changes later. Do not expose the sandbox configuration as the live checkout.
+Production is READY and publicly aliased. Direct buyers can proceed straight to Stripe Checkout; the published customer license and 14-day refund policy remain linked from the offer. The Mac 5.1.4 private artifact is fully checksum-verified and configured for delivery. No customer payment or paid live download was performed, and actual GA/Meta dashboard event receipt remains unverified. The website's offer and metadata reflect US $7.99 plus applicable tax; update those alongside Stripe if the public price changes later. Do not expose the sandbox configuration as the live checkout.
 
 ## Releasing an update
 

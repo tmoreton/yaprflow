@@ -1,6 +1,6 @@
 # Production release verification
 
-Last updated: September 19, 2026
+Last updated: September 21, 2026
 
 ## Active release
 
@@ -37,9 +37,9 @@ Last updated: September 19, 2026
 - Public `/api/config` reports live mode, the US $7.99 one-time price, `downloadReady: true`, and `voiceDemoAvailable: true`.
 - The public page reports software version 5.1.4.
 - The published policies contain the customer license, separate source-license terms, direct/App Store update disclosures, and the 14-day direct-purchase refund policy.
-- Checkout-specific terms open in an accessible modal without leaving the offer. The accepted value is submitted through a dedicated successful form control, including after browser page restoration.
-- The server rejects missing and cross-origin acceptance, accepts a browser-verified same-site fallback when Safari omits `Origin`, and records the terms version in Stripe Checkout metadata.
-- The exact production flow passed: open the terms modal, return to checkout, select the checkbox, and buy. It navigated to live Stripe Checkout instead of the terms error page; no payment was submitted.
+- Checkout has no mandatory terms checkbox or acceptance gate. The offer keeps a direct link to the published terms and refund policy.
+- The server rejects cross-origin checkout requests and accepts a browser-verified same-site fallback when Safari omits `Origin`, without requiring a terms field or recording checkbox acceptance metadata.
+- The checkout button proceeds directly to live Stripe Checkout after availability is confirmed; no payment was submitted during verification.
 - The live microphone status keeps a measured 20-pixel gap below the record button, including its ready state, with no browser errors or error overlay.
 - `/api/download` returned HTTP 403 without a verified purchase.
 - `https://yaprflow.com/appcast.xml` serves the signed empty production feed.
@@ -47,6 +47,9 @@ Last updated: September 19, 2026
 
 ## Checks that require an owner transaction or account action
 
+- Verify the sending domain in Resend, create the newsletter segment, add all purchase-email environment variables, and register `/api/webhook` for `checkout.session.completed` and `checkout.session.async_payment_succeeded` in both Stripe test and live modes.
+- Complete a test purchase on mobile, confirm exactly one transactional email arrives, open its private link in a desktop browser, and verify the installer becomes available only after Stripe payment verification.
+- Repeat test checkout once with promotional email consent and once without it. Confirm only the opted-in address appears in the Resend newsletter segment, then verify its unsubscribe behavior before sending a campaign.
 - Complete one real live purchase in a normal browser, confirm the returned download opens, then refund the charge in Stripe. This validates receipts, tax, payment settlement, the paid cookie, and the complete delivery path with live funds.
 - Confirm the purchase and conversion events arrive in Google Analytics and Meta Events Manager. Deployed scripts and server-side guards have been tested, but dashboard receipt has not.
 - Confirm Stripe payout, tax-registration, receipt-email, statement-descriptor, support, and dispute settings in the live account before increasing ad spend.

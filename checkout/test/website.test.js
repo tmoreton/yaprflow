@@ -44,12 +44,10 @@ function node(dataset = {}) {
 
 function page(search = '') {
   const ids = new Map([
-    'checkout-form', 'checkout-button', 'checkout-status', 'checkout-notice', 'checkout-retry', 'purchase-terms', 'purchase-terms-value',
-    'purchase-terms-open', 'purchase-terms-dialog', 'purchase-terms-close', 'purchase-terms-return',
+    'checkout-form', 'checkout-button', 'checkout-status', 'checkout-notice', 'checkout-retry',
     'price-comparison', 'status', 'ready', 'help', 'download', 'retry', 'test-badge',
     'live-transcriber', 'live-transcribe-button', 'live-transcribe-status', 'live-transcript',
   ].map((id) => [id, node()]));
-  ids.get('purchase-terms').checked = true;
   const prices = {
     '[data-price]': [node(), node()],
     '[data-price-currency]': [node()],
@@ -93,6 +91,24 @@ test('checkout presentation requires enabled sales, private download readiness, 
   const sandbox = checkoutPresentation({ ...config, mode: 'test' });
   assert.equal(sandbox.button, 'Try test checkout');
   assert.match(sandbox.status, /No real charge/);
+});
+
+test('checkout has no mandatory terms checkbox and keeps the offer terms available', async () => {
+  const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+  assert.doesNotMatch(html, /id="purchase-terms"|class="purchase-consent"|name="terms"/);
+  assert.match(html, /href="\/policies\/#offer">Offer terms<\/a>/);
+  assert.match(html, /download on the confirmation page or from the private link we email you/i);
+  assert.match(html, /Can I buy on my phone and install it later\?/);
+});
+
+test('the customer-facing policy separates purchase delivery from optional newsletter consent', async () => {
+  const policy = await readFile(new URL('../policies/index.html', import.meta.url), 'utf8');
+  const confirmation = await readFile(new URL('../confirmation.html', import.meta.url), 'utf8');
+  assert.match(policy, /Only an affirmative promotional-email opt-in adds the checkout email address/i);
+  assert.match(policy, /Buying the app and receiving the required download message do not subscribe you/i);
+  assert.match(policy, /transactional message containing a private purchase-recovery link/i);
+  assert.match(policy, /resend\.com\/legal\/privacy-policy/);
+  assert.match(confirmation, /private download link to the email used at checkout/i);
 });
 
 test('all displayed prices and illustrative savings update together from server pricing', () => {
@@ -200,37 +216,6 @@ test('checkout blocks submission until configuration arrives and then permits on
   assert.equal(ui.ids.get('checkout-button').disabled, true);
   assert.equal(ui.ids.get('checkout-form').dispatch('submit').defaultPrevented, true);
   assert.equal(calls.length, 1, 'native submission must not call fetch across the Stripe redirect');
-});
-
-test('checkout requires explicit purchase-term acceptance', async () => {
-  const ui = page();
-  ui.ids.get('purchase-terms').checked = false;
-  const mounted = mountCheckout(ui.document, ui.window, async () => json(config));
-  await mounted.ready;
-  assert.equal(ui.ids.get('purchase-terms').disabled, false);
-  assert.equal(ui.ids.get('purchase-terms-value').disabled, true);
-  assert.equal(ui.ids.get('checkout-button').disabled, true);
-  assert.equal(ui.ids.get('checkout-form').dispatch('submit').defaultPrevented, true);
-  ui.ids.get('purchase-terms').checked = true;
-  ui.ids.get('purchase-terms').dispatch('change');
-  assert.equal(ui.ids.get('purchase-terms-value').disabled, false);
-  assert.equal(ui.ids.get('checkout-button').disabled, false);
-  assert.equal(ui.ids.get('checkout-form').dispatch('submit').defaultPrevented, false);
-});
-
-test('purchase terms open in a modal without changing or navigating away from checkout', async () => {
-  const ui = page();
-  await mountCheckout(ui.document, ui.window, async () => json(config)).ready;
-  ui.ids.get('purchase-terms').checked = false;
-  ui.ids.get('purchase-terms-open').dispatch('click');
-  assert.equal(ui.ids.get('purchase-terms-dialog').open, true);
-  assert.equal(ui.ids.get('purchase-terms').checked, false);
-  assert.equal(ui.window.location.search, '');
-  ui.ids.get('purchase-terms-return').dispatch('click');
-  assert.equal(ui.ids.get('purchase-terms-dialog').open, false);
-  ui.ids.get('purchase-terms-open').dispatch('click');
-  ui.ids.get('purchase-terms-close').dispatch('click');
-  assert.equal(ui.ids.get('purchase-terms-dialog').open, false);
 });
 
 test('checkout errors stay closed and a retry can recover without reloading the page', async () => {

@@ -42,7 +42,11 @@ enum MeetingAIService {
                 validSegmentIDs: Set(meeting.transcript.map(\.id))
             )
             if tracksRequest { Telemetry.shared.track(.aiSummaryCompleted(provider)) }
-            return notes
+            return MeetingGeneratedNotesGrounder.grounded(
+                notes,
+                in: meeting,
+                allowsFollowUpDraft: template.includesFollowUpDraft
+            )
         } catch {
             if tracksRequest {
                 Telemetry.shared.track(.aiSummaryFailed(provider, .invalidResponse))

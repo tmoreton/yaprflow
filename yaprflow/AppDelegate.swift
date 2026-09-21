@@ -23,6 +23,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let isPreviewSmokeTest = arguments.contains("--smoke-test-preview")
         let isRecordingSmokeTest = arguments.contains("--smoke-test-recording")
         let isMeetingNotesSmokeTest = arguments.contains("--smoke-test-meeting-notes")
+        let isMeetingAudioSmokeTest = arguments.contains("--smoke-test-meeting-audio")
+        let isMeetingSmokeTest = isMeetingNotesSmokeTest || isMeetingAudioSmokeTest
 
         // AppKit finishes its window-restoration bookkeeping after this
         // callback and enables automatic termination for windowless apps.
@@ -36,11 +38,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if !isPreviewSmokeTest {
             Telemetry.shared.beginRun()
         }
-        if !isPreviewSmokeTest && !isMeetingNotesSmokeTest {
+        if !isPreviewSmokeTest && !isMeetingSmokeTest {
             TranscriptionController.shared.prepareSpeechRecognizer()
         }
         #if DIRECT_DISTRIBUTION
-        if !isPreviewSmokeTest && !isRecordingSmokeTest && !isMeetingNotesSmokeTest {
+        if !isPreviewSmokeTest && !isRecordingSmokeTest && !isMeetingSmokeTest {
             AppUpdater.shared.start()
         }
         #endif
@@ -50,7 +52,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // Nemotron is warmed above so the first hotkey press avoids its ONNX
         // graph-loading cost; idle and memory-pressure paths still release it.
 
-        if !isPreviewSmokeTest, !isMeetingNotesSmokeTest, !OnboardingWindowController.hasCompleted {
+        if !isPreviewSmokeTest, !isMeetingSmokeTest, !OnboardingWindowController.hasCompleted {
             OnboardingWindowController.shared.show()
         }
 
@@ -72,6 +74,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 MeetingNotesWindowController.show(.settings)
                 try? await Task.sleep(for: .milliseconds(200))
                 let settingsPassed = MeetingNotesWindowController.isVisibleForSmokeTest
+                    && MeetingNotesWindowController.isKeyForSmokeTest
                     && MeetingNotesWindowController.destinationForSmokeTest == .settings
                 MeetingNotesWindowController.show(.workspace, selection: .liveMeeting)
                 let persistencePassed = MeetingStore.runPersistenceSmokeTest()
@@ -81,6 +84,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 NSApp.terminate(nil)
             }
         }
+
+        #if DEBUG
+        if isMeetingAudioSmokeTest {
+            Task { @MainActor in
+                let result = await MeetingSessionController.shared.runAudioSeparationSmokeTest()
+                let output = "YAPRFLOW_MEETING_AUDIO_SMOKE_TEST=\(result.succeeded ? "PASS" : "FAIL") \(result.message)\n"
+                FileHandle.standardOutput.write(Data(output.utf8))
+                NSApp.terminate(nil)
+            }
+        }
+        #endif
 
         NotificationCenter.default.addObserver(
             forName: .yaprflowHotkeyChanged,

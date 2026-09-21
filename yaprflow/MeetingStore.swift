@@ -19,13 +19,27 @@ final class MeetingStore: ObservableObject {
 
     init(fileManager: FileManager = .default, rootOverride: URL? = nil) {
         self.fileManager = fileManager
-        self.rootOverride = rootOverride
+        self.rootOverride = rootOverride ?? Self.audioSmokeTestRoot()
         encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
         decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         refresh()
+    }
+
+    private static func audioSmokeTestRoot() -> URL? {
+        #if DEBUG
+        guard ProcessInfo.processInfo.arguments.contains("--smoke-test-meeting-audio") else {
+            return nil
+        }
+        return FileManager.default.temporaryDirectory.appendingPathComponent(
+            "yaprflow-meeting-audio-smoke-\(ProcessInfo.processInfo.processIdentifier)",
+            isDirectory: true
+        )
+        #else
+        return nil
+        #endif
     }
 
     func refresh() {
@@ -43,6 +57,9 @@ final class MeetingStore: ObservableObject {
                     return nil
                 }
                 meeting.transcript = MeetingTranscriptReconciler.reconcile(meeting.transcript)
+                if let notes = meeting.generatedNotes {
+                    meeting.generatedNotes = MeetingGeneratedNotesGrounder.grounded(notes, in: meeting)
+                }
                 return meeting
             }.sorted { $0.startedAt > $1.startedAt }
             errorMessage = nil
@@ -60,6 +77,9 @@ final class MeetingStore: ObservableObject {
     func save(_ meeting: MeetingRecord) throws -> URL {
         var meeting = meeting
         meeting.transcript = MeetingTranscriptReconciler.reconcile(meeting.transcript)
+        if let notes = meeting.generatedNotes {
+            meeting.generatedNotes = MeetingGeneratedNotesGrounder.grounded(notes, in: meeting)
+        }
         let directory = try meetingsDirectory()
         let jsonURL = directory.appendingPathComponent(meeting.id.uuidString).appendingPathExtension("json")
         let data = try encoder.encode(meeting)

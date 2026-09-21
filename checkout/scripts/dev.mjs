@@ -14,8 +14,10 @@ const routes = {
   '/api/config': ['GET', () => import('../api/config.js')],
   '/api/checkout': ['POST', () => import('../api/checkout.js')],
   '/api/complete': ['GET', () => import('../api/complete.js')],
+  '/api/redeem': ['GET', () => import('../api/redeem.js')],
   '/api/status': ['GET', () => import('../api/status.js')],
   '/api/download': ['GET', () => import('../api/download.js')],
+  '/api/webhook': ['POST', () => import('../api/webhook.js')],
 };
 const publicPages = new Set([
   'index.html', 'confirmation.html', 'confirmation.js', 'checkout.js',
@@ -28,6 +30,17 @@ const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; ch
 function finish(response, status, body = '') {
   response.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
   response.end(body);
+}
+
+async function readApiBody(request) {
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of request) {
+    size += chunk.length;
+    if (size > 1024 * 1024) throw Object.assign(new Error('REQUEST_TOO_LARGE'), { code: 'REQUEST_TOO_LARGE' });
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
 }
 
 export const server = createServer(async (request, response) => {
@@ -48,7 +61,8 @@ export const server = createServer(async (request, response) => {
         return finish(response, 405, 'Method not allowed.');
       }
       const handler = (await load())[method];
-      const result = await handler(new Request(url, { method, headers: request.headers }));
+      const body = method === 'POST' ? await readApiBody(request) : undefined;
+      const result = await handler(new Request(url, { method, headers: request.headers, body }));
       response.writeHead(result.status, Object.fromEntries(result.headers));
       return response.end(Buffer.from(await result.arrayBuffer()));
     }

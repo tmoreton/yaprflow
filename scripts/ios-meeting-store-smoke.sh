@@ -14,6 +14,7 @@ trap cleanup EXIT
 
 xcrun swiftc \
     -parse-as-library \
+    "$ROOT/Shared/TranscriptionCore.swift" \
     "$ROOT/Shared/MeetingCore.swift" \
     "$ROOT/yaprflow-iOS/MobileMeetingStore.swift" \
     "$ROOT/Tools/MobileMeetingStoreSmoke.swift" \

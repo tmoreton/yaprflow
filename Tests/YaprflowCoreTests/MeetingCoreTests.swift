@@ -46,6 +46,27 @@ struct MeetingCoreTests {
         #expect(reconciled.first { $0.speaker == .them }?.text == systemText)
     }
 
+    @Test("System playback is removed despite recognition differences and skipped words")
+    func fuzzySystemAudioEchoReconciliation() {
+        let microphone = MeetingTranscriptSegment(
+            speaker: .me,
+            startTime: 25,
+            endTime: 42,
+            text: "Hello hello hello what is going on today my name is Tim and this is a new sentence when at the line of scrimmage who Hurts. Look, I'll say this for the Philly fans out there."
+        )
+        let system = MeetingTranscriptSegment(
+            speaker: .them,
+            startTime: 30,
+            endTime: 45,
+            text: "Winn at the line of scri can give their quarterbacks time to throw the ball and on the final drive it came down to Jalen Hurse. Look"
+        )
+
+        let reconciled = MeetingTranscriptReconciler.reconcile([microphone, system])
+
+        #expect(reconciled.first { $0.speaker == .me }?.text == "Hello hello hello what is going on today my name is Tim and this is a new sentence I'll say this for the Philly fans out there")
+        #expect(reconciled.first { $0.speaker == .them }?.text == system.text)
+    }
+
     @Test("Distinct or non-overlapping speech is preserved")
     func preservesDistinctSpeech() {
         let microphone = MeetingTranscriptSegment(
@@ -221,22 +242,125 @@ struct MeetingCoreTests {
 
         #expect(prompt.contains("Important: prioritize export"))
         #expect(prompt.contains(segment.id.uuidString))
-        #expect(prompt.contains("pain points"))
+        #expect(prompt.contains("Research Synthesis"))
+        #expect(prompt.contains("Pain points"))
+        #expect(prompt.contains("Do not create example or placeholder contact information"))
+    }
+
+    @Test("Generated follow-up discards an invented email address")
+    func inventedEmailGrounding() {
+        let meeting = MeetingRecord(
+            title: "New meeting",
+            transcript: [
+                MeetingTranscriptSegment(
+                    speaker: .them,
+                    startTime: 0,
+                    endTime: 4,
+                    text: "Tim discussed the final drive."
+                ),
+            ],
+            templateID: "sales"
+        )
+        let generated = MeetingGeneratedNotes(
+            overview: "Tim discussed the final drive.",
+            followUpEmail: "To: tim.jalen@example.com\nThanks for the conversation."
+        )
+
+        let grounded = MeetingGeneratedNotesGrounder.grounded(generated, in: meeting)
+
+        #expect(grounded.followUpEmail.isEmpty)
+    }
+
+    @Test("Generated follow-up preserves an email address supplied by an attendee")
+    func suppliedEmailGrounding() {
+        let meeting = MeetingRecord(
+            title: "Sales conversation",
+            attendees: [MeetingAttendee(name: "Tim Jalen", email: "tim@team.test")],
+            transcript: [
+                MeetingTranscriptSegment(
+                    speaker: .them,
+                    startTime: 0,
+                    endTime: 4,
+                    text: "Please send the plan."
+                ),
+            ],
+            templateID: "sales"
+        )
+        let generated = MeetingGeneratedNotes(
+            overview: "A plan was requested.",
+            followUpEmail: "To: tim@team.test\nHere is the plan."
+        )
+
+        let grounded = MeetingGeneratedNotesGrounder.grounded(generated, in: meeting)
+
+        #expect(grounded.followUpEmail.contains("tim@team.test"))
+    }
+
+    @Test("Outputs without a follow-up never retain an unsolicited draft")
+    func nonFollowUpOutputGrounding() {
+        let meeting = MeetingRecord(
+            title: "Weekly sync",
+            transcript: [
+                MeetingTranscriptSegment(
+                    speaker: .me,
+                    startTime: 0,
+                    endTime: 2,
+                    text: "We reviewed progress."
+                ),
+            ],
+            templateID: MeetingTemplateCatalog.generalID
+        )
+        let generated = MeetingGeneratedNotes(
+            overview: "Progress was reviewed.",
+            followUpEmail: "Thanks for meeting."
+        )
+
+        let grounded = MeetingGeneratedNotesGrounder.grounded(generated, in: meeting)
+
+        #expect(grounded.followUpEmail.isEmpty)
     }
 
     @Test("Every built-in template has a stable unique identifier")
     func templates() {
         let templates = MeetingTemplateCatalog.builtIns
-        #expect(templates.count >= 7)
+        #expect(templates.count == 9)
         #expect(Set(templates.map(\.id)).count == templates.count)
+        #expect(templates.map(\.id) == LibraryPromptCatalog.itemPresets.map(\.id))
+        #expect(templates.contains { $0.name == "1:1 Notes" })
+        #expect(templates.contains { $0.name == "Interview Notes" })
+        #expect(templates.contains { $0.name == "Research Synthesis" })
+        #expect(templates.contains { $0.name == "Sales Follow-up" && $0.includesFollowUpDraft })
+        #expect(templates.contains { $0.name == "Standup Update" })
+        #expect(templates.contains { $0.name == "Follow-up Email" && $0.includesFollowUpDraft })
+        #expect(templates.contains { $0.name == "Detailed Notes" })
+        #expect(MeetingTemplateCatalog.template(id: "general").id == LibraryPromptCatalog.structuredBrief.id)
+        #expect(MeetingTemplateCatalog.template(id: "sales").id == LibraryPromptCatalog.salesFollowUp.id)
+        #expect(MeetingTemplateCatalog.template(id: "standup").id == LibraryPromptCatalog.standupUpdate.id)
+        #expect(MeetingTemplateCatalog.template(id: "project-review").id == LibraryPromptCatalog.actionPlan.id)
         #expect(MeetingTemplateCatalog.template(id: "missing").id == MeetingTemplateCatalog.generalID)
+    }
+
+    @Test("Output prompts can be customized and reset")
+    func outputPromptPreferences() {
+        let suiteName = "MeetingCoreTests.outputPrompts.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let preset = LibraryPromptCatalog.actionPlan
+
+        #expect(LibraryPromptPreferences.prompt(for: preset.id, defaults: defaults) == preset.prompt)
+
+        LibraryPromptPreferences.setPrompt("My custom action prompt", for: preset.id, defaults: defaults)
+        #expect(LibraryPromptPreferences.prompt(for: preset.id, defaults: defaults) == "My custom action prompt")
+
+        LibraryPromptPreferences.reset(presetID: preset.id, defaults: defaults)
+        #expect(LibraryPromptPreferences.prompt(for: preset.id, defaults: defaults) == preset.prompt)
     }
 
     @Test("Library presets provide structured, trustworthy workflows")
     func libraryPromptPresets() {
         let presets = LibraryPromptCatalog.itemPresets + LibraryPromptCatalog.allMeetingPresets
 
-        #expect(presets.count == 8)
+        #expect(presets.count == 13)
         #expect(Set(presets.map(\.id)).count == presets.count)
         #expect(presets.allSatisfy { $0.prompt.split(separator: "\n").count >= 8 })
         #expect(presets.allSatisfy { $0.prompt.localizedCaseInsensitiveContains("invent") })

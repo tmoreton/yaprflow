@@ -206,7 +206,7 @@ struct ContentView: View {
                         .accessibilityLabel("Meeting title")
 
                     HStack {
-                        Label("Template", systemImage: "rectangle.3.group")
+                        Label("Output", systemImage: "rectangle.3.group")
                             .foregroundStyle(.white.opacity(0.65))
                         Spacer()
                         Menu {
@@ -216,7 +216,7 @@ struct ContentView: View {
                                 } label: {
                                     Label(
                                         template.name,
-                                        systemImage: template.id == meetings.draftTemplateID
+                                        systemImage: template.id == selectedMeetingTemplate.id
                                             ? "checkmark"
                                             : template.systemImage
                                     )
@@ -833,11 +833,16 @@ private struct AcknowledgementsSheet: View {
 
 // MARK: - History sheet
 
+private enum HistoryDeletionTarget {
+    case item(String)
+    case all
+}
+
 private struct HistorySheet: View {
     @ObservedObject var history: HistoryStore
     @Environment(\.dismiss) private var dismiss
     @State private var copiedItem: String?
-    @State private var showClearConfirmation = false
+    @State private var deletionTarget: HistoryDeletionTarget?
 
     var body: some View {
         ZStack {
@@ -852,7 +857,7 @@ private struct HistorySheet: View {
                         .textCase(.uppercase)
                     Spacer()
                     Button("Clear", role: .destructive) {
-                        showClearConfirmation = true
+                        deletionTarget = .all
                     }
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
                     .disabled(history.items.isEmpty)
@@ -880,7 +885,8 @@ private struct HistorySheet: View {
                                 HistoryRow(
                                     text: item,
                                     isCopied: copiedItem == item,
-                                    onCopy: { copy(item) }
+                                    onCopy: { copy(item) },
+                                    onDelete: { deletionTarget = .item(item) }
                                 )
                             }
                         }
@@ -891,17 +897,49 @@ private struct HistorySheet: View {
             }
         }
         .confirmationDialog(
-            "Clear recent transcripts?",
-            isPresented: $showClearConfirmation,
+            deletionTitle,
+            isPresented: Binding(
+                get: { deletionTarget != nil },
+                set: { if !$0 { deletionTarget = nil } }
+            ),
             titleVisibility: .visible
         ) {
-            Button("Clear History", role: .destructive) {
-                history.clear()
-                dismiss()
+            if let deletionTarget {
+                switch deletionTarget {
+                case let .item(item):
+                    Button("Delete Dictation", role: .destructive) {
+                        history.delete(item)
+                        self.deletionTarget = nil
+                    }
+                case .all:
+                    Button("Clear History", role: .destructive) {
+                        history.clear()
+                        self.deletionTarget = nil
+                        dismiss()
+                    }
+                }
             }
-            Button("Cancel", role: .cancel) {}
+            Button("Cancel", role: .cancel) {
+                deletionTarget = nil
+            }
         } message: {
-            Text("This removes all saved transcript text from this device.")
+            Text(deletionMessage)
+        }
+    }
+
+    private var deletionTitle: String {
+        switch deletionTarget {
+        case .item: "Delete this dictation?"
+        case .all: "Clear recent transcripts?"
+        case nil: "Delete dictation?"
+        }
+    }
+
+    private var deletionMessage: String {
+        switch deletionTarget {
+        case .item: "This removes the saved transcript text from this device."
+        case .all: "This removes all saved transcript text from this device."
+        case nil: "This removes saved transcript text from this device."
         }
     }
 
@@ -964,29 +1002,42 @@ private struct HistoryRow: View {
     let text: String
     let isCopied: Bool
     let onCopy: () -> Void
+    let onDelete: () -> Void
 
     var body: some View {
-        Button(action: onCopy) {
-            HStack(alignment: .top, spacing: 10) {
-                Text(text)
-                    .font(.system(size: 14, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.8))
-                    .multilineTextAlignment(.leading)
-                    .lineLimit(3)
-                Spacer(minLength: 0)
-                Image(systemName: isCopied ? "checkmark" : "doc.on.doc")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(isCopied ? Color.green : .white.opacity(0.4))
-                    .frame(width: 18)
+        HStack(alignment: .top, spacing: 10) {
+            Button(action: onCopy) {
+                HStack(alignment: .top, spacing: 10) {
+                    Text(text)
+                        .font(.system(size: 14, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.8))
+                        .multilineTextAlignment(.leading)
+                        .lineLimit(3)
+                    Spacer(minLength: 0)
+                    Image(systemName: isCopied ? "checkmark" : "doc.on.doc")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(isCopied ? Color.green : .white.opacity(0.4))
+                        .frame(width: 18)
+                }
+                .contentShape(Rectangle())
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.white.opacity(0.06))
-            )
+            .buttonStyle(.plain)
+
+            Button(role: .destructive, action: onDelete) {
+                Image(systemName: "trash")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.red.opacity(0.8))
+                    .frame(width: 24, height: 24)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Delete dictation")
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color.white.opacity(0.06))
+        )
     }
 }
 #endif

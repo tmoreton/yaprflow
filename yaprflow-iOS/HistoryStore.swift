@@ -34,4 +34,10 @@ final class HistoryStore: ObservableObject {
         items = []
         defaults.removeObject(forKey: Self.key)
     }
+
+    func delete(_ text: String) {
+        let next = items.filter { $0 != text }
+        items = next
+        defaults.set(next, forKey: Self.key)
+    }
 }

@@ -294,13 +294,15 @@ final class BottomMenuActionsView: NSView {
             symbolName: "gearshape",
             title: "Settings",
             accessibilityDescription: "Show Yaprflow settings",
-            action: #selector(showSettings)
+            action: #selector(showSettings),
+            textColor: .labelColor
         )
         quitButton = makeButton(
             symbolName: nil,
             title: "\u{2318}Q",
             accessibilityDescription: "Quit Yaprflow",
-            action: #selector(quit)
+            action: #selector(quit),
+            textColor: .secondaryLabelColor
         )
 
         addSubview(settingsButton)
@@ -333,7 +335,8 @@ final class BottomMenuActionsView: NSView {
         symbolName: String?,
         title: String,
         accessibilityDescription: String,
-        action: Selector
+        action: Selector,
+        textColor: NSColor
     ) -> NSButton {
         let button = NSButton()
         button.translatesAutoresizingMaskIntoConstraints = false
@@ -349,7 +352,7 @@ final class BottomMenuActionsView: NSView {
             string: title,
             attributes: [
                 .font: NSFont.menuFont(ofSize: 0),
-                .foregroundColor: NSColor.secondaryLabelColor,
+                .foregroundColor: textColor,
             ]
         )
         button.font = NSFont.menuFont(ofSize: 0)
@@ -359,7 +362,7 @@ final class BottomMenuActionsView: NSView {
         button.action = action
         button.toolTip = accessibilityDescription
         button.setAccessibilityLabel(accessibilityDescription)
-        button.contentTintColor = .secondaryLabelColor
+        button.contentTintColor = textColor
         button.setContentHuggingPriority(.required, for: .horizontal)
         button.setContentCompressionResistancePriority(.required, for: .horizontal)
         button.heightAnchor.constraint(equalToConstant: 24).isActive = true
@@ -376,7 +379,10 @@ final class BottomMenuActionsView: NSView {
 
     private func send(action: Selector) {
         guard let target = actionTarget else { return }
-        NSApp.sendAction(action, to: target, from: self)
         enclosingMenuItem?.menu?.cancelTracking()
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            NSApp.sendAction(action, to: target, from: self)
+        }
     }
 }

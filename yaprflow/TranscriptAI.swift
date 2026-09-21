@@ -2,6 +2,10 @@ import Combine
 import Foundation
 import FoundationModels
 
+extension Notification.Name {
+    static let yaprflowPromptPresetsChanged = Notification.Name("yaprflow.prompt-presets.changed")
+}
+
 @MainActor
 final class TranscriptAIModel: ObservableObject {
     static let defaultPrompt = LibraryPromptCatalog.itemDefaultPrompt

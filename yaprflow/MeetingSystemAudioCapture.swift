@@ -1,14 +1,19 @@
 @preconcurrency import AVFoundation
+import AppKit
 import CoreMedia
+import CoreGraphics
 import Foundation
 @preconcurrency import ScreenCaptureKit
 
 enum MeetingSystemAudioError: LocalizedError {
+    case permissionDenied
     case noDisplay
     case invalidAudioBuffer
 
     var errorDescription: String? {
         switch self {
+        case .permissionDenied:
+            "Screen & System Audio access is not active. Turn it on for Yaprflow in System Settings, then restart Yaprflow."
         case .noDisplay:
             "No display is available for system-audio capture."
         case .invalidAudioBuffer:
@@ -94,8 +99,29 @@ final class MeetingSystemAudioCapture {
         output = SystemAudioStreamOutput(handler: handler)
     }
 
+    static var isAuthorized: Bool {
+        CGPreflightScreenCaptureAccess()
+    }
+
+    /// Registers Yaprflow with macOS and presents the native permission prompt
+    /// the first time Meeting Notes needs Screen & System Audio access.
+    @discardableResult
+    static func requestAuthorizationIfNeeded() -> Bool {
+        guard !isAuthorized else { return true }
+        _ = CGRequestScreenCaptureAccess()
+        return isAuthorized
+    }
+
+    static func openPrivacySettings() {
+        guard let url = URL(
+            string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
+        ) else { return }
+        NSWorkspace.shared.open(url)
+    }
+
     func start() async throws {
         guard stream == nil else { return }
+        guard Self.isAuthorized else { throw MeetingSystemAudioError.permissionDenied }
         let content = try await SCShareableContent.excludingDesktopWindows(
             false,
             onScreenWindowsOnly: true
