@@ -2,19 +2,19 @@
 
 This directory contains the redesigned landing page, policies, support, Stripe checkout, and private Mac download flow in one Vercel project: `tmoretons-projects/yaprflow-checkout`.
 
-The redesigned website and enabled live Stripe checkout are published at `https://yaprflow.com/`, with the US $7.99 one-time price verified. The active release points to the signed and notarized Mac 5.1.4 installer with the matching icon. Google and Meta tracking are enabled by default when no saved choice exists, with changes available through **Cookie settings** and no automatic bottom bar. The direct-purchase terms include a 14-day refund policy. No real live purchase has been made during verification.
+The redesigned website and enabled live Stripe checkout are published at `https://yaprflow.com/`, with the US $7.99 one-time price verified. The active release points to the signed and notarized Mac 5.2.7 installer. Google and Meta tracking are enabled by default when no saved choice exists, with changes available through **Cookie settings** and no automatic bottom bar. The direct-purchase terms include a 14-day refund policy. No real live purchase has been made during verification.
 
-## Current setup — September 19, 2026
+## Current setup — September 21, 2026
 
-Production deployment `dpl_Co8YMpdaBRCKt9YrkuGbFTmk5waL` is READY at `https://yaprflow-checkout-hy1z98fi4-tmoretons-projects.vercel.app` and aliased to `yaprflow.com`. It publishes the channel-specific purchase and update disclosure: direct purchases receive the private Stripe download and Sparkle updates, while Mac App Store purchases and updates are handled by Apple. The checkout links to the published purchase and license terms, including the 14-day refund policy, without requiring a separate acceptance checkbox. The signed empty Sparkle feed is available for the direct edition, and the OpenAI Realtime microphone demo remains enabled.
+Production is READY and aliased to `yaprflow.com`. It publishes the channel-specific purchase and update disclosure: direct purchases receive the private Stripe download and Sparkle updates, while Mac App Store purchases and updates are handled by Apple. The checkout links to the published purchase and license terms, including the 14-day refund policy, without requiring a separate acceptance checkbox. The signed empty Sparkle feed is available for the direct edition, and the OpenAI Realtime microphone demo remains enabled.
 
-Live Production settings are `CHECKOUT_ENABLED=true`, `CHECKOUT_BASE_URL=https://yaprflow.com`, and `BLOB_PATHNAME=releases/yaprflow-5.1.4.dmg`. Public `/api/config` verifies `enabled: true`, `mode: "live"`, price `{amount: 799, currency: "usd", formatted: "$7.99"}`, `downloadReady: true`, and `voiceDemoAvailable: true`. The live product is `prod_VHf8LJ6S6B1Rk6`, and the live Price ID is `price_1UH5oDAlzJZxFihrxO8VSy8p`.
+Live Production settings are `CHECKOUT_ENABLED=true`, `CHECKOUT_BASE_URL=https://yaprflow.com`, and `BLOB_PATHNAME=releases/yaprflow-5.2.7.dmg`. Public `/api/config` verifies `enabled: true`, `mode: "live"`, price `{amount: 799, currency: "usd", formatted: "$7.99"}`, `downloadReady: true`, and `voiceDemoAvailable: true`. The live product is `prod_VHf8LJ6S6B1Rk6`, and the live Price ID is `price_1UH5oDAlzJZxFihrxO8VSy8p`.
 
-Production checks passed for enabled live price/configuration, version 5.1.4 metadata, the signed feed, the published purchase terms, the private confirmation and cookie flow, and unauthorized download denial. A same-origin checkout request returned HTTP 303 to `checkout.stripe.com`. No personal or card details were entered, and no payment was submitted. Paid live delivery and vendor analytics dashboard receipt remain unverified.
+Production checks passed for enabled live price/configuration, version 5.2.7 metadata, the signed feed, the published purchase terms, the private confirmation and cookie flow, and unauthorized download denial. A same-origin checkout request returned HTTP 303 to `checkout.stripe.com`. No personal or card details were entered, and no payment was submitted. Paid live delivery and vendor analytics dashboard receipt remain unverified.
 
-The local prebuilt Production build passed. It generated six Node.js 24 API functions with zero environment-override keys, the correct project and Production target, the intended canonical www redirect, and public output excluding credentials and installers. The latest full suite passed 80 website tests and 33 shared app tests. Universal optimized Release builds passed for both Mac schemes; bundle inspection confirmed that only the direct edition contains and links Sparkle.
+The local prebuilt Production build passed. It generated the expected Node.js 24 API functions with zero environment-override keys, the correct project and Production target, the intended canonical www redirect, and public output excluding credentials and installers. The latest full suite passed 99 website tests and 56 shared app tests. Universal optimized Release builds passed for both Mac schemes; bundle inspection confirmed that only the direct edition contains and links Sparkle. The paired macOS and iOS App Store export gate also passed.
 
-The native update is Mac only. Yaprflow 5.1.4 (build 10) is signed, notarized, stapled, and accepted by Gatekeeper, with arm64 and x86_64 support and all ten Mac icon sizes matching the website artwork. Its private uploaded DMG passed a full-file size and checksum comparison, and unauthenticated access returned 403. Production points to that artifact; paid live delivery remains unverified. The original 5.1.0 installer is preserved.
+Yaprflow 5.2.7 (build 20) is signed, notarized, stapled, and accepted by Gatekeeper, with arm64 and x86_64 support. Its private uploaded DMG passed a full-file size and checksum comparison, and unauthenticated access returned 403. Production points to that artifact; paid live delivery remains unverified. Matching App Store candidates were exported for macOS 5.2.7 (build 20) and iOS 1.0.0 (build 7), but were not uploaded. The original 5.1.0 installer is preserved.
 
 Namecheap DNS was saved and rechecked: apex A `216.150.1.1`, and `www` CNAME `49cac89f54e8a17a.vercel-dns-016.com`. Google DNS-over-HTTPS returns those records. TLS checks pass for both domains, and the current public smoke checks verify www redirects to the apex. The old GitHub Pages A records were removed; existing mail forwarding and SPF were preserved.
 
@@ -72,7 +72,7 @@ final HTTPS location. Publish the archive before replacing this feed with the
 output from `../scripts/prepare-sparkle-update.sh`; otherwise installed apps
 could discover an update they cannot download.
 
-The old `/privacy.html` route redirects to `/policies/#privacy`. The landing page, purchase confirmation, policies, and support share the new branding. Files under `assets/brand/` include the matching website favicon and icon artwork applied to the signed and notarized Mac 5.1.4 build. Its private upload is verified and configured in the active checkout release. The original 5.1.0 installer remains preserved.
+The old `/privacy.html` route redirects to `/policies/#privacy`. The landing page, purchase confirmation, policies, and support share the new branding. Files under `assets/brand/` include the matching website favicon and icon artwork applied to the signed and notarized Mac 5.2.7 build. Its private upload is verified and configured in the active checkout release. The original 5.1.0 installer remains preserved.
 
 Public pages use `yaprflow.com` canonical URLs. `robots.txt` allows the website, excludes API routes, and links to a sitemap containing only the landing page, policies, and support. The private confirmation page retains its separate `noindex` metadata and response header and is absent from the sitemap.
 
@@ -80,7 +80,7 @@ Public pages use `yaprflow.com` canonical URLs. `robots.txt` allows the website,
 
 1. `GET /api/config` reports checkout availability, test/live mode, the configured Stripe price, and browser-demo availability.
 2. The landing page submits `POST /api/checkout`. The server creates a one-time Stripe Checkout Session for one copy of that price.
-3. Stripe sends a signed `checkout.session.completed` webhook to `POST /api/webhook`. After verifying the signature and paid product, the server emails a private recovery link through Resend. The website’s optional newsletter checkbox is recorded in Stripe session metadata and adds opted-in purchasers to the configured Resend newsletter segment; other purchasers are not subscribed.
+3. When email delivery is configured, Stripe sends a signed `checkout.session.completed` webhook to `POST /api/webhook`. After verifying the signature and paid product, the server emails a private recovery link through Resend. The website’s optional newsletter checkbox is always recorded in Stripe session metadata; with Resend configured, opted-in purchasers are added to the newsletter segment and other purchasers are not subscribed.
 4. Stripe returns the browser to `/api/complete?session_id={CHECKOUT_SESSION_ID}`. The server stores the private checkout reference in a purchase cookie and redirects to clean `/confirmation.html` before any page tags can load. Legacy confirmation URLs containing a session query are redirected through the same server flow before HTML is served.
 5. The emailed `/api/redeem?token=...` link validates its HMAC signature, re-verifies the paid purchase with Stripe, sets the same purchase cookie, and redirects to the clean confirmation page. The token is a private bearer credential and should not be shared.
 6. `GET /api/status` uses the purchase cookie and checks the session with Stripe, including its payment mode, product marker, quantity, allowed Price ID, completion, and paid status.
@@ -90,7 +90,7 @@ The integration follows the account’s Managed Payments defaults; it does not o
 
 The production cookie is `__Host-yaprflow-purchase`: host-only, `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`, and a 30-day maximum age. It holds the private Stripe checkout reference, which remains inaccessible to browser JavaScript; payment status and download access are rechecked with Stripe. Status and download calls use the cookie, so the clean confirmation page and its download link do not expose session references or presigned Blob URLs to tags. Local HTTP development uses the separate `yaprflow-purchase-dev` cookie only on loopback dev/test origins.
 
-The cookie lets the purchaser return to `/confirmation.html` in the same browser for 30 days. The transactional purchase email lets the purchaser restore that access on another device. If the email is unavailable, support at `tim@yaprflow.com` can help using the address from checkout. Optional marketing consent changes leave this necessary purchase flow intact. Its expiry does not limit use of the installed app. The page and API responses use `no-store` and `no-referrer`; the page is excluded from indexing. Stripe retains the payment record; no Yaprflow account or in-app sign-in is needed.
+The cookie lets the purchaser return to `/confirmation.html` in the same browser for 30 days. When its production credentials are configured, the transactional purchase email lets the purchaser restore that access on another device. Until then, support at `tim@yaprflow.com` can help using the address from checkout. Optional newsletter choices leave the necessary purchase flow intact. Its expiry does not limit use of the installed app. The page and API responses use `no-store` and `no-referrer`; the page is excluded from indexing. Stripe retains the payment record; no Yaprflow account or in-app sign-in is needed.
 
 The cookie delivery flow and Meta integration are included in Preview and Production. The paid-purchase checks were performed in the sandbox Preview: browser checks verified the legacy-link redirect, clean confirmation address, paid test status, query-free download link, and purchase access after optional consent was declined. Preview API checks verified the cookie attributes, exact clean redirect, `no-store`/`no-referrer` response headers, cookie-based paid status, and signed private-download redirect. The redirected file was not downloaded again; the earlier full-file checksum test used the previous session-query flow. Production checkout is now enabled, and public smoke checks pass for confirmation routing/cookies and unauthorized access denial. No paid live purchase or download has been performed.
 
@@ -111,13 +111,13 @@ cannot interrupt paid browser delivery.
 | `CHECKOUT_ENABLED` | Exactly `true` enables new checkout sessions when all other settings and the Stripe price are valid. Unset or `false` keeps checkout disabled. |
 | `STRIPE_ALLOWED_PRICE_IDS` | Optional comma-separated previous Price IDs whose paid purchasers should retain access. The current Price ID is always included. |
 | `CHECKOUT_BASE_URL` | Canonical HTTPS origin for checkout redirects. Required in Production; use the actual origin that serves these handlers. Local development permits HTTP on localhost. |
-| `BLOB_PATHNAME` | Fixed private installer path. Active Production uses the verified `releases/yaprflow-5.1.4.dmg`. |
+| `BLOB_PATHNAME` | Fixed private installer path. Active Production uses the verified `releases/yaprflow-5.2.7.dmg`. |
 | `BLOB_READ_WRITE_TOKEN` | Token for the private Blob store. Keep server-side and never commit it. |
 | `DOWNLOAD_LINK_SECRET` | Stable random secret of at least 32 characters used to sign cross-device purchase links. Rotating it invalidates links already emailed. |
 | `RESEND_API_KEY` | Server-only Resend credential used for transactional purchase delivery and opted-in newsletter contacts. |
 | `PURCHASE_EMAIL_FROM` | Verified Resend sender, for example `Yaprflow <downloads@yaprflow.com>`. |
 | `PURCHASE_EMAIL_REPLY_TO` | Optional support reply address. Defaults to `tim@yaprflow.com`. |
-| `RESEND_NEWSLETTER_SEGMENT_ID` | Resend segment that receives only purchasers whose Stripe Checkout promotional consent is `opt_in`. |
+| `RESEND_NEWSLETTER_SEGMENT_ID` | Resend segment that receives only purchasers whose optional Yaprflow newsletter choice is `opt_in`. |
 | `OPENAI_API_KEY` | Server credential for the website microphone demo. Configured as a hidden Production secret; unrelated to customers' native-app AI provider keys. |
 
 In Vercel Preview, leave `CHECKOUT_BASE_URL` unset to use the deployment-specific `https://${VERCEL_URL}` automatically. The fallback accepts a validated `*.vercel.app` hostname only when `VERCEL_ENV=preview`. It does not replace the explicit Production origin. An explicit `CHECKOUT_BASE_URL` overrides the Preview fallback.
@@ -164,14 +164,14 @@ Earlier browser checks confirmed all three settings buttons fit at 390 pixels wi
 
 ## Mac installer status
 
-The signed universal Mac app 5.1.4 (build 10) includes the website-matching icon at all ten required sizes. Apple accepted both the app and DMG for notarization; both are stapled and Gatekeeper accepted. The app mounted from the DMG passed deep, strict signature verification, stapler validation, and Gatekeeper assessment. It contains arm64 and x86_64 architectures. This is a Mac-only release.
+The signed universal Mac app 5.2.7 (build 20) includes the full-bleed red icon at all ten required sizes. Apple accepted both the app and DMG for notarization; both are stapled and Gatekeeper accepted. The app mounted from the DMG passed deep, strict signature verification, stapler validation, and Gatekeeper assessment. It contains arm64 and x86_64 architectures.
 
-- Local file: `../build/yaprflow-5.1.4.dmg`.
-- Private Blob pathname: `releases/yaprflow-5.1.4.dmg` in `yaprflow-private-downloads`.
-- Size: 491,696,385 bytes.
-- SHA-256: `d155f9c7d562d54cef73a494a6cc5674173abd27425fa7b1a6289dc6dc718441`.
+- Local file: `../build/yaprflow-5.2.7.dmg`.
+- Private Blob pathname: `releases/yaprflow-5.2.7.dmg` in `yaprflow-private-downloads`.
+- Size: 493,879,246 bytes.
+- SHA-256: `4520528deccecea9c039f8d4766f2296624dedaf11d048999b2f2b29701a5058`.
 
-The full uploaded 5.1.4 file was downloaded through a short-lived private URL; its size and SHA-256 match the local release. An unauthenticated GET returned 403. Active Production uses that path. These checks establish the uploaded artifact's integrity; no paid live purchase or customer download was performed.
+The full uploaded 5.2.7 file was downloaded through a short-lived private URL; its size and SHA-256 match the local release. An unauthenticated GET returned 403. Active Production uses that path. These checks establish the uploaded artifact's integrity; no paid live purchase or customer download was performed.
 
 The private store is `yaprflow-private-downloads`. The preserved and previously verified Yaprflow 5.1.0 Mac release is:
 
@@ -194,16 +194,16 @@ For each release, complete the browser flow in a Preview deployment using Stripe
 - Verify an unpaid or invalid session cannot download the installer.
 - Complete test checkout, return to the confirmation page, and download the app.
 - Confirm the signed webhook sends exactly one download email, the emailed link restores access in a separate browser, and Stripe webhook retries remain successful.
-- Test both promotional-consent choices. Only the explicit opt-in should create or attach a contact in the Resend newsletter segment.
+- Test both newsletter choices. Only the explicit opt-in should create or attach a contact in the Resend newsletter segment.
 - Compare the downloaded SHA-256 with the value above; check installation guidance.
 - Check cancellation, unavailable checkout, and payment-status retry behavior.
 
 Do not promote the sandbox deployment to Production: deployments retain their environment configuration. Create a fresh Production deployment with verified live credentials instead.
 
-Production is READY and publicly aliased. Direct buyers can proceed straight to Stripe Checkout; the published customer license and 14-day refund policy remain linked from the offer. The Mac 5.1.4 private artifact is fully checksum-verified and configured for delivery. No customer payment or paid live download was performed, and actual GA/Meta dashboard event receipt remains unverified. The website's offer and metadata reflect US $7.99 plus applicable tax; update those alongside Stripe if the public price changes later. Do not expose the sandbox configuration as the live checkout.
+Production is READY and publicly aliased. Direct buyers can proceed straight to Stripe Checkout; the published customer license and 14-day refund policy remain linked from the offer. The Mac 5.2.7 private artifact is fully checksum-verified and configured for browser delivery. Transactional email delivery remains inactive until its listed production credentials and webhook are configured. No customer payment or paid live download was performed, and actual GA/Meta dashboard event receipt remains unverified. The website's offer and metadata reflect US $7.99 plus applicable tax; update those alongside Stripe if the public price changes later. Do not expose the sandbox configuration as the live checkout.
 
 ## Releasing an update
 
 Build, sign, and notarize a new DMG with the repository's `scripts/release.sh`. Upload it under a new versioned pathname in the private Blob store, verify unauthenticated access is denied, update `BLOB_PATHNAME`, and redeploy. Record the new checksum and repeat the paid-download verification.
 
-Existing paid sessions receive the configured current installer while their Price ID remains current or appears in `STRIPE_ALLOWED_PRICE_IDS`. Mac 5.1.4 has completed signing, notarization, artifact verification, and private upload, and is configured in the active Production checkout release. A real paid live delivery has not been exercised.
+Existing paid sessions receive the configured current installer while their Price ID remains current or appears in `STRIPE_ALLOWED_PRICE_IDS`. Mac 5.2.7 has completed signing, notarization, artifact verification, and private upload, and is configured in the active Production checkout release. A real paid live delivery has not been exercised.
