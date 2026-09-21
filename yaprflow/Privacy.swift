@@ -164,51 +164,40 @@ struct SettingsView: View {
     private var updateSettings: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("Installed version")
-                    .font(.callout.weight(.medium))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Version \(appVersion)")
+                        .font(.callout.weight(.medium))
+                    #if !DIRECT_DISTRIBUTION
+                    Text("Updates are installed through the Mac App Store.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    #endif
+                }
                 Spacer()
-                Text(appVersion)
-                    .font(.callout.monospacedDigit())
-                    .foregroundStyle(.secondary)
-                    .accessibilityLabel("Installed version \(appVersion)")
-            }
-            .padding(.vertical, 7)
-
-            Divider()
-
-        #if DIRECT_DISTRIBUTION
-            HStack {
-                Text("Check for updates")
-                    .font(.callout.weight(.medium))
-                Spacer()
+                #if DIRECT_DISTRIBUTION
                 Button("Check Now") {
                     updater.checkForUpdates()
                 }
+                .accessibilityLabel("Check for updates now")
+                #endif
             }
-            .padding(.vertical, 7)
+            .padding(.vertical, 9)
 
+            #if DIRECT_DISTRIBUTION
             Divider()
 
-            Toggle("Check automatically", isOn: automaticUpdateChecksBinding)
-                .padding(.vertical, 9)
-
-            Divider()
-
-            Toggle("Download automatically", isOn: automaticUpdateDownloadsBinding)
-                .padding(.vertical, 9)
-                .disabled(!updater.automaticallyChecksForUpdates)
-        #else
-            HStack {
-                Text("Updates are installed automatically through the Mac App Store.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text("Mac App Store")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
+            Toggle(isOn: automaticUpdatesBinding) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Automatic updates")
+                        .font(.callout.weight(.medium))
+                    Text("Check for and download new versions automatically.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
-            .padding(.vertical, 7)
-        #endif
+            .toggleStyle(.switch)
+            .padding(.vertical, 9)
+            #endif
         }
     }
 
@@ -220,17 +209,21 @@ struct SettingsView: View {
     }
 
     #if DIRECT_DISTRIBUTION
-    private var automaticUpdateChecksBinding: Binding<Bool> {
+    private var automaticUpdatesBinding: Binding<Bool> {
         Binding(
-            get: { updater.automaticallyChecksForUpdates },
-            set: { updater.setAutomaticallyChecksForUpdates($0) }
-        )
-    }
-
-    private var automaticUpdateDownloadsBinding: Binding<Bool> {
-        Binding(
-            get: { updater.automaticallyDownloadsUpdates },
-            set: { updater.setAutomaticallyDownloadsUpdates($0) }
+            get: {
+                updater.automaticallyChecksForUpdates
+                    && updater.automaticallyDownloadsUpdates
+            },
+            set: { enabled in
+                if enabled {
+                    updater.setAutomaticallyChecksForUpdates(true)
+                    updater.setAutomaticallyDownloadsUpdates(true)
+                } else {
+                    updater.setAutomaticallyDownloadsUpdates(false)
+                    updater.setAutomaticallyChecksForUpdates(false)
+                }
+            }
         )
     }
     #endif
