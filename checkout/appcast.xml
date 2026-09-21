@@ -1,13 +1,40 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><!-- sparkle-sign-warning:
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!-- sparkle-sign-warning:
 IMPORTANT: This file was signed by Sparkle. Any modifications to this file requires re-signing this file with generate_appcast or sign_update! The signed signature will be embedded at the end of this file.
---><rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
-  <channel>
-    <title>Yaprflow Updates</title>
-    <link>https://yaprflow.com/</link>
-    <description>Signed updates for Yaprflow for Mac.</description>
-    <language>en</language>
-  </channel>
-</rss><!-- sparkle-signatures:
-edSignature: pmFbXhS4Ax6xuEXubHJ/B9j6i5UNaCDyYIxqNkPgIVZT4Ds6eHEX47X28uQ37vUjUT3bXvPMRXvXOSIAkrluBA==
-length: 581
+-->
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>Yaprflow Updates</title>
+        <link>https://yaprflow.com/</link>
+        <description>Signed updates for Yaprflow for Mac.</description>
+        <language>en</language>
+        <item>
+            <title>5.2.8</title>
+            <pubDate>Mon, 21 Sep 2026 16:09:57 -0400</pubDate>
+            <link>https://yaprflow.com/</link>
+            <sparkle:version>21</sparkle:version>
+            <sparkle:shortVersionString>5.2.8</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Yaprflow 5.2.8
+
+This maintenance release makes AI-generated meeting outputs more reliable:
+
+- Action plans and meeting summaries now recover cleanly when an AI provider
+  returns truncated or slightly malformed structured output.
+- Structured output is rendered as native Yaprflow sections instead of exposing
+  raw JSON in the meeting view.
+- Existing saved meetings containing a raw structured response are repaired
+  automatically when they are reopened.
+- Unrecoverable structured output now produces a clear retry state rather than
+  being displayed as meeting content.
+
+Quick Dictation and the meeting transcription workflow are unchanged.
+]]></description>
+            <enclosure url="https://m3kx2mv37nzf8tbz.public.blob.vercel-storage.com/updates/5.2.8/f92c05ffd1e28b55fe61/yaprflow-5.2.8-tH86HVlzk03qY1CiXADKepDaUs4lue.dmg" length="493890853" type="application/octet-stream" sparkle:edSignature="he/ZcfKvYXIOv2YNvh6js4pjn0aI4YPaBzoBOVAM+BC55JssJRVcDXXpbajplFJapQe8ATfe1U0pwfoO30g1Bg=="/>
+        </item>
+    </channel>
+</rss>
+<!-- sparkle-signatures:
+edSignature: igOgltoKVxccOMlN+vF1dZTsWt9bvP/EEVL9QJrTEqjwienQ0U3GqBF1+BX95j50icVZhUU2ydqmSUr4lqqlBA==
+length: 2041
 -->

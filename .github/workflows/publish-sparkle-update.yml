@@ -3,12 +3,16 @@ name: Publish Sparkle update
 on:
   workflow_dispatch:
     inputs:
-      release_tag:
-        description: Existing GitHub release tag containing the notarized DMG (for example, v5.1.5)
+      release_version:
+        description: Release version already uploaded to the updater Blob store (for example, 5.2.9)
         required: true
         type: string
-      asset_name:
-        description: Exact DMG asset name (for example, yaprflow-5.1.5.dmg)
+      asset_url:
+        description: Exact immutable public Blob URL returned by the updater upload
+        required: true
+        type: string
+      asset_sha256:
+        description: SHA-256 of the signed and notarized DMG
         required: true
         type: string
 
@@ -27,8 +31,9 @@ jobs:
     timeout-minutes: 30
     env:
       GH_TOKEN: ${{ github.token }}
-      RELEASE_TAG: ${{ inputs.release_tag }}
-      ASSET_NAME: ${{ inputs.asset_name }}
+      RELEASE_VERSION: ${{ inputs.release_version }}
+      ASSET_URL: ${{ inputs.asset_url }}
+      ASSET_SHA256: ${{ inputs.asset_sha256 }}
       SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
     steps:
       - name: Check out the stable branch
@@ -41,22 +46,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
-          [[ "$ASSET_NAME" =~ ^yaprflow-[0-9]+\.[0-9]+\.[0-9]+\.dmg$ ]]
-          [[ "$ASSET_NAME" == "yaprflow-${RELEASE_TAG#v}.dmg" ]]
+          [[ "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$ASSET_SHA256" =~ ^[a-f0-9]{64}$ ]]
+          [[ "$ASSET_URL" =~ ^https://[a-z0-9]+\.public\.blob\.vercel-storage\.com/updates/${RELEASE_VERSION}/[a-f0-9]{20}/yaprflow-${RELEASE_VERSION}-[A-Za-z0-9]+\.dmg$ ]]
           [[ -n "$SPARKLE_PRIVATE_KEY" ]]
-          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
+          [[ -f "release-notes/${RELEASE_VERSION}.md" ]]
 
       - name: Download the signed and notarized release
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p build/sparkle-release
-          gh release download "$RELEASE_TAG" \
-            --repo "$GITHUB_REPOSITORY" \
-            --pattern "$ASSET_NAME" \
-            --dir build/sparkle-release
-          [[ -f "build/sparkle-release/$ASSET_NAME" ]]
+          asset_name="${ASSET_URL##*/}"
+          curl --fail --location --proto '=https' --tlsv1.2 \
+            --retry 5 --retry-all-errors --output "build/sparkle-release/$asset_name" \
+            "$ASSET_URL"
+          printf '%s  %s\n' "$ASSET_SHA256" "build/sparkle-release/$asset_name" | shasum -a 256 -c -
 
       - name: Resolve the pinned Sparkle tools
         shell: bash
@@ -73,13 +78,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          update_prefix="https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/"
+          asset_name="${ASSET_URL##*/}"
+          update_prefix="${ASSET_URL%/*}/"
           printf '%s' "$SPARKLE_PRIVATE_KEY" | \
             SPARKLE_ED_KEY_FILE=- \
             SPARKLE_BIN_DIR=build/SourcePackages/artifacts/sparkle/Sparkle/bin \
             SPARKLE_OUTPUT_DIR=build/sparkle-publish \
             SPARKLE_DOWNLOAD_URL_PREFIX="$update_prefix" \
-            scripts/prepare-sparkle-update.sh "build/sparkle-release/$ASSET_NAME"
+            SPARKLE_RELEASE_NOTES_FILE="release-notes/${RELEASE_VERSION}.md" \
+            SPARKLE_EMBED_RELEASE_NOTES=true \
+            scripts/prepare-sparkle-update.sh "build/sparkle-release/$asset_name"
           printf '%s' "$SPARKLE_PRIVATE_KEY" | \
             build/SourcePackages/artifacts/sparkle/Sparkle/bin/sign_update \
               --ed-key-file - --verify build/sparkle-publish/appcast.xml
@@ -100,5 +108,5 @@ jobs:
           git diff --cached --quiet && { echo "The feed did not change." >&2; exit 1; }
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "Publish Sparkle update ${RELEASE_TAG}"
+          git commit -m "Publish Sparkle update v${RELEASE_VERSION}"
           git push origin HEAD:main

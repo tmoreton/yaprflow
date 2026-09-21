@@ -13,6 +13,7 @@ OUTPUT_DIR="${SPARKLE_OUTPUT_DIR:-build/sparkle-update}"
 KEY_ACCOUNT="${SPARKLE_KEY_ACCOUNT:-com.tmoreton.yaprflow}"
 ED_KEY_FILE="${SPARKLE_ED_KEY_FILE:-}"
 RELEASE_NOTES_FILE="${SPARKLE_RELEASE_NOTES_FILE:-}"
+EMBED_RELEASE_NOTES="${SPARKLE_EMBED_RELEASE_NOTES:-false}"
 
 if [[ -z "$ARCHIVE_PATH" || ! -f "$ARCHIVE_PATH" ]]; then
     echo "usage: SPARKLE_DOWNLOAD_URL_PREFIX=https://updates.example/ $0 path/to/release.(dmg|zip)" >&2
@@ -84,8 +85,21 @@ if [[ -n "$ED_KEY_FILE" ]]; then
     KEY_ARGUMENTS=(--ed-key-file "$ED_KEY_FILE")
 fi
 
+RELEASE_NOTES_ARGUMENTS=()
+if [[ "$EMBED_RELEASE_NOTES" == true ]]; then
+    if [[ -z "$RELEASE_NOTES_FILE" ]]; then
+        echo "error: SPARKLE_EMBED_RELEASE_NOTES=true requires SPARKLE_RELEASE_NOTES_FILE" >&2
+        exit 2
+    fi
+    RELEASE_NOTES_ARGUMENTS=(--embed-release-notes)
+elif [[ "$EMBED_RELEASE_NOTES" != false ]]; then
+    echo "error: SPARKLE_EMBED_RELEASE_NOTES must be true or false" >&2
+    exit 2
+fi
+
 "$GENERATE_APPCAST" \
     "${KEY_ARGUMENTS[@]}" \
+    "${RELEASE_NOTES_ARGUMENTS[@]}" \
     --download-url-prefix "$DOWNLOAD_URL_PREFIX" \
     --link "https://yaprflow.com/" \
     --maximum-versions 3 \

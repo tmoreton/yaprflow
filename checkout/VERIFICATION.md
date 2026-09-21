@@ -29,9 +29,9 @@ Last updated: September 21, 2026
 ## Sparkle checks
 
 - The direct edition includes Sparkle and requires both archive and feed signatures.
-- The first updater-enabled release was 5.1.4. The production feed is intentionally empty because no newer public Sparkle update has been published, and the empty feed carries a verified EdDSA signature.
+- The first updater-enabled release was 5.1.4. The production feed now offers Mac 5.2.8 build 21 and carries a verified EdDSA feed signature and signed enclosure.
 - The private EdDSA key remains outside the repository. The repository contains only the public key.
-- The 5.2.8 installer stays behind paid checkout. A future Sparkle update requires a separately reachable signed asset or an entitlement-aware update service.
+- The paid 5.2.8 installer stays in the private checkout store. Its byte-identical updater copy is isolated in the unlisted public `yaprflow-sparkle-updates` store under an opaque immutable path and randomized filename. The full public object matches SHA-256 `f92c05ffd1e28b55fe61f3c2ed6fbe7ef25b89ca3a91dd2279d50955acf54165`.
 
 ## Website and checkout checks
 

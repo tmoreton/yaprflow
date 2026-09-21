@@ -335,14 +335,22 @@ the appcast's `sparkle:version` with the app's increasing `CFBundleVersion`;
 every release must therefore increment `CURRENT_PROJECT_VERSION` as well as the
 marketing version.
 
-The stable feed is `https://yaprflow.com/appcast.xml`. The 5.1.4 bridge release
-uses a signed empty feed because there is no newer update yet. To stage a signed
+The stable feed is `https://yaprflow.com/appcast.xml`. Yaprflow 5.2.8 is the
+first published updater release and is stored in the isolated public Vercel
+Blob store `yaprflow-sparkle-updates`. Its immutable URL uses an opaque path and
+randomized filename and is referenced only by the signed feed; it is not linked
+from the website, checkout, sitemap, or paid-download endpoint. The original
+customer download remains in the separate private Blob store. To stage a signed
 feed entry while producing a later notarized release, run:
 
 ```bash
 DIRECT_BUILD_NUMBER=11 \
-  SPARKLE_DOWNLOAD_URL_PREFIX=https://github.com/tmoreton/yaprflow/releases/download/v5.1.5/ \
-  scripts/release.sh 5.1.5 --prepare-update
+  scripts/release.sh 5.2.9
+
+SPARKLE_DOWNLOAD_URL_PREFIX=https://<public-store>.public.blob.vercel-storage.com/updates/5.2.9/<opaque-id>/ \
+  SPARKLE_RELEASE_NOTES_FILE=release-notes/5.2.9.md \
+  SPARKLE_EMBED_RELEASE_NOTES=true \
+  scripts/prepare-sparkle-update.sh build/yaprflow-5.2.9-<random-suffix>.dmg
 ```
 
 This writes the signed archive and appcast to `build/sparkle-update/`. Upload the
@@ -356,22 +364,24 @@ writes it into the repository or logs. Run
 `scripts/configure-sparkle-github-secret.sh` to replace the secret from the
 existing Keychain key.
 
-For a later release, upload the signed and notarized DMG to an existing public
-GitHub release, then run **Publish Sparkle update** in GitHub Actions with the
-release tag and exact DMG asset name. The workflow downloads that fixed asset,
-generates and verifies the archive and feed signatures, runs the website tests,
-and commits the new appcast to `main`. Vercel then deploys the feed from the
-Git-connected repository. The `sparkle-release` environment limits secret
-access to this manual workflow.
+For a later release, upload the signed and notarized DMG immutably to the
+isolated updater Blob store with `addRandomSuffix` enabled. Generate the feed
+against the exact returned URL, verify the full downloaded checksum and both
+Sparkle signatures, then publish `checkout/appcast.xml`. Set
+`SPARKLE_RELEASE_NOTES_FILE` and `SPARKLE_EMBED_RELEASE_NOTES=true` to keep the
+release notes inside the signed feed rather than creating another public asset.
+The **Publish Sparkle update** GitHub workflow accepts that exact Blob URL and
+the verified SHA-256, regenerates and verifies the signed feed, runs the website
+tests, and commits the feed to `main`.
 
 The first updater-enabled Yaprflow release is 5.1.4 and requires a manual
 website download because 5.1.3 does not contain Sparkle. Later releases can
 update automatically. Sparkle validates the update archive before extraction
 and requires the appcast itself to carry a valid EdDSA signature.
 Yaprflow currently has no in-app license entitlement, so an update archive URL
-that Sparkle can download without authentication is also downloadable outside
-the app. Keep the feed empty until update hosting is deliberately made public
-or a purchase-linked app entitlement is implemented.
+that Sparkle can download without authentication is also downloadable to anyone
+who obtains the opaque URL from the feed. The isolated store and unlisted,
+randomized path prevent casual discovery; they are not an authorization layer.
 The `--publish` option rejects public binary publication. A source-only release
 is still available with `--publish-source`.
 

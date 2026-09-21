@@ -113,6 +113,17 @@ test('the customer-facing policy separates purchase delivery from optional newsl
   assert.match(confirmation, /email a private download link/i);
 });
 
+test('the Sparkle feed publishes only the signed unlisted 5.2.8 updater asset', async () => {
+  const appcast = await readFile(new URL('../appcast.xml', import.meta.url), 'utf8');
+  assert.match(appcast, /<sparkle:version>21<\/sparkle:version>/);
+  assert.match(appcast, /<sparkle:shortVersionString>5\.2\.8<\/sparkle:shortVersionString>/);
+  assert.match(appcast, /https:\/\/[^/]+\.public\.blob\.vercel-storage\.com\/updates\/5\.2\.8\/[^"\s]+\.dmg/);
+  assert.match(appcast, /<enclosure [^>]*sparkle:edSignature="[A-Za-z0-9+/=]+"\/>/);
+  assert.match(appcast, /<!-- sparkle-signatures:[\s\S]*edSignature: [A-Za-z0-9+/=]+/);
+  assert.doesNotMatch(appcast, /<sparkle:releaseNotesLink/);
+  assert.equal((appcast.match(/<enclosure /g) || []).length, 1);
+});
+
 test('all displayed prices and illustrative savings update together from server pricing', () => {
   const ui = page();
   updateDisplayedPrices(ui.document, config.price);

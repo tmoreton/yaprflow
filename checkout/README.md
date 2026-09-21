@@ -6,7 +6,7 @@ The redesigned website and enabled live Stripe checkout are published at `https:
 
 ## Current setup — September 21, 2026
 
-Production is READY and aliased to `yaprflow.com`. It publishes the channel-specific purchase and update disclosure: direct purchases receive the private Stripe download and Sparkle updates, while Mac App Store purchases and updates are handled by Apple. The checkout links to the published purchase and license terms, including the 14-day refund policy, without requiring a separate acceptance checkbox. The signed empty Sparkle feed is available for the direct edition, and the OpenAI Realtime microphone demo remains enabled.
+Production is READY and aliased to `yaprflow.com`. It publishes the channel-specific purchase and update disclosure: direct purchases receive the private Stripe download and Sparkle updates, while Mac App Store purchases and updates are handled by Apple. The checkout links to the published purchase and license terms, including the 14-day refund policy, without requiring a separate acceptance checkbox. The signed Sparkle feed offers Mac 5.2.8 build 21 from an isolated, unlisted public updater Blob, and the OpenAI Realtime microphone demo remains enabled.
 
 Live Production settings are `CHECKOUT_ENABLED=true`, `CHECKOUT_BASE_URL=https://yaprflow.com`, and `BLOB_PATHNAME=releases/yaprflow-5.2.8.dmg`. Public `/api/config` verifies `enabled: true`, `mode: "live"`, price `{amount: 799, currency: "usd", formatted: "$7.99"}`, `downloadReady: true`, and `voiceDemoAvailable: true`. The live product is `prod_VHf8LJ6S6B1Rk6`, and the live Price ID is `price_1UH5oDAlzJZxFihrxO8VSy8p`.
 
@@ -64,13 +64,15 @@ With checkout credentials absent, the landing page still loads and displays chec
 
 Asset directories reject hidden files, symlinks, and unexpected extensions. Source, environment files, and private installers are excluded. Vercel deploys the `api/` handlers separately; the static output alone does not implement checkout.
 
-`appcast.xml` is the public Sparkle 2 update feed for the paid website edition.
-The Mac App Store edition excludes Sparkle and receives updates from Apple.
-The committed feed has no
-release enclosure until an updater-enabled archive has been uploaded to its
-final HTTPS location. Publish the archive before replacing this feed with the
-output from `../scripts/prepare-sparkle-update.sh`; otherwise installed apps
-could discover an update they cannot download.
+`appcast.xml` is the public, signed Sparkle 2 update feed for the paid website
+edition. The Mac App Store edition excludes Sparkle and receives updates from
+Apple. Mac 5.2.8 build 21 is the current enclosure. Its DMG lives in the
+separate `yaprflow-sparkle-updates` public Blob store under an opaque immutable
+path and randomized filename. It is absent from website navigation, checkout,
+the sitemap, and the private purchase-download API. Publish and checksum-verify
+the updater archive before replacing this feed with the signed output from
+`../scripts/prepare-sparkle-update.sh`; otherwise installed apps could discover
+an update they cannot download.
 
 The old `/privacy.html` route redirects to `/policies/#privacy`. The landing page, purchase confirmation, policies, and support share the new branding. Files under `assets/brand/` include the matching website favicon and icon artwork applied to the signed and notarized Mac 5.2.7 build. Its private upload is verified and configured in the active checkout release. The original 5.1.0 installer remains preserved.
 
@@ -168,6 +170,7 @@ The signed universal Mac app 5.2.8 (build 21) includes the full-bleed red icon a
 
 - Local file: `../build/yaprflow-5.2.8.dmg`.
 - Private Blob pathname: `releases/yaprflow-5.2.8.dmg` in `yaprflow-private-downloads`.
+- Updater copy: isolated `yaprflow-sparkle-updates` public store, opaque immutable path, randomized filename, and no website or sitemap link.
 - Size: 493,890,853 bytes.
 - SHA-256: `f92c05ffd1e28b55fe61f3c2ed6fbe7ef25b89ca3a91dd2279d50955acf54165`.
 
@@ -182,7 +185,11 @@ The private store is `yaprflow-private-downloads`. The preserved and previously 
 
 The local DMG signature, stapled notarization, and Gatekeeper assessment passed fresh checks on September 18, 2026; the exported app also passed deep, strict signature verification. The file retrieved through the completed sandbox purchase matched the same checksum.
 
-Keep the installer private. Do not copy it into `assets/` or `public/`, publish it as a public GitHub release asset, or link directly to a Blob URL on the landing page.
+Keep the paid-download installer private. Do not copy it into `assets/` or
+`public/`, publish it as a public GitHub release asset, or link directly to a
+Blob URL on the landing page. The separate updater copy is the sole exception:
+it must be readable by Sparkle, stays in the isolated updater store, and is
+referenced only by the signed appcast.
 
 ## Verification and launch
 
