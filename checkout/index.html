@@ -956,6 +956,17 @@
     .offer-detail ul { margin: 0 0 26px; padding: 0; list-style: none; }
     .offer-detail li { position: relative; padding: 9px 0 9px 24px; border-bottom: 1px solid var(--line); }
     .offer-detail li::before { content: "✓"; position: absolute; left: 0; font-weight: 900; }
+    .newsletter-choice {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin: 0 0 14px;
+      font-size: 13px;
+      line-height: 1.35;
+      color: var(--ink-soft);
+      cursor: pointer;
+    }
+    .newsletter-choice input { width: 18px; height: 18px; margin: 0; flex: none; accent-color: var(--orange); }
     .offer-status {
       margin: 0;
       padding: 14px 16px;
@@ -1465,6 +1476,10 @@
             <li>No word caps or Yaprflow usage charges</li>
           </ul>
           <form id="checkout-form" action="/api/checkout" method="post">
+            <label class="newsletter-choice">
+              <input type="checkbox" name="newsletter" value="opt_in">
+              <span>Send me occasional Yaprflow product news. Optional; unsubscribe anytime.</span>
+            </label>
             <button id="checkout-button" class="button checkout-button" type="submit" disabled>Checking availability…</button>
           </form>
           <p id="checkout-status" class="offer-status" role="status" aria-live="polite">Checking secure checkout availability…</p>

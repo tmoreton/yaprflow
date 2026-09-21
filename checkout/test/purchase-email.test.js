@@ -20,8 +20,9 @@ function fixture(options = {}) {
   } = options;
   const consent = Object.hasOwn(options, 'consent') ? options.consent : 'opt_in';
   const session = {
-    id: sessionId, livemode: false, metadata,
-    consent: { promotions: consent }, customer_details: customerDetails,
+    id: sessionId, livemode: false,
+    metadata: { ...metadata, newsletter_opt_in: String(consent === 'opt_in') },
+    customer_details: customerDetails,
   };
   const calls = { emails: [], contacts: [], segments: [], updates: [] };
   const resend = {

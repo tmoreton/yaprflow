@@ -35,6 +35,16 @@ export function createHandlers({
       ((!origin || origin === 'null') && fetchSite === 'same-origin' && requestOrigin === settings.baseUrl?.origin);
   }
 
+  async function requestedNewsletterOptIn(request) {
+    if (!request) return false;
+    try {
+      const choices = (await request.formData()).getAll('newsletter');
+      return choices.length === 1 && choices[0] === 'opt_in';
+    } catch {
+      return false;
+    }
+  }
+
   return {
     async config() {
       const env = environment();
@@ -63,6 +73,7 @@ export function createHandlers({
         return privateResponse('Checkout request could not be verified.', { status: 400 });
       }
       try {
+        const newsletterOptIn = await requestedNewsletterOptIn(request);
         const stripe = stripeFactory(env);
         if (!await loadCheckoutPrice(stripe, settings)) {
           return privateResponse('Checkout is not ready.', { status: 503 });
@@ -71,11 +82,11 @@ export function createHandlers({
           mode: 'payment',
           line_items: [{ price: settings.priceId, quantity: 1 }],
           customer_creation: 'always',
-          consent_collection: { promotions: 'auto' },
           success_url: new URL('/api/complete?session_id={CHECKOUT_SESSION_ID}', settings.baseUrl).href,
           cancel_url: new URL('/?checkout=cancelled', settings.baseUrl).href,
           metadata: {
             product: checkoutProductMarker(),
+            newsletter_opt_in: String(newsletterOptIn),
           },
         });
         const url = new URL(session.url);

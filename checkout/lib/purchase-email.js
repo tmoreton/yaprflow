@@ -4,6 +4,7 @@ import { checkoutSettings } from './settings.js';
 
 const EMAIL_SENT = 'download_email_sent';
 const NEWSLETTER_SAVED = 'newsletter_contact_saved';
+const NEWSLETTER_OPT_IN = 'newsletter_opt_in';
 
 function configuredValue(value, maximum = 320) {
   return typeof value === 'string' && value.trim() && value.length <= maximum && !/[\r\n]/.test(value)
@@ -97,7 +98,7 @@ export async function fulfillPaidPurchase({
   if (!email) throw new Error('The paid checkout session does not contain a valid customer email.');
 
   const sendEmail = session.metadata?.[EMAIL_SENT] !== 'true';
-  const saveNewsletter = session.consent?.promotions === 'opt_in' &&
+  const saveNewsletter = session.metadata?.[NEWSLETTER_OPT_IN] === 'true' &&
     session.metadata?.[NEWSLETTER_SAVED] !== 'true';
   if (!sendEmail && !saveNewsletter) return { emailSent: false, newsletterSaved: false };
 

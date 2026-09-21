@@ -98,13 +98,15 @@ test('checkout has no mandatory terms checkbox and keeps the offer terms availab
   assert.doesNotMatch(html, /id="purchase-terms"|class="purchase-consent"|name="terms"/);
   assert.match(html, /href="\/policies\/#offer">Offer terms<\/a>/);
   assert.match(html, /download on the confirmation page or from the private link we email you/i);
+  assert.match(html, /name="newsletter" value="opt_in"/);
+  assert.match(html, /Optional; unsubscribe anytime/i);
   assert.match(html, /Can I buy on my phone and install it later\?/);
 });
 
 test('the customer-facing policy separates purchase delivery from optional newsletter consent', async () => {
   const policy = await readFile(new URL('../policies/index.html', import.meta.url), 'utf8');
   const confirmation = await readFile(new URL('../confirmation.html', import.meta.url), 'utf8');
-  assert.match(policy, /Only an affirmative promotional-email opt-in adds the checkout email address/i);
+  assert.match(policy, /Only selecting that checkbox adds the checkout email address/i);
   assert.match(policy, /Buying the app and receiving the required download message do not subscribe you/i);
   assert.match(policy, /transactional message containing a private purchase-recovery link/i);
   assert.match(policy, /resend\.com\/legal\/privacy-policy/);

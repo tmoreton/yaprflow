@@ -206,11 +206,11 @@ test('checkout redirects only to Stripe and uses the configured one-time price a
   assert.deepEqual(api.calls.creates[0], {
     mode: 'payment', line_items: [{ price: 'price_current123', quantity: 1 }],
     customer_creation: 'always',
-    consent_collection: { promotions: 'auto' },
     success_url: 'https://checkout.example.com/api/complete?session_id={CHECKOUT_SESSION_ID}',
     cancel_url: 'https://checkout.example.com/?checkout=cancelled',
     metadata: {
       product: 'yaprflow-mac',
+      newsletter_opt_in: 'false',
     },
   });
   assert.equal('payment_method_types' in api.calls.creates[0], false, 'Stripe controls payment methods, including Managed Payments');
@@ -240,6 +240,25 @@ test('production checkout requires a same-origin request without requiring terms
     headers: { 'Sec-Fetch-Site': 'cross-site' },
   }))).status, 400);
   assert.equal(api.calls.creates.length, 3);
+});
+
+test('checkout records only an explicit optional newsletter choice', async () => {
+  const api = fixture({ env: { NODE_ENV: 'production' } });
+  const optedIn = await api.checkout(new Request('https://checkout.example.com/api/checkout', {
+    method: 'POST',
+    headers: { Origin: 'https://checkout.example.com', 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'newsletter=opt_in',
+  }));
+  assert.equal(optedIn.status, 303);
+  assert.equal(api.calls.creates[0].metadata.newsletter_opt_in, 'true');
+
+  const malformed = await api.checkout(new Request('https://checkout.example.com/api/checkout', {
+    method: 'POST',
+    headers: { Origin: 'https://checkout.example.com', 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'newsletter=opt_in&newsletter=opt_in',
+  }));
+  assert.equal(malformed.status, 303);
+  assert.equal(api.calls.creates[1].metadata.newsletter_opt_in, 'false');
 });
 
 test('checkout rejects unsafe redirect targets', async () => {
