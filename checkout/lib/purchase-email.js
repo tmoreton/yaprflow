@@ -45,8 +45,9 @@ export function resendClient(environment = process.env) {
   return apiKey?.startsWith('re_') ? new Resend(apiKey) : null;
 }
 
-export function purchaseEmailContent({ downloadUrl, testMode = false }) {
+export function purchaseEmailContent({ downloadUrl, testMode = false, supportEmail = 'hello@yaprflow.com' }) {
   const safeUrl = htmlEscape(downloadUrl);
+  const safeSupportEmail = htmlEscape(validEmail(supportEmail) || 'hello@yaprflow.com');
   const modeNote = testMode
     ? '\nThis was a Stripe test purchase, so it does not grant a live product license.\n'
     : '';
@@ -60,9 +61,9 @@ export function purchaseEmailContent({ downloadUrl, testMode = false }) {
       '',
       'The link verifies your purchase before making the latest Mac installer available. Keep it private and do not forward it.',
       '',
-      'Need help? Reply to this email or contact tim@yaprflow.com.',
+      `Need help? Reply to this email or contact ${validEmail(supportEmail) || 'hello@yaprflow.com'}.`,
     ].filter(Boolean).join('\n\n'),
-    html: `<!doctype html><html><body style="margin:0;background:#f5f1e8;color:#171714;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"><div style="max-width:560px;margin:0 auto;padding:40px 24px"><div style="font-size:28px;font-weight:800;letter-spacing:-.03em">Yaprflow</div><h1 style="font-size:32px;line-height:1.05;margin:28px 0 14px">Your Mac download is ready.</h1><p style="font-size:17px;line-height:1.55;margin:0 0 24px">Thanks for purchasing Yaprflow. Open this private link on the Mac where you want to install it.</p>${testMode ? '<p style="padding:12px 14px;background:#fff3c4;border:1px solid #c99700">This was a Stripe test purchase and does not grant a live product license.</p>' : ''}<p style="margin:28px 0"><a href="${safeUrl}" style="display:inline-block;background:#ff4f38;color:#171714;text-decoration:none;font-weight:800;padding:15px 22px;border:2px solid #171714">Download Yaprflow for Mac</a></p><p style="font-size:14px;line-height:1.55;color:#5d5b55">This link verifies your purchase before making the latest installer available. Keep it private and do not forward it.</p><p style="font-size:14px;line-height:1.55;color:#5d5b55">Need help? Reply to this email or contact <a href="mailto:tim@yaprflow.com" style="color:#171714">tim@yaprflow.com</a>.</p></div></body></html>`,
+    html: `<!doctype html><html><body style="margin:0;background:#f5f1e8;color:#171714;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"><div style="max-width:560px;margin:0 auto;padding:40px 24px"><div style="font-size:28px;font-weight:800;letter-spacing:-.03em">Yaprflow</div><h1 style="font-size:32px;line-height:1.05;margin:28px 0 14px">Your Mac download is ready.</h1><p style="font-size:17px;line-height:1.55;margin:0 0 24px">Thanks for purchasing Yaprflow. Open this private link on the Mac where you want to install it.</p>${testMode ? '<p style="padding:12px 14px;background:#fff3c4;border:1px solid #c99700">This was a Stripe test purchase and does not grant a live product license.</p>' : ''}<p style="margin:28px 0"><a href="${safeUrl}" style="display:inline-block;background:#ff4f38;color:#171714;text-decoration:none;font-weight:800;padding:15px 22px;border:2px solid #171714">Download Yaprflow for Mac</a></p><p style="font-size:14px;line-height:1.55;color:#5d5b55">This link verifies your purchase before making the latest installer available. Keep it private and do not forward it.</p><p style="font-size:14px;line-height:1.55;color:#5d5b55">Need help? Reply to this email or contact <a href="mailto:${safeSupportEmail}" style="color:#171714">${safeSupportEmail}</a>.</p></div></body></html>`,
   };
 }
 
@@ -109,7 +110,7 @@ export async function fulfillPaidPurchase({
   let newsletterSaved = false;
   if (sendEmail) {
     const from = configuredValue(environment.PURCHASE_EMAIL_FROM);
-    const replyTo = validEmail(environment.PURCHASE_EMAIL_REPLY_TO) || 'tim@yaprflow.com';
+    const replyTo = validEmail(environment.PURCHASE_EMAIL_REPLY_TO) || 'hello@yaprflow.com';
     const secret = environment.DOWNLOAD_LINK_SECRET;
     if (!from || !from.includes('@')) throw new Error('The purchase email sender is not configured.');
     const token = issueDownloadLinkToken(session.id, secret);
@@ -117,7 +118,7 @@ export async function fulfillPaidPurchase({
     if (!baseUrl) throw new Error('The checkout origin is not configured.');
     const recoveryUrl = new URL('/api/redeem', baseUrl);
     recoveryUrl.searchParams.set('token', token);
-    const content = purchaseEmailContent({ downloadUrl: recoveryUrl.href, testMode: !session.livemode });
+    const content = purchaseEmailContent({ downloadUrl: recoveryUrl.href, testMode: !session.livemode, supportEmail: replyTo });
     const result = await resend.emails.send({
       from,
       to: email,

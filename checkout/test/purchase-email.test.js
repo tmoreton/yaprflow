@@ -47,6 +47,8 @@ test('paid fulfillment emails a cross-device recovery link and stores explicit n
   assert.equal(message.to, 'buyer@example.com');
   assert.equal(message.replyTo, environment.PURCHASE_EMAIL_REPLY_TO);
   assert.equal(message.subject, '[Test] Your Yaprflow download');
+  assert.match(message.text, /support@yaprflow\.com/);
+  assert.match(message.html, /mailto:support@yaprflow\.com/);
   assert.equal(options.idempotencyKey, `yaprflow-download-${sessionId}`);
   const link = new URL(message.text.match(/https:\/\/\S+/)[0]);
   assert.equal(link.origin, environment.CHECKOUT_BASE_URL);

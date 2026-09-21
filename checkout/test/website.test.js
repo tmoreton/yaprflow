@@ -97,8 +97,7 @@ test('checkout has no mandatory terms checkbox and keeps the offer terms availab
   const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
   assert.doesNotMatch(html, /id="purchase-terms"|class="purchase-consent"|name="terms"/);
   assert.match(html, /href="\/policies\/#offer">Offer terms<\/a>/);
-  assert.match(html, /then download on the confirmation page/i);
-  assert.doesNotMatch(html, /private link we email you/i);
+  assert.match(html, /then download on the confirmation page or from the private link we email you/i);
   assert.match(html, /name="newsletter" value="opt_in"/);
   assert.match(html, /Optional; unsubscribe anytime/i);
   assert.match(html, /Can I buy on my phone and install it later\?/);
@@ -109,9 +108,9 @@ test('the customer-facing policy separates purchase delivery from optional newsl
   const confirmation = await readFile(new URL('../confirmation.html', import.meta.url), 'utf8');
   assert.match(policy, /That choice is recorded with the Stripe purchase/i);
   assert.match(policy, /Buying the app does not subscribe you/i);
-  assert.match(policy, /When transactional email delivery is enabled/i);
+  assert.match(policy, /Resend sends a private purchase-recovery link/i);
   assert.match(policy, /resend\.com\/legal\/privacy-policy/);
-  assert.match(confirmation, /To move the download to another device, contact/i);
+  assert.match(confirmation, /email a private download link/i);
 });
 
 test('all displayed prices and illustrative savings update together from server pricing', () => {

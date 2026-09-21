@@ -5,8 +5,8 @@ Last updated: September 21, 2026
 ## Active release
 
 - Public site: `https://yaprflow.com/`
-- Vercel deployment: `dpl_8WceRMHiDzXeBkffcRKRatUcD2t6`
-- Deployment URL: `https://yaprflow-checkout-7zpgatqgc-tmoretons-projects.vercel.app`
+- Vercel deployment: `dpl_EMgachodbuFJsaf3MHauxLMbd3n5`
+- Deployment URL: `https://yaprflow-checkout-r2nkgmci0-tmoretons-projects.vercel.app`
 - Direct Mac app: Yaprflow 5.2.7, build 20, universal Intel and Apple silicon
 - Private installer: `releases/yaprflow-5.2.7.dmg`
 - Installer size: 493,879,246 bytes
@@ -38,21 +38,22 @@ Last updated: September 21, 2026
 ## Website and checkout checks
 
 - The full website suite passed: 99 tests, zero failures. The production build completed with the pinned Vercel CLI and the project's Node.js runtime.
-- Production deployment `dpl_8WceRMHiDzXeBkffcRKRatUcD2t6` is READY and aliased to `https://yaprflow.com/`.
+- Production deployment `dpl_EMgachodbuFJsaf3MHauxLMbd3n5` is READY and aliased to `https://yaprflow.com/`.
 - Public `/api/config` reports live mode, the US $7.99 one-time price, `downloadReady: true`, and `voiceDemoAvailable: true`.
 - The public page reports software version 5.2.7 and shows the optional newsletter choice.
 - Checkout has no mandatory terms checkbox or acceptance gate. The offer links directly to the published terms and 14-day refund policy.
 - A same-origin live checkout request returned HTTP 303 to Stripe Checkout; no payment was submitted.
 - `/api/download` returned HTTP 403 without a verified purchase, and `/api/redeem?token=invalid` returned HTTP 403.
+- `/api/webhook` returned HTTP 400 without a Stripe signature, confirming the production endpoint is configured and validating signed events rather than returning a setup error.
 - The active production environment uses `BLOB_PATHNAME=releases/yaprflow-5.2.7.dmg`.
-- The site accurately states that browser delivery is active and cross-device email delivery is still being finalized.
+- The Resend sender domain `yaprflow.com` is verified. The live Stripe destination `we_1UIAdhAlzJZxFihraErWdoUj` is active for `checkout.session.completed` and `checkout.session.async_payment_succeeded`.
+- All production fulfillment settings are present in Vercel, including Stripe webhook verification, Resend delivery, signed recovery links, the verified sender, support reply-to, and the dedicated newsletter segment.
+- The site accurately states that paid buyers receive both immediate browser access and an emailed private cross-device recovery link.
 
-## Production items that still require owner credentials or an account action
+## Remaining production observations
 
-- Transactional purchase email and automatic newsletter enrollment are implemented and tested but dormant. Configure `STRIPE_WEBHOOK_SECRET`, `DOWNLOAD_LINK_SECRET`, `RESEND_API_KEY`, `PURCHASE_EMAIL_FROM`, and `RESEND_NEWSLETTER_SEGMENT_ID`, then register `/api/webhook` for `checkout.session.completed` and `checkout.session.async_payment_succeeded` in Stripe live mode.
-- Complete a test purchase on mobile, confirm exactly one transactional email arrives, open its private link on a Mac, and verify the installer becomes available only after Stripe payment verification.
+- On the next ordinary purchase, confirm exactly one transactional email arrives, open its private link on another browser or Mac, and verify the installer becomes available only after Stripe payment verification. Do not replay the earlier refunded live purchase for this check.
 - Repeat test checkout once with the optional newsletter box selected and once without it. Confirm only the opted-in address enters the Resend newsletter segment and verify unsubscribe behavior.
-- Complete one real live purchase in a normal browser, confirm the returned download opens, then refund the charge in Stripe. This validates receipts, tax, payment settlement, the paid cookie, and delivery with live funds.
 - Confirm purchase and conversion events arrive in Google Analytics and Meta Events Manager. The deployed scripts and server-side guards are tested, but dashboard receipt is not verified.
 - Confirm Stripe payout, tax-registration, receipt-email, statement-descriptor, support, and dispute settings before increasing ad spend.
 - Upload both current TestFlight candidates together and complete App Store Connect agreements, banking, tax, Digital Services Act status, metadata, screenshots, review contact, TestFlight checks, and review submission.

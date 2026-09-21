@@ -14,7 +14,7 @@ export function checkoutPresentation(config) {
       ? (mode === 'test'
         ? 'Test mode · No real charge. Use Stripe test payment details to try checkout and the Mac download.'
         : 'One payment. Secure checkout by Stripe. Your download follows payment confirmation.')
-      : 'Checkout is not available right now. Please check again or contact tim@yaprflow.com.',
+      : 'Checkout is not available right now. Please check again or contact hello@yaprflow.com.',
   };
 }
 
