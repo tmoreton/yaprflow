@@ -5,7 +5,7 @@ Last updated: September 21, 2026
 ## Active release
 
 - Public site: `https://yaprflow.com/`
-- Vercel deployment: `dpl_6WxK2jWbsW8r7ixeMP8ZwVUyAXbS`
+- Vercel deployment: `dpl_H53GuJSnAsU811iCj637dQ27CJfV`
 - Deployment URL: `https://yaprflow-checkout-h405h20th-tmoretons-projects.vercel.app`
 - Direct Mac app: Yaprflow 5.2.8, build 21, universal Intel and Apple silicon
 - Private installer: `releases/yaprflow-5.2.8.dmg`
@@ -35,8 +35,9 @@ Last updated: September 21, 2026
 
 ## Website and checkout checks
 
-- The full website suite passed: 99 tests, zero failures. The production build completed with the pinned Vercel CLI and the project's Node.js runtime.
-- Production deployment `dpl_6WxK2jWbsW8r7ixeMP8ZwVUyAXbS` is READY and aliased to `https://yaprflow.com/`.
+- The full website suite passed: 100 tests, zero failures. The production build completed with the pinned Vercel CLI and the project's Node.js runtime.
+- Production deployment `dpl_H53GuJSnAsU811iCj637dQ27CJfV` is READY and aliased to `https://yaprflow.com/`.
+- A real installed Mac 5.2.6 build 19 discovered 5.2.8 through **Check Now** and displayed the signed embedded release notes and **Install Update** action.
 - Public `/api/config` reports live mode, the US $7.99 one-time price, `downloadReady: true`, and `voiceDemoAvailable: true`.
 - The public page reports software version 5.2.8 and shows the optional newsletter choice.
 - Checkout has no mandatory terms checkbox or acceptance gate. The offer links directly to the published terms and 14-day refund policy.
