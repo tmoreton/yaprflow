@@ -303,7 +303,7 @@ and build number for each release.
 The website, Stripe checkout, and private download service live together in
 [`checkout/`](checkout/README.md). The test purchase and private file delivery
 have been verified in Vercel Preview. Production is live at the confirmed US
-$7.99 one-time price and points to the verified Yaprflow 5.2.8 installer. The
+$7.99 one-time price and points to the verified Yaprflow 5.2.9 installer. The
 original site remains preserved in `docs/`.
 The release script verifies the bundled app,
 entitlements, notices, privacy manifest, and model hashes before it publishes
@@ -330,27 +330,27 @@ The resulting DMG stays private until the paid checkout is configured.
 The Mac target uses Sparkle 2.10.0 for updates outside the App Store. The menu
 and Settings include **Check for Updates…**, automatic checks default to once a
 day, and verified updates can download and install when Yaprflow next relaunches.
-Users can turn automatic checks or downloads off in Settings. Sparkle compares
+Users can turn automatic updating off in Settings. Sparkle compares
 the appcast's `sparkle:version` with the app's increasing `CFBundleVersion`;
 every release must therefore increment `CURRENT_PROJECT_VERSION` as well as the
 marketing version.
 
-The stable feed is `https://yaprflow.com/appcast.xml`. Yaprflow 5.2.8 is the
-first published updater release and is stored in the isolated public Vercel
-Blob store `yaprflow-sparkle-updates`. Its immutable URL uses an opaque path and
-randomized filename and is referenced only by the signed feed; it is not linked
-from the website, checkout, sitemap, or paid-download endpoint. The original
-customer download remains in the separate private Blob store. To stage a signed
-feed entry while producing a later notarized release, run:
+The stable feed is `https://yaprflow.com/appcast.xml`. It currently offers
+Yaprflow 5.2.9 build 22; Yaprflow 5.2.8 was the first published updater release.
+Updater archives are stored in the isolated public Vercel Blob store
+`yaprflow-sparkle-updates`. Each immutable URL uses an opaque path and randomized
+filename and is referenced only by the signed feed; it is not linked from the
+website, checkout, sitemap, or paid-download endpoint. The customer download
+remains in the separate private Blob store. To stage a later signed release, run:
 
 ```bash
-DIRECT_BUILD_NUMBER=11 \
-  scripts/release.sh 5.2.9
+DIRECT_BUILD_NUMBER=23 \
+  scripts/release.sh 5.3.0
 
-SPARKLE_DOWNLOAD_URL_PREFIX=https://<public-store>.public.blob.vercel-storage.com/updates/5.2.9/<opaque-id>/ \
-  SPARKLE_RELEASE_NOTES_FILE=release-notes/5.2.9.md \
+SPARKLE_DOWNLOAD_URL_PREFIX=https://<public-store>.public.blob.vercel-storage.com/updates/5.3.0/<opaque-id>/ \
+  SPARKLE_RELEASE_NOTES_FILE=release-notes/5.3.0.md \
   SPARKLE_EMBED_RELEASE_NOTES=true \
-  scripts/prepare-sparkle-update.sh build/yaprflow-5.2.9-<random-suffix>.dmg
+  scripts/prepare-sparkle-update.sh build/yaprflow-5.3.0.dmg
 ```
 
 This writes the signed archive and appcast to `build/sparkle-update/`. Upload the
