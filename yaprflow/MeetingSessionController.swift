@@ -30,93 +30,292 @@ struct MeetingAudioSeparationSmokeTestResult {
 private final class MeetingRecognitionPipeline {
     private static let sampleRate = 16_000
     private static let maximumSegmentSamples = 25 * sampleRate
+    private static let forcedSegmentOverlapSamples = 3 * sampleRate / 2
+    private static let fallbackTailSamples = 30 * sampleRate
 
     let speaker: MeetingSpeaker
     private let recognizer: AsrManager
+    private let voiceDetector: VoiceActivityDetector?
+    private let transcriptProcessor: TranscriptProcessor
     private let converter = StreamingAudioConverter()
-    private var segmentSamples: [Float] = []
-    private var segmentStartSample = 0
-    private var segmentFirstAudibleSample: Int?
-    private var totalSampleCount = 0
+    private var sessionAudio = RollingSessionAudio()
+    private var vadPending: [Float] = []
+    private var vadState: VoiceActivityStreamState?
+    private var usesVoiceDetector = false
+    private var currentSpeechStart: Int?
+    private var currentSpeechFedThrough: Int?
+    private var lastFinalizedAudioEnd = 0
+    private var recognizerSegmentIsOpen = false
+    private var recognizerSegmentHasLeadingOverlap = false
+    private var confirmedText = ""
     private(set) var recentlyHadAudio = false
+
+    private let segmentationConfig = VoiceActivitySegmentationConfiguration(
+        minSilenceDuration: 0.6,
+        speechStartPadding: 0.35,
+        speechEndPadding: 0.45
+    )
 
     init(
         speaker: MeetingSpeaker,
-        recognizer: AsrManager
+        recognizer: AsrManager,
+        voiceDetector: VoiceActivityDetector?,
+        transcriptProcessor: TranscriptProcessor
     ) {
         self.speaker = speaker
         self.recognizer = recognizer
+        self.voiceDetector = voiceDetector
+        self.transcriptProcessor = transcriptProcessor
     }
 
-    func start() {
+    func start() async {
         converter.reset()
-        segmentSamples.removeAll(keepingCapacity: true)
-        segmentSamples.reserveCapacity(Self.maximumSegmentSamples)
-        segmentStartSample = 0
-        segmentFirstAudibleSample = nil
-        totalSampleCount = 0
+        sessionAudio.reset(keepingCapacity: true)
+        vadPending.removeAll(keepingCapacity: true)
+        usesVoiceDetector = voiceDetector != nil
+        vadState = await voiceDetector?.makeStreamState()
+        currentSpeechStart = nil
+        currentSpeechFedThrough = nil
+        lastFinalizedAudioEnd = 0
+        recognizerSegmentIsOpen = false
+        recognizerSegmentHasLeadingOverlap = false
+        confirmedText = ""
+        recentlyHadAudio = false
+
+        if !usesVoiceDetector {
+            recognizerSegmentIsOpen = true
+            currentSpeechStart = 0
+            currentSpeechFedThrough = 0
+        }
     }
 
     func consume(_ buffer: AVAudioPCMBuffer) async throws -> [MeetingTranscriptSegment] {
-        try await consume(samples: converter.resampleBuffer(buffer))
+        let samples = try converter.resampleBuffer(buffer)
+        guard !samples.isEmpty else { return [] }
+        return try await consume(samples: samples)
     }
 
     func finish() async throws -> [MeetingTranscriptSegment] {
-        guard !segmentSamples.isEmpty else { return [] }
-        return try await transcribeCurrentSegment().map { [$0] } ?? []
+        var completed: [MeetingTranscriptSegment] = []
+        let converterTail = try converter.finish()
+        if !converterTail.isEmpty {
+            completed.append(contentsOf: try await consume(samples: converterTail))
+        }
+
+        let sessionEnd = sessionAudio.endIndex
+        if currentSpeechStart != nil {
+            completed.append(contentsOf: try await feedCurrentSpeech(upTo: sessionEnd))
+            lastFinalizedAudioEnd = max(
+                lastFinalizedAudioEnd,
+                currentSpeechFedThrough ?? sessionEnd
+            )
+            if let segment = try await finishRecognizerSegment() {
+                completed.append(segment)
+            }
+            currentSpeechStart = nil
+            currentSpeechFedThrough = nil
+        } else if usesVoiceDetector, !sessionAudio.isEmpty {
+            // The VAD may never open for a very brief or quiet final utterance.
+            // Keep this fallback bounded, but always give Parakeet the retained
+            // tail rather than silently dropping it.
+            let fallbackStart = max(lastFinalizedAudioEnd, sessionAudio.startIndex)
+            if fallbackStart < sessionEnd {
+                beginRecognizerSegment(at: fallbackStart)
+                completed.append(contentsOf: try await feedCurrentSpeech(upTo: sessionEnd))
+                if let segment = try await finishRecognizerSegment() {
+                    completed.append(segment)
+                }
+                currentSpeechStart = nil
+                currentSpeechFedThrough = nil
+            }
+        }
+
+        sessionAudio.reset(keepingCapacity: false)
+        vadPending.removeAll(keepingCapacity: false)
+        vadState = nil
+        return completed
     }
 
     private func consume(samples: [Float]) async throws -> [MeetingTranscriptSegment] {
         var completed: [MeetingTranscriptSegment] = []
-        var offset = 0
-        var hadAudibleAudio = false
-        while offset < samples.count {
-            let remaining = Self.maximumSegmentSamples - segmentSamples.count
-            let count = min(remaining, samples.count - offset)
-            let part = Array(samples[offset..<(offset + count)])
-            let meanSquare = part.reduce(0.0) { $0 + Double($1 * $1) } / Double(part.count)
-            let isAudible = meanSquare > 0.000_025
-            if isAudible {
-                hadAudibleAudio = true
-                if segmentFirstAudibleSample == nil {
-                    segmentFirstAudibleSample = totalSampleCount
-                }
-            }
-            segmentSamples.append(contentsOf: part)
-            totalSampleCount += count
-            offset += count
+        let meanSquare = samples.reduce(0.0) { $0 + Double($1 * $1) }
+            / Double(samples.count)
+        recentlyHadAudio = meanSquare > 0.000_025
+        let appendStart = sessionAudio.endIndex
+        sessionAudio.append(samples)
 
-            if segmentSamples.count >= Self.maximumSegmentSamples {
-                if let segment = try await transcribeCurrentSegment() {
+        guard usesVoiceDetector, let voiceDetector, var currentVadState = vadState else {
+            completed.append(contentsOf: try await continueWithoutVoiceDetector(from: appendStart))
+            return completed
+        }
+        vadPending.append(contentsOf: samples)
+
+        while vadPending.count >= VoiceActivityDetector.chunkSize {
+            let chunk = Array(vadPending.prefix(VoiceActivityDetector.chunkSize))
+            vadPending.removeFirst(VoiceActivityDetector.chunkSize)
+
+            let result: VoiceActivityStreamResult
+            do {
+                result = try await voiceDetector.processStreamingChunk(
+                    chunk,
+                    state: currentVadState,
+                    configuration: segmentationConfig
+                )
+            } catch {
+                usesVoiceDetector = false
+                vadState = nil
+                vadPending.removeAll(keepingCapacity: false)
+                completed.append(contentsOf: try await continueWithoutVoiceDetector(
+                    from: max(lastFinalizedAudioEnd, sessionAudio.startIndex)
+                ))
+                return completed
+            }
+            currentVadState = result.state
+            vadState = currentVadState
+
+            guard let event = result.event else { continue }
+            switch event.kind {
+            case .speechStart:
+                if currentSpeechStart != nil {
+                    completed.append(contentsOf: try await feedCurrentSpeech(
+                        upTo: sessionAudio.endIndex
+                    ))
+                    if let segment = try await finishRecognizerSegment() {
+                        completed.append(segment)
+                    }
+                }
+                beginRecognizerSegment(at: event.sampleIndex)
+            case .speechEnd:
+                guard currentSpeechStart != nil else { continue }
+                let end = max(
+                    sessionAudio.startIndex,
+                    min(event.sampleIndex, sessionAudio.endIndex)
+                )
+                completed.append(contentsOf: try await feedCurrentSpeech(upTo: end))
+                lastFinalizedAudioEnd = max(
+                    lastFinalizedAudioEnd,
+                    currentSpeechFedThrough ?? end
+                )
+                if let segment = try await finishRecognizerSegment() {
                     completed.append(segment)
                 }
-                segmentStartSample = totalSampleCount
-                segmentFirstAudibleSample = nil
+                currentSpeechStart = nil
+                currentSpeechFedThrough = nil
+                trimRetainedAudio()
             }
         }
-        recentlyHadAudio = hadAudibleAudio
+
+        completed.append(contentsOf: try await feedCurrentSpeech(upTo: sessionAudio.endIndex))
+        trimRetainedAudio()
         return completed
     }
 
-    private func transcribeCurrentSegment() async throws -> MeetingTranscriptSegment? {
-        guard !segmentSamples.isEmpty else { return nil }
-        let audio = segmentSamples
-        segmentSamples.removeAll(keepingCapacity: true)
-        let source: AudioSource = speaker == .me ? .microphone : .system
-        let result = try await recognizer.transcribe(audio, source: source)
-        return makeSegment(text: result.text)
+    private func beginRecognizerSegment(at requestedStart: Int, hasLeadingOverlap: Bool = false) {
+        let start = max(sessionAudio.startIndex, min(requestedStart, sessionAudio.endIndex))
+        currentSpeechStart = start
+        currentSpeechFedThrough = start
+        recognizerSegmentIsOpen = true
+        recognizerSegmentHasLeadingOverlap = hasLeadingOverlap
     }
 
-    private func makeSegment(text: String) -> MeetingTranscriptSegment? {
-        let polished = TranscriptPolishing.polish(text)
-        guard !polished.isEmpty else { return nil }
+    private func feedCurrentSpeech(upTo requestedEnd: Int) async throws -> [MeetingTranscriptSegment] {
+        var completed: [MeetingTranscriptSegment] = []
+        let targetEnd = max(sessionAudio.startIndex, min(requestedEnd, sessionAudio.endIndex))
+
+        while recognizerSegmentIsOpen,
+              let segmentStart = currentSpeechStart,
+              let fedThrough = currentSpeechFedThrough {
+            let hardEnd = segmentStart + Self.maximumSegmentSamples
+            let feedEnd = min(targetEnd, hardEnd)
+            if feedEnd > fedThrough {
+                currentSpeechFedThrough = feedEnd
+            }
+            guard feedEnd >= hardEnd else { break }
+
+            lastFinalizedAudioEnd = max(lastFinalizedAudioEnd, hardEnd)
+            if let segment = try await finishRecognizerSegment() {
+                completed.append(segment)
+            }
+            let continuationStart = max(
+                sessionAudio.startIndex,
+                hardEnd - Self.forcedSegmentOverlapSamples
+            )
+            beginRecognizerSegment(at: continuationStart, hasLeadingOverlap: true)
+        }
+        return completed
+    }
+
+    private func continueWithoutVoiceDetector(
+        from requestedStart: Int
+    ) async throws -> [MeetingTranscriptSegment] {
+        if !recognizerSegmentIsOpen || currentSpeechStart == nil {
+            beginRecognizerSegment(at: requestedStart)
+        }
+        let completed = try await feedCurrentSpeech(upTo: sessionAudio.endIndex)
+        trimRetainedAudio()
+        return completed
+    }
+
+    private func finishRecognizerSegment() async throws -> MeetingTranscriptSegment? {
+        guard recognizerSegmentIsOpen else { return nil }
+        let start = currentSpeechStart ?? sessionAudio.startIndex
+        let end = currentSpeechFedThrough ?? start
+        let audio = sessionAudio.samples(from: start, to: end)
+        recognizerSegmentIsOpen = false
+        let hasLeadingOverlap = recognizerSegmentHasLeadingOverlap
+        recognizerSegmentHasLeadingOverlap = false
+        guard !audio.isEmpty else { return nil }
+
+        let source: AudioSource = speaker == .me ? .microphone : .system
+        let preparedAudio = OfflineRecognitionAudio.paddedToMinimumDuration(audio)
+        let result: ASRResult
+        do {
+            result = try await recognizer.transcribe(preparedAudio, source: source)
+        } catch {
+            try? await recognizer.resetDecoderState(for: source)
+            result = try await recognizer.transcribe(preparedAudio, source: source)
+        }
+
+        var text = transcriptProcessor.process(result.text).text
+        if hasLeadingOverlap {
+            let timedOverlapTokens = result.tokenTimings?.filter {
+                $0.startTime <= Double(Self.forcedSegmentOverlapSamples) / Double(Self.sampleRate) + 0.25
+            }.count ?? 12
+            text = TranscriptSegments.removingLeadingOverlap(
+                from: text,
+                alreadyConfirmedIn: confirmedText,
+                maximumOverlapWords: min(32, max(12, timedOverlapTokens))
+            )
+        }
+        text = TranscriptSegments.capitalizingFirstLetter(
+            in: text.trimmingCharacters(in: .whitespacesAndNewlines)
+        )
+        guard !text.isEmpty else { return nil }
+
+        confirmedText = TranscriptSegments.appending(
+            text,
+            to: confirmedText,
+            deduplicatingLeadingOverlap: false
+        )
         return MeetingTranscriptSegment(
             speaker: speaker,
-            startTime: Double(segmentFirstAudibleSample ?? segmentStartSample)
-                / Double(Self.sampleRate),
-            endTime: Double(totalSampleCount) / Double(Self.sampleRate),
-            text: TranscriptSegments.capitalizingFirstLetter(in: polished)
+            startTime: Double(start) / Double(Self.sampleRate),
+            endTime: Double(end) / Double(Self.sampleRate),
+            text: text
         )
+    }
+
+    private func trimRetainedAudio() {
+        let retainFrom: Int
+        if let currentSpeechStart {
+            retainFrom = max(sessionAudio.startIndex, currentSpeechStart)
+        } else {
+            retainFrom = max(
+                sessionAudio.startIndex,
+                sessionAudio.endIndex - Self.fallbackTailSamples
+            )
+        }
+        sessionAudio.discard(before: retainFrom)
     }
 }
 
@@ -265,14 +464,27 @@ final class MeetingSessionController: ObservableObject {
             phase = .preparing("Loading meeting transcription models…")
             let recognizer = try await TranscriptionController.shared
                 .speechRecognizerForMeeting()
+            let voiceDetector = await TranscriptionController.shared
+                .voiceDetectorForMeeting()
+            let transcriptProcessor = AppState.shared.makeTranscriptProcessor(mode: .polished)
             let pipelines = (
-                MeetingRecognitionPipeline(speaker: .me, recognizer: recognizer),
-                MeetingRecognitionPipeline(speaker: .them, recognizer: recognizer)
+                MeetingRecognitionPipeline(
+                    speaker: .me,
+                    recognizer: recognizer,
+                    voiceDetector: voiceDetector,
+                    transcriptProcessor: transcriptProcessor
+                ),
+                MeetingRecognitionPipeline(
+                    speaker: .them,
+                    recognizer: recognizer,
+                    voiceDetector: voiceDetector,
+                    transcriptProcessor: transcriptProcessor
+                )
             )
             mePipeline = pipelines.0
             themPipeline = pipelines.1
-            mePipeline?.start()
-            themPipeline?.start()
+            await mePipeline?.start()
+            await themPipeline?.start()
 
             sessionGeneration &+= 1
             let generation = sessionGeneration
@@ -292,6 +504,11 @@ final class MeetingSessionController: ObservableObject {
             }
 
             phase = .preparing("Starting Mac and microphone audio…")
+            // Accept packets before either capture source starts. The streams
+            // are already generation-scoped, so buffering setup audio cannot
+            // leak a previous meeting and prevents clipping an immediate hello.
+            acceptsAudio = true
+            let captureStartedAt = Date()
             try await systemAudio.start()
             do {
                 try microphone.start(sessionGeneration: generation)
@@ -300,14 +517,13 @@ final class MeetingSessionController: ObservableObject {
                 throw error
             }
 
-            meeting.startedAt = Date()
+            meeting.startedAt = captureStartedAt
             meeting.endedAt = nil
             meeting.transcript = []
             meeting.generatedNotes = nil
             try MeetingStore.shared.save(meeting)
             startedAt = meeting.startedAt
             lastAudioActivityAt = meeting.startedAt
-            acceptsAudio = true
             phase = .recording
             startElapsedTimer()
             scheduleAutomaticStop()
@@ -346,14 +562,20 @@ final class MeetingSessionController: ObservableObject {
         systemTask = nil
         acceptsAudio = false
 
+        var finalSegments: [MeetingTranscriptSegment] = []
         do {
-            let meSegments = try await mePipeline?.finish() ?? []
-            let themSegments = try await themPipeline?.finish() ?? []
-            appendTranscriptSegments(meSegments + themSegments)
+            finalSegments.append(contentsOf: try await mePipeline?.finish() ?? [])
         } catch {
             finalizationReason = finalizationReason
-                ?? "Meeting transcription failed: \(error.localizedDescription)"
+                ?? "Microphone transcription failed while finishing: \(error.localizedDescription)"
         }
+        do {
+            finalSegments.append(contentsOf: try await themPipeline?.finish() ?? [])
+        } catch {
+            finalizationReason = finalizationReason
+                ?? "System-audio transcription failed while finishing: \(error.localizedDescription)"
+        }
+        appendTranscriptSegments(finalSegments)
         flushPendingMicrophoneSegments()
         meeting.endedAt = Date()
         mePipeline = nil
@@ -419,7 +641,10 @@ final class MeetingSessionController: ObservableObject {
             appendTranscriptSegments(try await pipeline.consume(buffer))
             if pipeline.recentlyHadAudio { lastAudioActivityAt = Date() }
         } catch {
-            await stop(reason: "Microphone transcription failed: \(error.localizedDescription)")
+            let message = "Microphone transcription failed: \(error.localizedDescription)"
+            Task { @MainActor [weak self] in
+                await self?.stop(reason: message)
+            }
         }
     }
 
@@ -434,7 +659,10 @@ final class MeetingSessionController: ObservableObject {
                 lastSystemAudioActivityAt = now
             }
         } catch {
-            await stop(reason: "System-audio transcription failed: \(error.localizedDescription)")
+            let message = "System-audio transcription failed: \(error.localizedDescription)"
+            Task { @MainActor [weak self] in
+                await self?.stop(reason: message)
+            }
         }
     }
 

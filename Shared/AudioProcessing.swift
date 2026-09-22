@@ -95,6 +95,13 @@ final class StreamingAudioConverter {
         }
     }
 
+    nonisolated private final class EndOfStreamFeeder: @unchecked Sendable {
+        func next(status: UnsafeMutablePointer<AVAudioConverterInputStatus>) -> AVAudioBuffer? {
+            status.pointee = .endOfStream
+            return nil
+        }
+    }
+
     private let targetFormat: AVAudioFormat
     private var sourceKey: FormatKey?
     private var converter: AVAudioConverter?
@@ -166,6 +173,39 @@ final class StreamingAudioConverter {
         return samples(from: output)
     }
 
+    /// Flushes samples retained by the sample-rate converter after the capture
+    /// tap has stopped. Without the explicit end-of-stream signal, the final
+    /// few milliseconds can remain inside the converter's filter history.
+    func finish() throws -> [Float] {
+        guard let converter else { return [] }
+
+        let feeder = EndOfStreamFeeder()
+        var drained: [Float] = []
+        for _ in 0..<8 {
+            guard let output = AVAudioPCMBuffer(
+                pcmFormat: targetFormat,
+                frameCapacity: 4_096
+            ) else {
+                throw AudioConversionError.cannotCreateBuffer
+            }
+            var conversionError: NSError?
+            let status = converter.convert(
+                to: output,
+                error: &conversionError,
+                withInputFrom: { _, inputStatus in
+                    feeder.next(status: inputStatus)
+                }
+            )
+            if status == .error {
+                throw AudioConversionError.conversionFailed(conversionError)
+            }
+            drained.append(contentsOf: samples(from: output))
+            if status == .endOfStream || output.frameLength == 0 { break }
+        }
+        converter.reset()
+        return drained
+    }
+
     private func matchesTarget(_ format: AVAudioFormat) -> Bool {
         format.sampleRate == targetFormat.sampleRate
             && format.channelCount == 1
@@ -200,31 +240,50 @@ nonisolated enum AudioConversionError: LocalizedError {
 
 nonisolated struct VoiceActivitySegmentationConfiguration: Sendable {
     var minSilenceDuration: TimeInterval
-    var speechPadding: TimeInterval
+    var speechStartPadding: TimeInterval
+    var speechEndPadding: TimeInterval
     var negativeThreshold: Float?
     var negativeThresholdOffset: Float
 
     init(
         minSilenceDuration: TimeInterval = 0.75,
-        speechPadding: TimeInterval = 0.1,
+        speechStartPadding: TimeInterval = 0.35,
+        speechEndPadding: TimeInterval = 0.45,
         negativeThreshold: Float? = nil,
         negativeThresholdOffset: Float = 0.15
     ) {
         precondition(minSilenceDuration >= 0)
-        precondition(speechPadding >= 0)
+        precondition(speechStartPadding >= 0)
+        precondition(speechEndPadding >= 0)
         precondition(negativeThresholdOffset >= 0)
         if let negativeThreshold {
             precondition((0...1).contains(negativeThreshold))
         }
 
         self.minSilenceDuration = minSilenceDuration
-        self.speechPadding = speechPadding
+        self.speechStartPadding = speechStartPadding
+        self.speechEndPadding = speechEndPadding
         self.negativeThreshold = negativeThreshold
         self.negativeThresholdOffset = negativeThresholdOffset
     }
 
     func effectiveNegativeThreshold(baseThreshold: Float) -> Float {
         negativeThreshold ?? max(baseThreshold - negativeThresholdOffset, 0.01)
+    }
+}
+
+/// Pads short offline recognition requests without shifting their timestamps.
+/// FluidAudio's Parakeet API rejects requests shorter than one second even
+/// though brief words are valid dictation and meeting utterances.
+nonisolated enum OfflineRecognitionAudio {
+    static func paddedToMinimumDuration(
+        _ samples: [Float],
+        sampleRate: Int = 16_000,
+        minimumDuration: TimeInterval = 1
+    ) -> [Float] {
+        let minimumSamples = max(0, Int((minimumDuration * Double(sampleRate)).rounded(.up)))
+        guard samples.count < minimumSamples else { return samples }
+        return samples + [Float](repeating: 0, count: minimumSamples - samples.count)
     }
 }
 
@@ -323,10 +382,6 @@ actor VoiceActivityDetector {
             state: state.modelState
         )
 
-        var nextState = state
-        nextState.modelState = modelState
-        nextState.processedSamples += audioChunk.count
-
         let entryThreshold: Float
         if let exitThreshold = segmentation.negativeThreshold {
             entryThreshold = min(1, exitThreshold + segmentation.negativeThresholdOffset)
@@ -336,42 +391,18 @@ actor VoiceActivityDetector {
         let exitThreshold = segmentation.effectiveNegativeThreshold(
             baseThreshold: entryThreshold
         )
-        let padding = Int(segmentation.speechPadding * Double(Self.sampleRate))
-        let minimumSilence = Int(
-            segmentation.minSilenceDuration * Double(Self.sampleRate)
+        let result = VoiceActivityBoundaryDetector.process(
+            probability: probability,
+            chunkSampleCount: audioChunk.count,
+            state: state,
+            configuration: segmentation,
+            entryThreshold: entryThreshold,
+            exitThreshold: exitThreshold,
+            sampleRate: Self.sampleRate
         )
-
-        var event: VoiceActivityStreamEvent?
-        if probability >= entryThreshold {
-            nextState.tentativeEndSample = nil
-            if !nextState.triggered {
-                nextState.triggered = true
-                let start = max(
-                    0,
-                    nextState.processedSamples - padding - audioChunk.count
-                )
-                event = VoiceActivityStreamEvent(
-                    kind: .speechStart,
-                    sampleIndex: start
-                )
-            }
-        } else if probability < exitThreshold, nextState.triggered {
-            if nextState.tentativeEndSample == nil {
-                nextState.tentativeEndSample = nextState.processedSamples
-            }
-            if let silenceStart = nextState.tentativeEndSample,
-               nextState.processedSamples - silenceStart >= minimumSilence {
-                let end = max(0, silenceStart + padding - audioChunk.count)
-                nextState.triggered = false
-                nextState.tentativeEndSample = nil
-                event = VoiceActivityStreamEvent(
-                    kind: .speechEnd,
-                    sampleIndex: end
-                )
-            }
-        }
-
-        return VoiceActivityStreamResult(state: nextState, event: event)
+        var nextState = result.state
+        nextState.modelState = modelState
+        return VoiceActivityStreamResult(state: nextState, event: result.event)
     }
 
     private func processChunk(
@@ -515,5 +546,52 @@ actor VoiceActivityDetector {
                 count: count
             )
         )
+    }
+}
+
+/// Pure VAD boundary state machine, separated from Core ML inference so onset,
+/// silence, and padding behavior can be tested deterministically.
+nonisolated enum VoiceActivityBoundaryDetector {
+    static func process(
+        probability: Float,
+        chunkSampleCount: Int,
+        state: VoiceActivityStreamState,
+        configuration: VoiceActivitySegmentationConfiguration,
+        entryThreshold: Float,
+        exitThreshold: Float,
+        sampleRate: Int = 16_000
+    ) -> VoiceActivityStreamResult {
+        var nextState = state
+        nextState.processedSamples += chunkSampleCount
+
+        let startPadding = Int(configuration.speechStartPadding * Double(sampleRate))
+        let endPadding = Int(configuration.speechEndPadding * Double(sampleRate))
+        let minimumSilence = Int(configuration.minSilenceDuration * Double(sampleRate))
+
+        var event: VoiceActivityStreamEvent?
+        if probability >= entryThreshold {
+            nextState.tentativeEndSample = nil
+            if !nextState.triggered {
+                nextState.triggered = true
+                let start = max(
+                    0,
+                    nextState.processedSamples - startPadding - chunkSampleCount
+                )
+                event = VoiceActivityStreamEvent(kind: .speechStart, sampleIndex: start)
+            }
+        } else if probability < exitThreshold, nextState.triggered {
+            if nextState.tentativeEndSample == nil {
+                nextState.tentativeEndSample = nextState.processedSamples
+            }
+            if let silenceStart = nextState.tentativeEndSample,
+               nextState.processedSamples - silenceStart >= minimumSilence {
+                let end = max(0, silenceStart + endPadding - chunkSampleCount)
+                nextState.triggered = false
+                nextState.tentativeEndSample = nil
+                event = VoiceActivityStreamEvent(kind: .speechEnd, sampleIndex: end)
+            }
+        }
+
+        return VoiceActivityStreamResult(state: nextState, event: event)
     }
 }

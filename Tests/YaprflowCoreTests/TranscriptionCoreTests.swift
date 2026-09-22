@@ -121,6 +121,17 @@ struct TranscriptSegmentTests {
         #expect(result == "The quick brown fox. jumps over the dog")
     }
 
+    @Test("Returns only the new portion of an overlapping timestamped segment")
+    func returnsOverlapRemainder() {
+        let remainder = TranscriptSegments.removingLeadingOverlap(
+            from: "brown fox, jumps over the dog",
+            alreadyConfirmedIn: "The quick brown fox.",
+            maximumOverlapWords: 12
+        )
+
+        #expect(remainder == "jumps over the dog")
+    }
+
     @Test("Does not deduplicate natural boundaries")
     func preservesNaturalBoundary() {
         let result = TranscriptSegments.appending(

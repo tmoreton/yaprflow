@@ -379,11 +379,12 @@ final class TranscriptionEngine: ObservableObject {
     private static let speechLanguageKey = "yaprflow.speechLanguage"
     private static let hardSegmentSamples = 30 * sampleRate
     private static let shortRecordingFallbackSamples = hardSegmentSamples
-    private static let forcedSegmentOverlapSamples = sampleRate / 2
+    private static let forcedSegmentOverlapSamples = 3 * sampleRate / 2
 
     private let segmentationConfig = VoiceActivitySegmentationConfiguration(
         minSilenceDuration: 0.6,
-        speechPadding: 0.15
+        speechStartPadding: 0.35,
+        speechEndPadding: 0.45
     )
 
     private var decayTimer: Timer?
@@ -624,6 +625,15 @@ final class TranscriptionEngine: ObservableObject {
             await pumpAudio(generation: generation)
         }
         await audioFIFO.waitUntilDrained(generation: generation)
+
+        do {
+            let converterTail = try audioConverter.finish()
+            if !converterTail.isEmpty {
+                await feed(converterTail, generation: generation)
+            }
+        } catch {
+            log.error("Could not drain final converted microphone audio: \(error.localizedDescription)")
+        }
 
         let sessionEnd = sessionAudio.endIndex
         if currentSpeechStart != nil {

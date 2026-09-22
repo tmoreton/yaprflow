@@ -153,6 +153,10 @@ final class MeetingSystemAudioCapture {
         self.stream = nil
         try? await stream.stopCapture()
         try? stream.removeStreamOutput(output, type: .audio)
+        // `stopCapture()` prevents new buffers, and this barrier lets any
+        // callback already queued finish enqueueing before the controller
+        // closes its bounded ingress stream.
+        callbackQueue.sync {}
     }
 
     static func pcmBuffer(from captured: CapturedSystemAudioBuffer) throws -> AVAudioPCMBuffer {

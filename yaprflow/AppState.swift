@@ -200,9 +200,9 @@ final class AppState: ObservableObject {
         makeTranscriptProcessor().process(raw)
     }
 
-    func makeTranscriptProcessor() -> TranscriptProcessor {
+    func makeTranscriptProcessor(mode overrideMode: DictationMode? = nil) -> TranscriptProcessor {
         TranscriptProcessor(
-            mode: dictationMode,
+            mode: overrideMode ?? dictationMode,
             vocabulary: (try? Self.loadVocabularyReplacements()) ?? []
         )
     }

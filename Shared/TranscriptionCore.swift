@@ -213,14 +213,31 @@ public enum TranscriptSegments {
             return joining(existing, segment)
         }
 
+        let remainder = removingLeadingOverlap(
+            from: segment,
+            alreadyConfirmedIn: existing,
+            maximumOverlapWords: maximumOverlapWords
+        )
+        guard !remainder.isEmpty else { return existing }
+        return joining(existing, remainder)
+    }
+
+    /// Returns only text that was not already confirmed at an overlapping
+    /// audio boundary. Meeting transcription uses this to keep timestamped
+    /// segments separate while sharing the same multilingual merge behavior.
+    public static func removingLeadingOverlap(
+        from segment: String,
+        alreadyConfirmedIn existing: String,
+        maximumOverlapWords: Int = 12
+    ) -> String {
+        guard !segment.isEmpty, !existing.isEmpty else { return segment }
+
         if usesCompactBoundary(between: existing, and: segment) {
-            let remainder = droppingCompactLeadingOverlap(
+            return droppingCompactLeadingOverlap(
                 from: segment,
                 alreadyConfirmedIn: existing,
                 maximumOverlapCharacters: max(0, maximumOverlapWords * 4)
             )
-            guard !remainder.isEmpty else { return existing }
-            return joining(existing, remainder)
         }
 
         let existingWords = existing.split(whereSeparator: { $0.isWhitespace }).map(String.init)
@@ -244,8 +261,7 @@ public enum TranscriptSegments {
         }
 
         let remainder = segmentWords.dropFirst(overlap)
-        guard !remainder.isEmpty else { return existing }
-        return joining(existing, remainder.joined(separator: " "))
+        return remainder.joined(separator: " ")
     }
 
     public static func combining(confirmed: String, volatile: String) -> String {

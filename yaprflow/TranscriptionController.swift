@@ -178,13 +178,14 @@ final class TranscriptionController {
     private static let sampleRate = 16_000
     private static let hardSegmentSamples = 30 * sampleRate
     private static let shortRecordingFallbackSamples = hardSegmentSamples
-    private static let forcedSegmentOverlapSamples = sampleRate / 2
+    private static let forcedSegmentOverlapSamples = 3 * sampleRate / 2
 
     // Natural pauses are preferred boundaries. The controller independently
     // enforces the 30-second segment ceiling used by the speech recognizer.
     private let segmentationConfig = VoiceActivitySegmentationConfiguration(
         minSilenceDuration: 0.6,
-        speechPadding: 0.15
+        speechStartPadding: 0.35,
+        speechEndPadding: 0.45
     )
 
     private init() {
@@ -537,6 +538,16 @@ final class TranscriptionController {
         await audioWorkerTask?.value
         audioWorkerTask = nil
 
+        do {
+            let converterTail = try audioConverter.finish()
+            if !converterTail.isEmpty {
+                await feed(converterTail)
+            }
+        } catch {
+            recognitionFailure = recognitionFailure ?? error
+            log.error("Could not drain final converted microphone audio: \(error.localizedDescription)")
+        }
+
         let sessionEnd = sessionAudio.endIndex
         if currentSpeechStart != nil {
             await feedCurrentSpeech(upTo: sessionEnd)
@@ -857,7 +868,12 @@ final class TranscriptionController {
         recognizerStreamHasLeadingOverlap = false
         guard !samples.isEmpty else { return }
         do {
-            let result = try await recognizer.transcribe(samples, source: .microphone)
+            let preparedSamples = OfflineRecognitionAudio.paddedToMinimumDuration(samples)
+            let result = try await transcribeWithOneRetry(
+                recognizer: recognizer,
+                samples: preparedSamples,
+                source: .microphone
+            )
             appendConfirmedText(
                 result.text,
                 deduplicatingLeadingOverlap: shouldDeduplicate
@@ -865,6 +881,20 @@ final class TranscriptionController {
         } catch {
             recognitionFailure = error
             log.error("Parakeet transcription failed: \(error.localizedDescription)")
+        }
+    }
+
+    private func transcribeWithOneRetry(
+        recognizer: AsrManager,
+        samples: [Float],
+        source: AudioSource
+    ) async throws -> ASRResult {
+        do {
+            return try await recognizer.transcribe(samples, source: source)
+        } catch {
+            log.error("Parakeet section failed; retrying once: \(error.localizedDescription)")
+            try? await recognizer.resetDecoderState(for: source)
+            return try await recognizer.transcribe(samples, source: source)
         }
     }
 
@@ -1064,6 +1094,12 @@ final class TranscriptionController {
         modelUnloadTask?.cancel()
         modelUnloadTask = nil
         return try await ensureLoaded(showLoadingStatus: false)
+    }
+
+    func voiceDetectorForMeeting() async -> VoiceActivityDetector? {
+        prepareVoiceDetector()
+        await voiceDetectorLoadingTask?.value
+        return vadManager
     }
 
     func meetingRecognitionDidEnd() {
