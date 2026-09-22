@@ -9,6 +9,25 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
         <description>Signed updates for Yaprflow for Mac.</description>
         <language>en</language>
         <item>
+            <title>5.2.16</title>
+            <pubDate>Tue, 22 Sep 2026 20:27:20 +0000</pubDate>
+            <link>https://yaprflow.com/</link>
+            <sparkle:version>29</sparkle:version>
+            <sparkle:shortVersionString>5.2.16</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Yaprflow 5.2.16
+
+- Shrinks the live Quick Dictation audio-level overlay to 208 × 36 points,
+  with a shorter waveform and tight spacing around the recording indicator.
+- Preparation and error messages resize only when they need more room.
+- Includes the transcription boundary improvements from 5.2.14 and the menu
+  bar status colors from 5.2.15.
+
+Speech recognition remains on the Mac.
+]]></description>
+            <enclosure url="https://m3kx2mv37nzf8tbz.public.blob.vercel-storage.com/updates/5.2.16/45f57761cf41f28d8783/yaprflow-5.2.16-pyKQFxTCWTU8CSvoGmiHKmM9e07nRz.dmg" length="480522346" type="application/octet-stream" sparkle:edSignature="3tgbEmbFik8SBRqeU+QZPwhon5JcbpglrVtj92hfBadTSxQ9mxHPkW8x+lwpojuM+RV+mDfBTVwcgLzny1YfBw=="/>
+        </item>
+        <item>
             <title>5.2.13</title>
             <pubDate>Tue, 22 Sep 2026 17:22:18 +0000</pubDate>
             <link>https://yaprflow.com/</link>
@@ -64,32 +83,9 @@ transcription.
 ]]></description>
             <enclosure url="https://m3kx2mv37nzf8tbz.public.blob.vercel-storage.com/updates/5.2.12/7d78d413306fa23b86da/yaprflow-5.2.12-tjrWMcgERrKkNoi4jk9J2jeZ9RkFYA.dmg" length="480490347" type="application/octet-stream" sparkle:edSignature="XVYb7c2EWcfY5nmWIaBEX6wLrT+6sUZJwluw/oc4vN/9ZYV5WTycRAT2n0d/BTx3PNlsvf0qPLahCDOcSA8sDw=="/>
         </item>
-        <item>
-            <title>5.2.10</title>
-            <pubDate>Tue, 22 Sep 2026 10:57:15 +0000</pubDate>
-            <link>https://yaprflow.com/</link>
-            <sparkle:version>23</sparkle:version>
-            <sparkle:shortVersionString>5.2.10</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[# Yaprflow 5.2.10
-
-This release improves AI output reliability across supported providers:
-
-- OpenAI, OpenRouter, and Ollama responses now use provider-compatible output
-  limits.
-- Yaprflow automatically retries once with a larger response budget when a
-  model stops before finishing.
-- Meeting summaries and transcript actions have more room to complete longer,
-  structured results.
-- Provider errors remain concise and never expose the full service response.
-
-Dictation, meeting recording, local storage, and privacy behavior are unchanged.
-]]></description>
-            <enclosure url="https://m3kx2mv37nzf8tbz.public.blob.vercel-storage.com/updates/5.2.10/65a716f33ea410f6de8c/yaprflow-5.2.10-fygtx2dQdybSFwh5jysChKdMv1q3BN.dmg" length="493898860" type="application/octet-stream" sparkle:edSignature="gkfM98srx7FD8jVyH/jjCmmVnLOfxq85lVzixN+L917OBECQlwsShY/jd6ifCSKK63hD/qksm/PKCTGHJGrjCw=="/>
-        </item>
     </channel>
 </rss>
 <!-- sparkle-signatures:
-edSignature: zJkemu1VyBhPYUlRvWPoYaKTLQCDuC2bnFL/QI+kQRsljlhswlmITNWgSIIf98w62nnH+NkNDHAVxHNhNYs8Aw==
-length: 5247
+edSignature: Pbq0j8m5USG3aACXdALqkRI/1FsL63E8iFQHzE0kdl8qnrRcVgWrvx+s3+sLJMXM6fHjLLsob+Iy2S6XrDqJBg==
+length: 5092
 -->
