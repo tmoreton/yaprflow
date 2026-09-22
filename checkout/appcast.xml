@@ -9,6 +9,36 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
         <description>Signed updates for Yaprflow for Mac.</description>
         <language>en</language>
         <item>
+            <title>5.2.12</title>
+            <pubDate>Tue, 22 Sep 2026 16:37:50 +0000</pubDate>
+            <link>https://yaprflow.com/</link>
+            <sparkle:version>25</sparkle:version>
+            <sparkle:shortVersionString>5.2.12</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Yaprflow 5.2.12
+
+This release upgrades on-device Mac transcription and adds natural spoken
+punctuation:
+
+- Quick Dictation and Meeting Notes now use NVIDIA Parakeet TDT 0.6B v3 for
+  substantially faster, highly accurate offline transcription.
+- Parakeet automatically detects 25 supported European languages without a
+  manual language setting.
+- Dictation is finalized at natural pauses, while long meetings are processed
+  in bounded sections so one- and two-hour sessions do not accumulate audio in
+  memory.
+- Meeting Notes continue to separate microphone speech from Mac system audio
+  and remove system-audio echo from the “Me” transcript.
+- In Polished mode, spoken commands such as “period,” “question mark,”
+  “comma,” “new line,” and “new paragraph” produce natural formatting.
+- Exact dictation mode continues to preserve recognized words verbatim.
+
+All speech recognition remains on the Mac. Audio is not uploaded for
+transcription.
+]]></description>
+            <enclosure url="https://m3kx2mv37nzf8tbz.public.blob.vercel-storage.com/updates/5.2.12/7d78d413306fa23b86da/yaprflow-5.2.12-tjrWMcgERrKkNoi4jk9J2jeZ9RkFYA.dmg" length="480490347" type="application/octet-stream" sparkle:edSignature="XVYb7c2EWcfY5nmWIaBEX6wLrT+6sUZJwluw/oc4vN/9ZYV5WTycRAT2n0d/BTx3PNlsvf0qPLahCDOcSA8sDw=="/>
+        </item>
+        <item>
             <title>5.2.10</title>
             <pubDate>Tue, 22 Sep 2026 10:57:15 +0000</pubDate>
             <link>https://yaprflow.com/</link>
@@ -52,33 +82,9 @@ Dictation, meeting recording, and saved notes are unchanged.
 ]]></description>
             <enclosure url="https://m3kx2mv37nzf8tbz.public.blob.vercel-storage.com/updates/5.2.9/c1bdce33ed13e11911b6/yaprflow-5.2.9-7cR34cOcnriKOsicAz3FRrhliyzQTI.dmg" length="493894620" type="application/octet-stream" sparkle:edSignature="xBuIGymW5HUWe961FBjL31SAYOtpBuQnDV0WESPNA9asXwA3IM2dKkqIYFvC6+3u8l2FhreZt4qWaUhOonoJBw=="/>
         </item>
-        <item>
-            <title>5.2.8</title>
-            <pubDate>Mon, 21 Sep 2026 16:09:57 -0400</pubDate>
-            <link>https://yaprflow.com/</link>
-            <sparkle:version>21</sparkle:version>
-            <sparkle:shortVersionString>5.2.8</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[# Yaprflow 5.2.8
-
-This maintenance release makes AI-generated meeting outputs more reliable:
-
-- Action plans and meeting summaries now recover cleanly when an AI provider
-  returns truncated or slightly malformed structured output.
-- Structured output is rendered as native Yaprflow sections instead of exposing
-  raw JSON in the meeting view.
-- Existing saved meetings containing a raw structured response are repaired
-  automatically when they are reopened.
-- Unrecoverable structured output now produces a clear retry state rather than
-  being displayed as meeting content.
-
-Quick Dictation and the meeting transcription workflow are unchanged.
-]]></description>
-            <enclosure url="https://m3kx2mv37nzf8tbz.public.blob.vercel-storage.com/updates/5.2.8/f92c05ffd1e28b55fe61/yaprflow-5.2.8-tH86HVlzk03qY1CiXADKepDaUs4lue.dmg" length="493890853" type="application/octet-stream" sparkle:edSignature="he/ZcfKvYXIOv2YNvh6js4pjn0aI4YPaBzoBOVAM+BC55JssJRVcDXXpbajplFJapQe8ATfe1U0pwfoO30g1Bg=="/>
-        </item>
     </channel>
 </rss>
 <!-- sparkle-signatures:
-edSignature: 4djbo7ar2Z7gFeBd6vtX+wIxUPUyV0a3NkfikvJjyNYAwnFnC1X1Dvc0Z7EGiw9rYkVelyfvUo7X1hlccjNjDA==
-length: 4587
+edSignature: Hjirl4mteYzpWPoI6etDFQWmWcIwATrLEJR60XoQ/i04mZqz2cSDr3t7n7F6Z2HV7lmCx87Y1XoayXNLcWD2BA==
+length: 4915
 -->
