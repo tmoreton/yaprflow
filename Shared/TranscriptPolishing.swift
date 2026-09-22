@@ -32,6 +32,16 @@ public enum TranscriptPolishing {
                 .trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
+        for rule in spokenPunctuationRules {
+            let punctuationRange = NSRange(text.startIndex..., in: text)
+            text = rule.regex.stringByReplacingMatches(
+                in: text,
+                options: [],
+                range: punctuationRange,
+                withTemplate: rule.replacement
+            )
+        }
+
         if normalizingEnglishAllCaps,
            text.rangeOfCharacter(from: .uppercaseLetters) != nil,
            text.rangeOfCharacter(from: .lowercaseLetters) == nil
@@ -46,7 +56,7 @@ public enum TranscriptPolishing {
             )
         }
 
-        return text
+        return resolvingSpokenPunctuationMarkers(in: text)
     }
 
     private static func isConfidentlyEnglish(_ text: String) -> Bool {
@@ -63,4 +73,81 @@ public enum TranscriptPolishing {
 
     private static let standaloneIRegex =
         try! NSRegularExpression(pattern: #"\bi\b"#)
+
+    private struct SpokenPunctuationRule {
+        let regex: NSRegularExpression
+        let replacement: String
+
+        init(_ pattern: String, replacement: String) {
+            regex = try! NSRegularExpression(pattern: pattern, options: [.caseInsensitive])
+            self.replacement = replacement
+        }
+    }
+
+    /// A private marker lets us capitalize only after punctuation the user
+    /// explicitly dictated. That avoids changing casing after abbreviations or
+    /// punctuation already supplied by the recognizer.
+    private static let sentenceBreakMarker = "\u{E000}"
+
+    private static let spokenPunctuationRules: [SpokenPunctuationRule] = [
+        SpokenPunctuationRule(
+            #"[ \t]+new paragraph\b(?![ \t]+(?:about|on|of|for|in)\b)[,.!?;:]?[ \t]*"#,
+            replacement: "\n\n\(sentenceBreakMarker)"
+        ),
+        SpokenPunctuationRule(
+            #"[ \t]+new line\b(?![ \t]+(?:of|from|for|products?|work|business|code)\b)[,.!?;:]?[ \t]*"#,
+            replacement: "\n\(sentenceBreakMarker)"
+        ),
+        SpokenPunctuationRule(
+            #"[ \t]+question mark\b(?![ \t]+(?:symbol|character|key|in|on|after|before|means|word)\b)[,.!?;:]?(?=[ \t\r\n]|$)"#,
+            replacement: "?\(sentenceBreakMarker)"
+        ),
+        SpokenPunctuationRule(
+            #"[ \t]+exclamation (?:point|mark)\b(?![ \t]+(?:symbol|character|key|in|on|after|before|means|word)\b)[,.!?;:]?(?=[ \t\r\n]|$)"#,
+            replacement: "!\(sentenceBreakMarker)"
+        ),
+        SpokenPunctuationRule(
+            #"[ \t]+(?:period|full stop)\b(?![ \t]+(?:of|in|between|during|where|when|after|before|from|for|was|is|that|which|called|means|symbol|word)\b)[,.!?;:]?(?=[ \t\r\n]|$)"#,
+            replacement: ".\(sentenceBreakMarker)"
+        ),
+        SpokenPunctuationRule(
+            #"[ \t]+semicolon\b(?![ \t]+(?:symbol|character|key|in|after|before|means|word)\b)[,.!?;:]?(?=[ \t\r\n]|$)"#,
+            replacement: ";"
+        ),
+        SpokenPunctuationRule(
+            #"[ \t]+colon\b(?![ \t]+(?:cancer|symbol|character|key|in|after|before|means|word)\b)[,.!?;:]?(?=[ \t\r\n]|$)"#,
+            replacement: ":"
+        ),
+        SpokenPunctuationRule(
+            #"[ \t]+comma\b(?![ \t]+(?:separated|delimited|splice|symbol|character|key|in|after|before|means|word)\b)[,.!?;:]?(?=[ \t\r\n]|$)"#,
+            replacement: ","
+        ),
+    ]
+
+    private static func resolvingSpokenPunctuationMarkers(in text: String) -> String {
+        var result = ""
+        var capitalizeNextLetter = false
+
+        for character in text {
+            if String(character) == sentenceBreakMarker {
+                capitalizeNextLetter = true
+                continue
+            }
+
+            if capitalizeNextLetter, character.isLetter {
+                result.append(contentsOf: String(character).uppercased())
+                capitalizeNextLetter = false
+            } else {
+                result.append(character)
+                if capitalizeNextLetter,
+                   !character.isWhitespace,
+                   !character.isPunctuation
+                {
+                    capitalizeNextLetter = false
+                }
+            }
+        }
+
+        return result
+    }
 }
