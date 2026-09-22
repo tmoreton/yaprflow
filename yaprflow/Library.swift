@@ -443,6 +443,27 @@ struct DictationWorkspace: View {
                         Divider()
                     }
 
+                    if let automaticOutput = item.automaticOutput {
+                        VStack(alignment: .leading, spacing: 7) {
+                            HStack {
+                                Text("Polished Dictation")
+                                    .font(.headline)
+                                Spacer()
+                                Button("Copy polished text", systemImage: "doc.on.clipboard") {
+                                    let pasteboard = NSPasteboard.general
+                                    pasteboard.clearContents()
+                                    pasteboard.setString(automaticOutput, forType: .string)
+                                }
+                                .buttonStyle(.borderless)
+                            }
+                            Text(automaticOutput)
+                                .font(.body)
+                                .textSelection(.enabled)
+                        }
+
+                        Divider()
+                    }
+
                     VStack(alignment: .leading, spacing: 7) {
                         Text("Transcript")
                             .font(.headline)
@@ -609,7 +630,7 @@ private struct AIWorkspaceContent: View {
                         .font(.callout.weight(.medium))
                     Spacer()
                     Menu {
-                        ForEach(LibraryPromptCatalog.itemPresets) { preset in
+                        ForEach(LibraryPromptCatalog.dictationPresets) { preset in
                             Button {
                                 selectItemPreset(preset)
                             } label: {
@@ -742,7 +763,7 @@ private struct AIWorkspaceContent: View {
     private var currentPresets: [LibraryPromptPreset] {
         source.isAllMeetings
             ? LibraryPromptCatalog.allMeetingPresets
-            : LibraryPromptCatalog.itemPresets
+            : LibraryPromptCatalog.dictationPresets
     }
 
     private var selectedItemPreset: LibraryPromptPreset {

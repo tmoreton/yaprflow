@@ -306,34 +306,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
             self.statusCancellable = AppState.shared.$status
                 .removeDuplicates()
-                .sink { [weak self] _ in
-                    self?.updateStatusItem()
+                .sink { [weak self] status in
+                    self?.updateStatusItem(status: status)
                 }
             self.meetingStatusCancellable = MeetingSessionController.shared.$phase
                 .removeDuplicates()
-                .sink { [weak self] _ in self?.updateStatusItem() }
+                .sink { [weak self] phase in
+                    self?.updateStatusItem(meetingPhase: phase)
+                }
         }
     }
 
-    private func updateStatusItem() {
+    private func updateStatusItem(
+        status updatedStatus: TranscriptionStatus? = nil,
+        meetingPhase updatedMeetingPhase: MeetingSessionPhase? = nil
+    ) {
         guard let button = statusItem?.button else { return }
 
-        let meetingPhase = MeetingSessionController.shared.phase
-        let status = AppState.shared.status
+        // @Published emits in willSet. Reading the singleton from its sink
+        // sees the previous state and leaves the icon one transition behind.
+        let meetingPhase = updatedMeetingPhase ?? MeetingSessionController.shared.phase
+        let status = updatedStatus ?? AppState.shared.status
         button.contentTintColor = nil
 
-        // An active recording takes priority over any other work the app may
-        // still be finishing. A paused meeting remains an active session.
+        // Active capture takes priority over any other work the app may still
+        // be finishing. Only genuinely paused or preparing work is yellow.
         if status == .listening {
             button.image = Self.statusItemImage(tint: .systemRed)
             button.toolTip = "Yaprflow is recording"
             button.setAccessibilityLabel("Yaprflow is recording")
             return
         }
-        if meetingPhase == .recording || meetingPhase == .paused {
+        if meetingPhase == .recording {
             button.image = Self.statusItemImage(tint: .systemRed)
-            button.toolTip = meetingPhase == .paused ? "Yaprflow meeting capture is paused" : "Yaprflow is recording a meeting"
+            button.toolTip = "Yaprflow is recording a meeting"
             button.setAccessibilityLabel(button.toolTip ?? "Yaprflow meeting capture")
+            return
+        }
+        if meetingPhase == .paused {
+            button.image = Self.statusItemImage(tint: .systemYellow)
+            button.toolTip = "Yaprflow meeting capture is paused"
+            button.setAccessibilityLabel("Yaprflow meeting capture is paused")
             return
         }
         if case let .preparing(message) = meetingPhase {
@@ -366,7 +379,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             button.setAccessibilityLabel("Yaprflow")
         }
 
-        // Colored states use palette-rendered non-template images. Applying
+        // Colored states use bitmap-rendered non-template images. Applying
         // contentTintColor to the button can recolor them unexpectedly.
     }
 
@@ -383,8 +396,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return symbol
         }
 
-        let palette = NSImage.SymbolConfiguration(paletteColors: [tint])
-        let colored = symbol.withSymbolConfiguration(palette) ?? symbol
+        // Render a real colored image. AppKit may retint a symbol configuration
+        // when it moves into the remote menu-bar scene, leaving the previous
+        // preparation color visible after capture has started.
+        let size = NSSize(width: 18, height: 18)
+        guard let bitmap = NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: 36,
+            pixelsHigh: 36,
+            bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: true,
+            isPlanar: false,
+            colorSpaceName: .deviceRGB,
+            bytesPerRow: 0,
+            bitsPerPixel: 0
+        ), let context = NSGraphicsContext(bitmapImageRep: bitmap) else {
+            return symbol
+        }
+        bitmap.size = size
+        let configured = symbol.withSymbolConfiguration(
+            NSImage.SymbolConfiguration(pointSize: 15, weight: .regular)
+        ) ?? symbol
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = context
+        let rect = NSRect(origin: .zero, size: size)
+        configured.draw(in: rect)
+        context.compositingOperation = .sourceIn
+        tint.setFill()
+        NSBezierPath(rect: rect).fill()
+        NSGraphicsContext.restoreGraphicsState()
+
+        let colored = NSImage(size: size)
+        colored.addRepresentation(bitmap)
         colored.isTemplate = false
         colored.accessibilityDescription = "Yaprflow"
         return colored

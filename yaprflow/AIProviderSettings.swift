@@ -15,44 +15,55 @@ final class AIProviderSettings: ObservableObject {
         static let openAIModel = "yaprflow.ai.openai.model"
         static let openRouterModel = "yaprflow.ai.openrouter.model"
         static let ollamaModel = "yaprflow.ai.ollama.model"
-        static let automaticRemoteMetadata = "yaprflow.ai.automaticRemoteMetadata"
+        static let automaticDictationOutput = "yaprflow.ai.automaticDictationOutput"
     }
 
     @Published var provider: AIProviderKind {
         didSet {
-            if oldValue != provider { automaticRemoteMetadata = false }
+            if oldValue != provider {
+                automaticDictationOutput = provider == .appleIntelligence
+                    && Self.supportsAutomaticAppleDictation
+            }
             changed(DefaultsKey.provider, value: provider.rawValue)
         }
     }
     @Published var openAIModel: String {
-        didSet { changed(DefaultsKey.openAIModel, value: openAIModel) }
+        didSet {
+            if oldValue != openAIModel && provider == .openAI { automaticDictationOutput = false }
+            changed(DefaultsKey.openAIModel, value: openAIModel)
+        }
     }
     @Published var openRouterModel: String {
-        didSet { changed(DefaultsKey.openRouterModel, value: openRouterModel) }
+        didSet {
+            if oldValue != openRouterModel && provider == .openRouter { automaticDictationOutput = false }
+            changed(DefaultsKey.openRouterModel, value: openRouterModel)
+        }
     }
     @Published var ollamaModel: String {
         didSet {
             if oldValue != ollamaModel && provider == .ollama {
-                automaticRemoteMetadata = false
+                automaticDictationOutput = false
             }
             changed(DefaultsKey.ollamaModel, value: ollamaModel)
         }
     }
-    @Published var automaticRemoteMetadata: Bool {
-        didSet { changed(DefaultsKey.automaticRemoteMetadata, value: automaticRemoteMetadata) }
+    @Published var automaticDictationOutput: Bool {
+        didSet { changed(DefaultsKey.automaticDictationOutput, value: automaticDictationOutput) }
     }
     @Published private(set) var hasOpenAIKey: Bool
     @Published private(set) var hasOpenRouterKey: Bool
 
     private init() {
         let defaults = UserDefaults.standard
-        provider = AIProviderKind(rawValue: defaults.string(forKey: DefaultsKey.provider) ?? "")
+        let selectedProvider = AIProviderKind(rawValue: defaults.string(forKey: DefaultsKey.provider) ?? "")
             ?? .appleIntelligence
+        provider = selectedProvider
         openAIModel = defaults.string(forKey: DefaultsKey.openAIModel) ?? "gpt-4o-mini"
         openRouterModel = defaults.string(forKey: DefaultsKey.openRouterModel)
             ?? "openai/gpt-4o-mini"
         ollamaModel = defaults.string(forKey: DefaultsKey.ollamaModel) ?? ""
-        automaticRemoteMetadata = defaults.bool(forKey: DefaultsKey.automaticRemoteMetadata)
+        automaticDictationOutput = defaults.object(forKey: DefaultsKey.automaticDictationOutput) as? Bool
+            ?? (selectedProvider == .appleIntelligence && Self.supportsAutomaticAppleDictation)
         hasOpenAIKey = (try? AIKeychain.read(account: AIProviderKind.openAI.rawValue)) != nil
         hasOpenRouterKey = (try? AIKeychain.read(account: AIProviderKind.openRouter.rawValue)) != nil
     }
@@ -64,6 +75,11 @@ final class AIProviderSettings: ObservableObject {
         case .openRouter: openRouterModel.trimmingCharacters(in: .whitespacesAndNewlines)
         case .ollama: ollamaModel.trimmingCharacters(in: .whitespacesAndNewlines)
         }
+    }
+
+    private static var supportsAutomaticAppleDictation: Bool {
+        if #available(macOS 26.0, *) { return true }
+        return false
     }
 
     var isConfigured: Bool {

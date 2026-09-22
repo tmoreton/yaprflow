@@ -67,6 +67,61 @@ struct MeetingCoreTests {
         #expect(reconciled.first { $0.speaker == .them }?.text == system.text)
     }
 
+    @Test("Repeated short words do not leave a duplicate microphone speaker")
+    func repeatedShortWordEcho() {
+        let text = "Yeah, yeah, it it it makes sense."
+        let reconciled = MeetingTranscriptReconciler.reconcile([
+            MeetingTranscriptSegment(speaker: .me, startTime: 234, endTime: 238, text: text),
+            MeetingTranscriptSegment(speaker: .them, startTime: 234, endTime: 238, text: text),
+        ])
+
+        #expect(reconciled.count == 1)
+        #expect(reconciled.first?.speaker == .them)
+    }
+
+    @Test("A shorter microphone rendering of system speech is not labeled Me")
+    func partialSystemAudioEcho() {
+        let reconciled = MeetingTranscriptReconciler.reconcile([
+            MeetingTranscriptSegment(
+                speaker: .me,
+                startTime: 216,
+                endTime: 229,
+                text: "The person we go to to go to to be in like a a litigation situation"
+            ),
+            MeetingTranscriptSegment(
+                speaker: .them,
+                startTime: 216,
+                endTime: 230,
+                text: "The person we go to for everything. I never want to go to court. You know, like I never want to be in like a litigation situation."
+            ),
+        ])
+
+        #expect(reconciled.count == 1)
+        #expect(reconciled.first?.speaker == .them)
+    }
+
+    @Test("A genuine local interruption is preserved beside echoed playback")
+    func preservesLocalInterruptionWithinEcho() {
+        let systemText = "The person we go to for everything is the expert who can help us make the major decision."
+        let reconciled = MeetingTranscriptReconciler.reconcile([
+            MeetingTranscriptSegment(
+                speaker: .me,
+                startTime: 216,
+                endTime: 229,
+                text: "The person we go to for everything wait stop is the expert who can help us make the major decision."
+            ),
+            MeetingTranscriptSegment(
+                speaker: .them,
+                startTime: 216,
+                endTime: 230,
+                text: systemText
+            ),
+        ])
+
+        #expect(reconciled.first { $0.speaker == .me }?.text.contains("wait stop") == true)
+        #expect(reconciled.first { $0.speaker == .them }?.text == systemText)
+    }
+
     @Test("Distinct or non-overlapping speech is preserved")
     func preservesDistinctSpeech() {
         let microphone = MeetingTranscriptSegment(
@@ -443,6 +498,9 @@ struct MeetingCoreTests {
         #expect(presets.allSatisfy { $0.prompt.localizedCaseInsensitiveContains("invent") })
         #expect(LibraryPromptCatalog.itemPresets.contains { $0.id == "follow-up-email" })
         #expect(LibraryPromptCatalog.allMeetingPresets.contains { $0.id == "follow-up-queue" })
+        #expect(LibraryPromptCatalog.dictationPresets.first?.id == LibraryPromptCatalog.polishedDictation.id)
+        #expect(!LibraryPromptCatalog.itemPresets.contains { $0.id == LibraryPromptCatalog.polishedDictation.id })
+        #expect(LibraryPromptCatalog.polishedDictation.prompt.localizedCaseInsensitiveContains("do not invent"))
     }
 
     @Test("Markdown export retains evidence anchors")

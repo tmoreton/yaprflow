@@ -192,7 +192,8 @@ final class AppState: ObservableObject {
         TranscriptMetadataEnricher.shared.enqueue(
             url: fileURL,
             transcript: trimmed,
-            recordedAt: recordedAt
+            recordedAt: recordedAt,
+            automaticOutput: AIProviderSettings.shared.automaticDictationOutput
         )
     }
 

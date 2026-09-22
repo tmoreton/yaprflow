@@ -37,6 +37,7 @@ private final class MeetingRecognitionPipeline {
     private let recognizer: AsrManager
     private let voiceDetector: VoiceActivityDetector?
     private let transcriptProcessor: TranscriptProcessor
+    private let echoDetector: MeetingPlaybackEchoDetector
     private let converter = StreamingAudioConverter()
     private var sessionAudio = RollingSessionAudio()
     private var vadPending: [Float] = []
@@ -60,12 +61,14 @@ private final class MeetingRecognitionPipeline {
         speaker: MeetingSpeaker,
         recognizer: AsrManager,
         voiceDetector: VoiceActivityDetector?,
-        transcriptProcessor: TranscriptProcessor
+        transcriptProcessor: TranscriptProcessor,
+        echoDetector: MeetingPlaybackEchoDetector
     ) {
         self.speaker = speaker
         self.recognizer = recognizer
         self.voiceDetector = voiceDetector
         self.transcriptProcessor = transcriptProcessor
+        self.echoDetector = echoDetector
     }
 
     func start() async {
@@ -138,6 +141,9 @@ private final class MeetingRecognitionPipeline {
 
     private func consume(samples: [Float]) async throws -> [MeetingTranscriptSegment] {
         var completed: [MeetingTranscriptSegment] = []
+        if speaker == .them {
+            echoDetector.appendSystemSamples(samples)
+        }
         let meanSquare = samples.reduce(0.0) { $0 + Double($1 * $1) }
             / Double(samples.count)
         recentlyHadAudio = meanSquare > 0.000_025
@@ -265,6 +271,10 @@ private final class MeetingRecognitionPipeline {
         let hasLeadingOverlap = recognizerSegmentHasLeadingOverlap
         recognizerSegmentHasLeadingOverlap = false
         guard !audio.isEmpty else { return nil }
+        if speaker == .me,
+           echoDetector.isPlaybackOnly(audio, startingAt: start) {
+            return nil
+        }
 
         let source: AudioSource = speaker == .me ? .microphone : .system
         let preparedAudio = OfflineRecognitionAudio.paddedToMinimumDuration(audio)
@@ -333,6 +343,7 @@ final class MeetingSessionController: ObservableObject {
 
     private var mePipeline: MeetingRecognitionPipeline?
     private var themPipeline: MeetingRecognitionPipeline?
+    private let echoDetector = MeetingPlaybackEchoDetector()
     private let micIngress: BoundedAudioIngress
     private let systemIngress: BoundedSystemAudioIngress
     private let microphone: AudioCapture
@@ -359,6 +370,7 @@ final class MeetingSessionController: ObservableObject {
         micIngress = ingress
         self.systemIngress = systemIngress
         microphone = AudioCapture(
+            prefersVoiceProcessing: true,
             bufferHandler: { generation, buffer in
                 ingress.enqueue(generation: generation, buffer: buffer)
             },
@@ -455,6 +467,7 @@ final class MeetingSessionController: ObservableObject {
             break
         }
         resetEchoPresentationState()
+        echoDetector.reset()
         phase = .preparing("Requesting microphone access…")
         do {
             try await ensureMicrophonePermission()
@@ -472,13 +485,15 @@ final class MeetingSessionController: ObservableObject {
                     speaker: .me,
                     recognizer: recognizer,
                     voiceDetector: voiceDetector,
-                    transcriptProcessor: transcriptProcessor
+                    transcriptProcessor: transcriptProcessor,
+                    echoDetector: echoDetector
                 ),
                 MeetingRecognitionPipeline(
                     speaker: .them,
                     recognizer: recognizer,
                     voiceDetector: voiceDetector,
-                    transcriptProcessor: transcriptProcessor
+                    transcriptProcessor: transcriptProcessor,
+                    echoDetector: echoDetector
                 )
             )
             mePipeline = pipelines.0
@@ -564,16 +579,16 @@ final class MeetingSessionController: ObservableObject {
 
         var finalSegments: [MeetingTranscriptSegment] = []
         do {
-            finalSegments.append(contentsOf: try await mePipeline?.finish() ?? [])
-        } catch {
-            finalizationReason = finalizationReason
-                ?? "Microphone transcription failed while finishing: \(error.localizedDescription)"
-        }
-        do {
             finalSegments.append(contentsOf: try await themPipeline?.finish() ?? [])
         } catch {
             finalizationReason = finalizationReason
                 ?? "System-audio transcription failed while finishing: \(error.localizedDescription)"
+        }
+        do {
+            finalSegments.append(contentsOf: try await mePipeline?.finish() ?? [])
+        } catch {
+            finalizationReason = finalizationReason
+                ?? "Microphone transcription failed while finishing: \(error.localizedDescription)"
         }
         appendTranscriptSegments(finalSegments)
         flushPendingMicrophoneSegments()
@@ -851,7 +866,7 @@ final class MeetingSessionController: ObservableObject {
 
         return MeetingAudioSeparationSmokeTestResult(
             succeeded: passed && cleanedUp,
-            message: "systemThem=\(reconciledSystemThemMarkers) systemMe=\(reconciledSystemMeMarkers) microphoneMe=\(reconciledMicrophoneMeMarkers) rawSystemThem=\(rawSystemThemMarkers) rawSystemMe=\(rawSystemMeMarkers) rawMicrophoneMe=\(rawMicrophoneMeMarkers) rawThemSegments=\(rawThemSegments) rawMeSegments=\(rawMeSegments) cleanup=\(cleanedUp)"
+            message: "systemThem=\(reconciledSystemThemMarkers) systemMe=\(reconciledSystemMeMarkers) microphoneMe=\(reconciledMicrophoneMeMarkers) rawSystemThem=\(rawSystemThemMarkers) rawSystemMe=\(rawSystemMeMarkers) rawMicrophoneMe=\(rawMicrophoneMeMarkers) rawThemSegments=\(rawThemSegments) rawMeSegments=\(rawMeSegments) voiceProcessing=\(microphone.isVoiceProcessingActive) audioEchoSuppressed=\(echoDetector.suppressedSegmentCount) cleanup=\(cleanedUp)"
         )
     }
 

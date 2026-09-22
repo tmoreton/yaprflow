@@ -22,13 +22,16 @@ nonisolated final class AudioCapture: @unchecked Sendable {
     private var acceptingCallbacks = false
     private var activeGeneration: UInt?
     private var configurationObserver: NSObjectProtocol?
+    private let prefersVoiceProcessing: Bool
     private let bufferHandler: @Sendable (UInt, AVAudioPCMBuffer) -> Void
     private let configurationChangeHandler: @Sendable (UInt) -> Void
 
     init(
+        prefersVoiceProcessing: Bool = false,
         bufferHandler: @escaping @Sendable (UInt, AVAudioPCMBuffer) -> Void,
         configurationChangeHandler: @escaping @Sendable (UInt) -> Void
     ) {
+        self.prefersVoiceProcessing = prefersVoiceProcessing
         self.bufferHandler = bufferHandler
         self.configurationChangeHandler = configurationChangeHandler
         configurationObserver = NotificationCenter.default.addObserver(
@@ -60,6 +63,29 @@ nonisolated final class AudioCapture: @unchecked Sendable {
         try validateInputAvailable()
 
         let input = engine.inputNode
+        if prefersVoiceProcessing, !input.isVoiceProcessingEnabled {
+            // Apple's voice-processing input includes acoustic echo
+            // cancellation. If the device cannot provide it, keep recording;
+            // meeting capture also has a conservative playback-echo detector.
+            do {
+                try input.setVoiceProcessingEnabled(true)
+            } catch {
+                NSLog("Yaprflow: meeting microphone voice processing unavailable: %@", error.localizedDescription)
+            }
+        }
+        do {
+            try startInputTap(input, sessionGeneration: sessionGeneration)
+        } catch {
+            guard prefersVoiceProcessing, input.isVoiceProcessingEnabled else { throw error }
+            // Some input devices advertise voice processing but cannot start
+            // a recording graph with it. Restore ordinary capture rather
+            // than sacrificing the meeting transcript.
+            try input.setVoiceProcessingEnabled(false)
+            try startInputTap(input, sessionGeneration: sessionGeneration)
+        }
+    }
+
+    private func startInputTap(_ input: AVAudioInputNode, sessionGeneration: UInt) throws {
         let format = input.inputFormat(forBus: 0)
         guard Self.supportsCaptureFormat(format) else {
             throw AudioCaptureError.invalidInputFormat
@@ -102,6 +128,10 @@ nonisolated final class AudioCapture: @unchecked Sendable {
             callbackGroup.wait()
             throw error
         }
+    }
+
+    var isVoiceProcessingActive: Bool {
+        engine.inputNode.isVoiceProcessingEnabled
     }
 
     func stop() {

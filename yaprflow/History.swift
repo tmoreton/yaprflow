@@ -9,6 +9,7 @@ struct TranscriptHistoryItem: Identifiable, Hashable {
     let generatedTitle: String?
     let topic: String?
     let generatedDescription: String?
+    let automaticOutput: String?
 
     var id: URL { url }
     var title: String {
@@ -62,7 +63,8 @@ final class TranscriptHistoryModel: ObservableObject {
                     transcript: document.transcript,
                     generatedTitle: document.generatedTitle,
                     topic: document.topic,
-                    generatedDescription: document.generatedDescription
+                    generatedDescription: document.generatedDescription,
+                    automaticOutput: document.automaticOutput
                 )
             }
             .sorted { $0.recordedAt > $1.recordedAt }

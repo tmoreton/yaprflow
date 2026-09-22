@@ -243,13 +243,13 @@ private struct PromptPresetSettingsView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Output prompts")
                         .font(.callout.weight(.medium))
-                    Text("Used for both meeting notes and dictations.")
+                    Text("Meeting outputs and dictations; Polished Dictation is dictation-only.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 16)
                 Picker("Output prompt", selection: $selectedPresetID) {
-                    ForEach(LibraryPromptCatalog.itemPresets) { preset in
+                    ForEach(LibraryPromptCatalog.dictationPresets) { preset in
                         Label(preset.title, systemImage: preset.systemImage).tag(preset.id)
                     }
                 }

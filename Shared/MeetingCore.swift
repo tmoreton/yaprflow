@@ -122,6 +122,38 @@ public enum MeetingTranscriptReconciler {
         let systemTokens = tokens(in: systemText)
         guard microphoneTokens.count >= 3, systemTokens.count >= 3 else { return microphoneText }
 
+        // When the microphone recognizer heard a shortened or differently
+        // punctuated copy of system playback, suppress the entire duplicate.
+        // Include short *exact* words here: repeated fillers such as "it it it"
+        // are strong evidence only in the context of several longer matches.
+        let wholeEchoMatches = fuzzyOrderedMatches(
+            microphoneTokens,
+            systemTokens,
+            includeShortExact: true
+        )
+        let microphoneContentCharacters = microphoneTokens
+            .filter { $0.value.count >= 3 }
+            .reduce(0) { $0 + $1.value.count }
+        let matchedContentCharacters = wholeEchoMatches.reduce(0) { total, match in
+            let count = microphoneTokens[match.microphoneIndex].value.count
+            return total + (count >= 3 ? count : 0)
+        }
+        // Keep any distinct content word: a real local interjection can be
+        // short even when most of the microphone segment is echoed playback.
+        let matchedMicrophoneIndexes = Set(wholeEchoMatches.map(\.microphoneIndex))
+        let unmatchedContentWords = microphoneTokens.enumerated().filter { index, token in
+            token.value.count >= 3
+                && !matchedMicrophoneIndexes.contains(index)
+        }
+        if wholeEchoMatches.count >= 3,
+           matchedContentCharacters >= 15,
+           unmatchedContentWords.isEmpty,
+           Double(wholeEchoMatches.count) / Double(microphoneTokens.count) >= 0.72,
+           microphoneContentCharacters > 0,
+           Double(matchedContentCharacters) / Double(microphoneContentCharacters) >= 0.82 {
+            return ""
+        }
+
         let matches = fuzzyOrderedMatches(microphoneTokens, systemTokens)
         let groups = matchGroups(matches)
         let echoRanges = groups.compactMap { group -> Range<String.Index>? in
@@ -154,7 +186,8 @@ public enum MeetingTranscriptReconciler {
     /// changes and omissions produced when two recognizers hear the same audio.
     private static func fuzzyOrderedMatches(
         _ microphoneTokens: [WordToken],
-        _ systemTokens: [WordToken]
+        _ systemTokens: [WordToken],
+        includeShortExact: Bool = false
     ) -> [TokenMatch] {
         var lengths = Array(
             repeating: [Int](repeating: 0, count: systemTokens.count + 1),
@@ -164,7 +197,8 @@ public enum MeetingTranscriptReconciler {
             for systemIndex in 1...systemTokens.count {
                 if tokensAreSimilar(
                     microphoneTokens[microphoneIndex - 1].value,
-                    systemTokens[systemIndex - 1].value
+                    systemTokens[systemIndex - 1].value,
+                    includeShortExact: includeShortExact
                 ) {
                     lengths[microphoneIndex][systemIndex] = lengths[microphoneIndex - 1][systemIndex - 1] + 1
                 } else {
@@ -182,7 +216,8 @@ public enum MeetingTranscriptReconciler {
         while microphoneIndex > 0, systemIndex > 0 {
             if tokensAreSimilar(
                 microphoneTokens[microphoneIndex - 1].value,
-                systemTokens[systemIndex - 1].value
+                systemTokens[systemIndex - 1].value,
+                includeShortExact: includeShortExact
             ), lengths[microphoneIndex][systemIndex] == lengths[microphoneIndex - 1][systemIndex - 1] + 1 {
                 matches.append(TokenMatch(
                     microphoneIndex: microphoneIndex - 1,
@@ -213,8 +248,12 @@ public enum MeetingTranscriptReconciler {
         }
     }
 
-    private static func tokensAreSimilar(_ lhs: String, _ rhs: String) -> Bool {
-        if lhs == rhs { return lhs.count >= 3 }
+    private static func tokensAreSimilar(
+        _ lhs: String,
+        _ rhs: String,
+        includeShortExact: Bool = false
+    ) -> Bool {
+        if lhs == rhs { return includeShortExact || lhs.count >= 3 }
         let minimumLength = min(lhs.count, rhs.count)
         guard minimumLength >= 4 else { return false }
         if lhs.commonPrefix(with: rhs).count >= 4 { return true }
@@ -477,6 +516,20 @@ public struct LibraryPromptPreset: Identifiable, Hashable, Sendable {
 }
 
 public enum LibraryPromptCatalog {
+    public static let polishedDictation = LibraryPromptPreset(
+        id: "polished-dictation",
+        title: "Polished Dictation",
+        systemImage: "text.badge.checkmark",
+        prompt: """
+        Clean up this dictated text for readability.
+        Correct obvious recognition errors, punctuation, capitalization, and grammar.
+        Preserve the speaker's meaning, voice, names, numbers, and technical terms.
+        Remove only clear filler words and accidental repetitions.
+        Do not invent facts, summarize, or change the intended format.
+        Return only the polished text.
+        """
+    )
+
     public static let structuredBrief = LibraryPromptPreset(
         id: "structured-brief",
         title: "General Summary",
@@ -792,12 +845,13 @@ public enum LibraryPromptCatalog {
         followUpEmail,
         detailedNotes,
     ]
+    public static let dictationPresets = [polishedDictation] + itemPresets
     public static let allMeetingPresets = [executiveBrief, actionTracker, decisionLog, followUpQueue]
     public static let itemDefaultPrompt = structuredBrief.prompt
     public static let allMeetingsDefaultPrompt = executiveBrief.prompt
 
     public static func itemPreset(id: String) -> LibraryPromptPreset {
-        itemPresets.first { $0.id == id } ?? structuredBrief
+        dictationPresets.first { $0.id == id } ?? structuredBrief
     }
 }
 

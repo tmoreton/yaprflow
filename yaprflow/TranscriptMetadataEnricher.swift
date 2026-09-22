@@ -30,6 +30,7 @@ final class TranscriptMetadataEnricher {
         let transcript: String?
         let recordedAt: Date?
         let provider: AIProviderKind
+        let automaticOutput: Bool
     }
 
     private let logger = Logger(
@@ -43,15 +44,20 @@ final class TranscriptMetadataEnricher {
 
     private init() {}
 
-    func enqueue(url: URL, transcript: String, recordedAt: Date) {
-        guard modelIsAvailable, !transcript.isEmpty, !queuedURLs.contains(url) else { return }
+    func enqueue(url: URL, transcript: String, recordedAt: Date, automaticOutput: Bool) {
+        guard !transcript.isEmpty, !queuedURLs.contains(url) else { return }
+        guard modelIsAvailable else {
+            if automaticOutput { AutomaticDictationProcessor.shared.enqueue(url: url) }
+            return
+        }
         queuedURLs.insert(url)
-        jobs.append(Job(
+        jobs.insert(Job(
             url: url,
             transcript: transcript,
             recordedAt: recordedAt,
-            provider: AIProviderSettings.shared.provider
-        ))
+            provider: AIProviderSettings.shared.provider,
+            automaticOutput: automaticOutput
+        ), at: jobHead)
         processNextIfNeeded()
     }
 
@@ -89,7 +95,8 @@ final class TranscriptMetadataEnricher {
                 url: candidate.url,
                 transcript: nil,
                 recordedAt: nil,
-                provider: .appleIntelligence
+                provider: .appleIntelligence,
+                automaticOutput: false
             ))
         }
         processNextIfNeeded()
@@ -104,12 +111,18 @@ final class TranscriptMetadataEnricher {
             }
             return false
         }
-        return settings.automaticRemoteMetadata && settings.isConfigured
+        return settings.isConfigured
     }
 
     private func processNextIfNeeded() {
         guard !isProcessing, jobHead < jobs.count else { return }
         guard modelIsAvailable else {
+            // Metadata can be unavailable while automatic polishing still
+            // works. Don't lose newly recorded dictations in that case.
+            for job in jobs[jobHead...] where job.automaticOutput
+                && job.provider == AIProviderSettings.shared.provider {
+                AutomaticDictationProcessor.shared.enqueue(url: job.url)
+            }
             jobs.removeAll()
             jobHead = 0
             queuedURLs.removeAll()
@@ -144,7 +157,7 @@ final class TranscriptMetadataEnricher {
                         guard document.needsGeneratedMetadata,
                               !document.transcript.isEmpty
                         else {
-                            self.finish(job)
+                            self.finish(job, resultingURL: job.url)
                             return
                         }
                         transcript = document.transcript
@@ -161,13 +174,13 @@ final class TranscriptMetadataEnricher {
                         name: .yaprflowTranscriptArchiveChanged,
                         object: TranscriptArchiveChange(oldURL: job.url, newURL: newURL)
                     )
+                    self.finish(job, resultingURL: newURL)
                 } catch {
                     // Provider errors can contain request details. Never log a transcript.
                     self.logger.error("Could not generate transcript metadata.")
                     Telemetry.shared.track(.archiveTitleFailed(job.provider))
+                    self.finish(job, resultingURL: job.url)
                 }
-
-                self.finish(job)
             }
             return
         }
@@ -175,9 +188,13 @@ final class TranscriptMetadataEnricher {
         jobHead = 0
     }
 
-    private func finish(_ job: Job) {
+    private func finish(_ job: Job, resultingURL: URL) {
         queuedURLs.remove(job.url)
         isProcessing = false
+        if job.automaticOutput,
+           job.provider == AIProviderSettings.shared.provider {
+            AutomaticDictationProcessor.shared.enqueue(url: resultingURL)
+        }
         processNextIfNeeded()
     }
 

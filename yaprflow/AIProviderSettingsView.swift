@@ -2,6 +2,7 @@ import SwiftUI
 
 struct AIProviderSettingsView: View {
     @ObservedObject private var settings = AIProviderSettings.shared
+    @ObservedObject private var automaticDictation = AutomaticDictationProcessor.shared
     @State private var draftKey = ""
     @State private var statusMessage: String?
     @State private var isTesting = false
@@ -26,7 +27,7 @@ struct AIProviderSettingsView: View {
 
             switch settings.provider {
             case .appleIntelligence:
-                Text("Runs on this Mac. Requires Apple Intelligence and macOS 26 or later.")
+                Text("When available, Apple Intelligence titles new dictations automatically on this Mac. Requires macOS 26 or later.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             case .openAI, .openRouter:
@@ -35,17 +36,30 @@ struct AIProviderSettingsView: View {
                 ollamaSettings
             }
 
+            Divider()
+
+            Toggle("Automatically polish each new dictation", isOn: $settings.automaticDictationOutput)
+                .font(.callout)
+
+            Text(settings.provider.sendsTranscriptOffDevice
+                 ? "When enabled, each new dictation is sent to \(settings.provider.displayName). The polished version is saved alongside the original; copied text stays unchanged."
+                 : "Uses \(settings.provider.displayName) to save a polished version alongside each new dictation. Copied text stays unchanged.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Text("Edit the Polished Dictation instructions under Outputs.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            if let error = automaticDictation.lastError {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .textSelection(.enabled)
+            }
+
             if settings.provider != .appleIntelligence {
                 Divider()
-
-                Toggle("Automatically title saved dictations", isOn: $settings.automaticRemoteMetadata)
-                    .font(.callout)
-
-                Text(settings.provider.sendsTranscriptOffDevice
-                     ? "Sends each new dictation to \(settings.provider.displayName) when enabled."
-                     : "Uses Ollama to title each new dictation when enabled.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
 
                 HStack {
                     Button(isTesting ? "Testing…" : "Test model") { testModel() }
@@ -109,7 +123,7 @@ struct AIProviderSettingsView: View {
             .font(.caption)
             .foregroundStyle(.secondary)
 
-            Text("AI actions send the selected text directly to \(settings.provider.displayName). Yaprflow never receives it.")
+            Text("Once configured, new dictations are sent directly from your Mac to \(settings.provider.displayName) for titles. Yaprflow does not relay them through a server.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -141,7 +155,7 @@ struct AIProviderSettingsView: View {
                 Spacer()
             }
 
-            Text("Uses Ollama at localhost:11434. Local models stay on this Mac; cloud models follow Ollama's policy.")
+            Text("Once configured, Ollama automatically titles new dictations at localhost:11434. Local models stay on this Mac; cloud models follow Ollama's policy.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

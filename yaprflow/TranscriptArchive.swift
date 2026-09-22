@@ -7,6 +7,9 @@ struct TranscriptArchiveDocument {
     let generatedTitle: String?
     let topic: String?
     let generatedDescription: String?
+    let automaticOutput: String?
+
+    static let automaticOutputMarker = "\n\n<!-- yaprflow:automatic-dictation-output -->\n\n# Polished Dictation\n\n"
 
     var needsGeneratedMetadata: Bool {
         generatedTitle == nil || topic == nil || generatedDescription == nil
@@ -23,7 +26,8 @@ struct TranscriptArchiveDocument {
             transcript: transcriptBody(from: contents),
             generatedTitle: metadataValue(named: "ai_title", in: contents),
             topic: metadataValue(named: "ai_topic", in: contents),
-            generatedDescription: metadataValue(named: "ai_description", in: contents)
+            generatedDescription: metadataValue(named: "ai_description", in: contents),
+            automaticOutput: automaticOutput(from: contents)
         )
     }
 
@@ -66,11 +70,17 @@ struct TranscriptArchiveDocument {
     }
 
     private static func transcriptBody(from markdown: String) -> String {
-        guard let heading = markdown.range(of: "# Transcript") else {
-            return markdown.trimmingCharacters(in: .whitespacesAndNewlines)
+        let rawMarkdown: String
+        if let marker = markdown.range(of: automaticOutputMarker) {
+            rawMarkdown = String(markdown[..<marker.lowerBound])
+        } else {
+            rawMarkdown = markdown
+        }
+        guard let heading = rawMarkdown.range(of: "# Transcript") else {
+            return rawMarkdown.trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
-        var lines = markdown[heading.upperBound...]
+        var lines = rawMarkdown[heading.upperBound...]
             .components(separatedBy: .newlines)
 
         while let first = lines.first {
@@ -86,6 +96,13 @@ struct TranscriptArchiveDocument {
         }
 
         return lines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func automaticOutput(from markdown: String) -> String? {
+        guard let marker = markdown.range(of: automaticOutputMarker) else { return nil }
+        let output = markdown[marker.upperBound...]
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return output.isEmpty ? nil : output
     }
 
     private static let fractionalISOFormatter: ISO8601DateFormatter = {

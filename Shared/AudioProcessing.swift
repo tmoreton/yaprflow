@@ -37,6 +37,169 @@ nonisolated enum AudioLevelMeter {
     }
 }
 
+/// Recognizes microphone segments made entirely of Mac playback. This is a
+/// conservative second line of defense after the input device's voice
+/// processing: it never suppresses a segment with independent local speech.
+/// Only a rolling, downsampled reference is retained; no audio is persisted.
+@MainActor
+final class MeetingPlaybackEchoDetector {
+    private static let decimation = 4
+    private static let referenceRate = 4_000
+    private static let retainedReferenceSamples = 35 * referenceRate
+    private static let searchRadius = 3 * referenceRate
+    private static let searchStep = 20
+    private static let windowLength = referenceRate / 5
+    private static let minimumWindowMeanSquare: Double = 0.000_004
+
+    private var reference = RollingSessionAudio()
+    private var pendingReferenceSum: Float = 0
+    private var pendingReferenceCount = 0
+
+    var retainedReferenceSampleCount: Int { reference.retainedSampleCount }
+    private(set) var suppressedSegmentCount = 0
+
+    func reset() {
+        reference.reset(keepingCapacity: true)
+        pendingReferenceSum = 0
+        pendingReferenceCount = 0
+        suppressedSegmentCount = 0
+    }
+
+    func appendSystemSamples(_ samples: [Float]) {
+        var reduced: [Float] = []
+        reduced.reserveCapacity((samples.count + Self.decimation - 1) / Self.decimation)
+        for sample in samples {
+            pendingReferenceSum += sample
+            pendingReferenceCount += 1
+            if pendingReferenceCount == Self.decimation {
+                reduced.append(pendingReferenceSum / Float(Self.decimation))
+                pendingReferenceSum = 0
+                pendingReferenceCount = 0
+            }
+        }
+        reference.append(reduced)
+        reference.discard(before: reference.endIndex - Self.retainedReferenceSamples)
+    }
+
+    func isPlaybackOnly(_ microphoneSamples: [Float], startingAt microphoneSampleIndex: Int) -> Bool {
+        let microphone = Self.downsample(microphoneSamples)
+        let windowLength = Self.windowLength
+        guard microphone.count >= windowLength,
+              reference.retainedSampleCount >= windowLength else { return false }
+
+        let microphoneStart = microphoneSampleIndex / Self.decimation
+        let windows = stride(from: 0, through: microphone.count - windowLength, by: windowLength)
+            .filter { Self.meanSquare(microphone, at: $0, count: windowLength) >= Self.minimumWindowMeanSquare }
+        guard !windows.isEmpty else { return false }
+
+        // Search one energetic window for the capture-clock offset plus the
+        // speaker-to-microphone acoustic delay. The offset then stays fixed
+        // while every voiced window is checked for local speech.
+        let probe = windows.max {
+            Self.meanSquare(microphone, at: $0, count: windowLength)
+                < Self.meanSquare(microphone, at: $1, count: windowLength)
+        } ?? windows[0]
+        let expected = microphoneStart + probe
+        let searchStart = max(reference.startIndex, expected - Self.searchRadius)
+        let searchEnd = min(reference.endIndex - windowLength, expected + Self.searchRadius)
+        guard searchEnd >= searchStart else { return false }
+        let searchAudio = reference.samples(from: searchStart, to: searchEnd + windowLength)
+
+        var bestPosition = searchStart
+        var bestCorrelation = 0.0
+        for position in stride(from: searchStart, through: searchEnd, by: Self.searchStep) {
+            let correlation = Self.correlation(
+                microphone, microphoneOffset: probe,
+                reference: searchAudio, referenceOffset: position - searchStart,
+                count: windowLength
+            )
+            if correlation > bestCorrelation {
+                bestCorrelation = correlation
+                bestPosition = position
+            }
+        }
+        let fineStart = max(searchStart, bestPosition - Self.searchStep)
+        let fineEnd = min(searchEnd, bestPosition + Self.searchStep)
+        for position in fineStart...fineEnd {
+            let correlation = Self.correlation(
+                microphone, microphoneOffset: probe,
+                reference: searchAudio, referenceOffset: position - searchStart,
+                count: windowLength
+            )
+            if correlation > bestCorrelation {
+                bestCorrelation = correlation
+                bestPosition = position
+            }
+        }
+        guard bestCorrelation >= 0.88 else { return false }
+
+        let offset = bestPosition - expected
+        var totalCorrelation = 0.0
+        for window in windows {
+            let referenceStart = microphoneStart + window + offset
+            guard referenceStart >= reference.startIndex,
+                  referenceStart + windowLength <= reference.endIndex else { return false }
+            let referenceWindow = reference.samples(
+                from: referenceStart,
+                to: referenceStart + windowLength
+            )
+            let correlation = Self.correlation(
+                microphone, microphoneOffset: window,
+                reference: referenceWindow, referenceOffset: 0,
+                count: windowLength
+            )
+            // One independently spoken window keeps the entire microphone
+            // segment. Text reconciliation can still remove echoed words.
+            guard correlation >= 0.72 else { return false }
+            totalCorrelation += correlation
+        }
+        let isPlaybackOnly = totalCorrelation / Double(windows.count) >= 0.85
+        if isPlaybackOnly { suppressedSegmentCount += 1 }
+        return isPlaybackOnly
+    }
+
+    private static func downsample(_ samples: [Float]) -> [Float] {
+        guard samples.count >= decimation else { return [] }
+        var reduced: [Float] = []
+        reduced.reserveCapacity(samples.count / decimation)
+        for start in stride(from: 0, through: samples.count - decimation, by: decimation) {
+            reduced.append(
+                (samples[start] + samples[start + 1] + samples[start + 2] + samples[start + 3]) / Float(decimation)
+            )
+        }
+        return reduced
+    }
+
+    private static func meanSquare(_ samples: [Float], at offset: Int, count: Int) -> Double {
+        var sum = 0.0
+        for index in offset..<(offset + count) {
+            let value = Double(samples[index])
+            sum += value * value
+        }
+        return sum / Double(count)
+    }
+
+    private static func correlation(
+        _ microphone: [Float], microphoneOffset: Int,
+        reference: [Float], referenceOffset: Int,
+        count: Int
+    ) -> Double {
+        var cross = 0.0
+        var microphoneEnergy = 0.0
+        var referenceEnergy = 0.0
+        for index in 0..<count {
+            let microphoneSample = Double(microphone[microphoneOffset + index])
+            let referenceSample = Double(reference[referenceOffset + index])
+            cross += microphoneSample * referenceSample
+            microphoneEnergy += microphoneSample * microphoneSample
+            referenceEnergy += referenceSample * referenceSample
+        }
+        guard microphoneEnergy >= Double(count) * minimumWindowMeanSquare,
+              referenceEnergy >= Double(count) * minimumWindowMeanSquare else { return 0 }
+        return cross / sqrt(microphoneEnergy * referenceEnergy)
+    }
+}
+
 /// A reusable, low-latency PCM converter for microphone buffers.
 ///
 /// `AVAudioConverter` preserves its sample-rate state across adjacent capture
