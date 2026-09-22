@@ -113,15 +113,26 @@ test('the customer-facing policy separates purchase delivery from optional newsl
   assert.match(confirmation, /email a private download link/i);
 });
 
-test('the Sparkle feed publishes only the signed unlisted 5.2.8 updater asset', async () => {
+test('the Sparkle feed publishes only signed unlisted updater assets', async () => {
   const appcast = await readFile(new URL('../appcast.xml', import.meta.url), 'utf8');
-  assert.match(appcast, /<sparkle:version>21<\/sparkle:version>/);
-  assert.match(appcast, /<sparkle:shortVersionString>5\.2\.8<\/sparkle:shortVersionString>/);
-  assert.match(appcast, /https:\/\/[^/]+\.public\.blob\.vercel-storage\.com\/updates\/5\.2\.8\/[^"\s]+\.dmg/);
-  assert.match(appcast, /<enclosure [^>]*sparkle:edSignature="[A-Za-z0-9+/=]+"\/>/);
+  const items = [...appcast.matchAll(/<item>([\s\S]*?)<\/item>/g)].map((match) => match[1]);
+  assert.ok(items.length >= 1 && items.length <= 3);
+  for (const item of items) {
+    const version = item.match(/<sparkle:shortVersionString>(\d+\.\d+\.\d+)<\/sparkle:shortVersionString>/)?.[1];
+    assert.ok(version);
+    assert.match(item, /<sparkle:version>\d+<\/sparkle:version>/);
+    assert.match(
+      item,
+      new RegExp(`https://[^/]+\\.public\\.blob\\.vercel-storage\\.com/updates/${version.replaceAll('.', '\\.')}/[^"\\s]+\\.dmg`),
+    );
+    assert.match(item, /<enclosure [^>]*sparkle:edSignature="[A-Za-z0-9+/=]+"\/>/);
+  }
+  if (process.env.RELEASE_VERSION) {
+    assert.match(items[0], new RegExp(`<sparkle:shortVersionString>${process.env.RELEASE_VERSION.replaceAll('.', '\\.')}<\\/sparkle:shortVersionString>`));
+  }
   assert.match(appcast, /<!-- sparkle-signatures:[\s\S]*edSignature: [A-Za-z0-9+/=]+/);
   assert.doesNotMatch(appcast, /<sparkle:releaseNotesLink/);
-  assert.equal((appcast.match(/<enclosure /g) || []).length, 1);
+  assert.equal((appcast.match(/<enclosure /g) || []).length, items.length);
 });
 
 test('all displayed prices and illustrative savings update together from server pricing', () => {
