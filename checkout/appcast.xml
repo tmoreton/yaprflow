@@ -9,6 +9,27 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
         <description>Signed updates for Yaprflow for Mac.</description>
         <language>en</language>
         <item>
+            <title>5.2.9</title>
+            <pubDate>Tue, 22 Sep 2026 00:33:02 +0000</pubDate>
+            <link>https://yaprflow.com/</link>
+            <sparkle:version>22</sparkle:version>
+            <sparkle:shortVersionString>5.2.9</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Yaprflow 5.2.9
+
+This maintenance release polishes provider setup and update settings:
+
+- API keys can now be pasted normally with Command-V or the standard Edit
+  menu.
+- Update settings are reduced to a clear version row, a Check Now action, and
+  one automatic-updates switch.
+- Automatic updates now use one control for both checking and downloading.
+
+Dictation, meeting recording, and saved notes are unchanged.
+]]></description>
+            <enclosure url="https://m3kx2mv37nzf8tbz.public.blob.vercel-storage.com/updates/5.2.9/c1bdce33ed13e11911b6/yaprflow-5.2.9-7cR34cOcnriKOsicAz3FRrhliyzQTI.dmg" length="493894620" type="application/octet-stream" sparkle:edSignature="xBuIGymW5HUWe961FBjL31SAYOtpBuQnDV0WESPNA9asXwA3IM2dKkqIYFvC6+3u8l2FhreZt4qWaUhOonoJBw=="/>
+        </item>
+        <item>
             <title>5.2.8</title>
             <pubDate>Mon, 21 Sep 2026 16:09:57 -0400</pubDate>
             <link>https://yaprflow.com/</link>
@@ -35,6 +56,6 @@ Quick Dictation and the meeting transcription workflow are unchanged.
     </channel>
 </rss>
 <!-- sparkle-signatures:
-edSignature: igOgltoKVxccOMlN+vF1dZTsWt9bvP/EEVL9QJrTEqjwienQ0U3GqBF1+BX95j50icVZhUU2ydqmSUr4lqqlBA==
-length: 2041
+edSignature: jo84MbLiow0Giyw79mB5w/wq/wE4muBXE+benicFnyuBPffFSL8qloJ7CQ7CawecIgpDNLqnmYLPnxkGEiAFAg==
+length: 3248
 -->
