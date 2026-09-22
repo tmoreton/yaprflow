@@ -30,6 +30,41 @@ struct AIProviderCoreTests {
         #expect(result == "Summary ready")
     }
 
+    @Test("OpenAI retries a response that exhausts its completion budget")
+    func openAIRetriesTruncatedResponse() async throws {
+        var requests = 0
+        let session = mockSession { request in
+            requests += 1
+            let body = try #require(request.jsonBody)
+            #expect(body["store"] as? Bool == false)
+            if requests == 1 {
+                #expect(body["max_completion_tokens"] as? Int == 120)
+                return response(for: request, body: """
+                    {"choices":[{"message":{"content":""},"finish_reason":"length"}]}
+                    """)
+            }
+
+            #expect(body["max_completion_tokens"] as? Int == 632)
+            return response(for: request, body: """
+                {"choices":[{"message":{"content":"Complete OpenAI answer"},"finish_reason":"stop"}]}
+                """)
+        }
+
+        let result = try await AIChatClient(session: session).complete(
+            configuration: AIChatConfiguration(
+                provider: .openAI,
+                model: "gpt-4o-mini",
+                apiKey: "test-openai-key"
+            ),
+            instructions: "Summarize accurately.",
+            prompt: "A meeting transcript",
+            maximumResponseTokens: 120
+        )
+
+        #expect(requests == 2)
+        #expect(result == "Complete OpenAI answer")
+    }
+
     @Test("OpenRouter uses its endpoint and model slug")
     func openRouterRequest() async throws {
         let session = mockSession { request in
@@ -37,9 +72,10 @@ struct AIProviderCoreTests {
             #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer test-router-key")
             let body = try #require(request.jsonBody)
             #expect(body["model"] as? String == "openai/gpt-4o-mini")
-            #expect(body["max_tokens"] as? Int == 150)
+            #expect(body["max_completion_tokens"] as? Int == 150)
+            #expect(body["max_tokens"] == nil)
             return response(for: request, body: """
-                {"choices":[{"message":{"content":"Router ready"},"finish_reason":"stop"}]}
+                {"choices":[{"message":{"content":"Router ready","reasoning":"Internal reasoning","reasoning_details":[{"type":"reasoning.text","text":"Internal reasoning"}]},"finish_reason":"stop"}]}
                 """)
         }
 
@@ -56,6 +92,72 @@ struct AIProviderCoreTests {
         #expect(result == "Router ready")
     }
 
+    @Test("OpenRouter retries a response that exhausts its completion budget")
+    func openRouterRetriesTruncatedResponse() async throws {
+        var requests = 0
+        let session = mockSession { request in
+            requests += 1
+            let body = try #require(request.jsonBody)
+            if requests == 1 {
+                #expect(body["max_completion_tokens"] as? Int == 900)
+                return response(for: request, body: """
+                    {"choices":[{"message":{"content":""},"finish_reason":"length"}]}
+                    """)
+            }
+
+            #expect(body["max_completion_tokens"] as? Int == 1_800)
+            return response(for: request, body: """
+                {"choices":[{"message":{"content":"Complete summary"},"finish_reason":"stop"}]}
+                """)
+        }
+
+        let result = try await AIChatClient(session: session).complete(
+            configuration: AIChatConfiguration(
+                provider: .openRouter,
+                model: "deepseek/deepseek-v4.1-flash",
+                apiKey: "test-router-key"
+            ),
+            instructions: "Summarize accurately.",
+            prompt: "A meeting transcript",
+            maximumResponseTokens: 900
+        )
+
+        #expect(requests == 2)
+        #expect(result == "Complete summary")
+    }
+
+    @Test("OpenRouter reports truncation after its bounded retry")
+    func openRouterStopsAfterTruncationRetry() async throws {
+        var requests = 0
+        let session = mockSession { request in
+            requests += 1
+            return response(for: request, body: """
+                {"choices":[{"message":{"content":"Partial"},"finish_reason":"length"}]}
+                """)
+        }
+
+        do {
+            _ = try await AIChatClient(session: session).complete(
+                configuration: AIChatConfiguration(
+                    provider: .openRouter,
+                    model: "deepseek/deepseek-v4.1-flash",
+                    apiKey: "test-router-key"
+                ),
+                instructions: "Summarize accurately.",
+                prompt: "A meeting transcript",
+                maximumResponseTokens: 900
+            )
+            Issue.record("Expected a truncation error")
+        } catch let error as AIProviderError {
+            guard case .truncatedResponse = error else {
+                Issue.record("Expected a truncation error, got \(error)")
+                return
+            }
+        }
+
+        #expect(requests == 2)
+    }
+
     @Test("Ollama uses the local chat endpoint without an API key")
     func ollamaRequest() async throws {
         let session = mockSession { request in
@@ -66,7 +168,7 @@ struct AIProviderCoreTests {
             #expect(body["stream"] as? Bool == false)
             #expect((body["options"] as? [String: Int])?["num_predict"] == 90)
             return response(for: request, body: """
-                {"message":{"content":"Local ready"},"done":true}
+                {"message":{"content":"Local ready","thinking":"Internal reasoning"},"done":true,"done_reason":"stop"}
                 """)
         }
 
@@ -77,6 +179,37 @@ struct AIProviderCoreTests {
             maximumResponseTokens: 90
         )
         #expect(result == "Local ready")
+    }
+
+    @Test("Ollama retries when done_reason reports a length limit")
+    func ollamaRetriesTruncatedResponse() async throws {
+        var requests = 0
+        let session = mockSession { request in
+            requests += 1
+            let body = try #require(request.jsonBody)
+            let options = try #require(body["options"] as? [String: Int])
+            if requests == 1 {
+                #expect(options["num_predict"] == 90)
+                return response(for: request, body: """
+                    {"message":{"content":""},"done":true,"done_reason":"length"}
+                    """)
+            }
+
+            #expect(options["num_predict"] == 602)
+            return response(for: request, body: """
+                {"message":{"content":"Complete local answer"},"done":true,"done_reason":"stop"}
+                """)
+        }
+
+        let result = try await AIChatClient(session: session).complete(
+            configuration: AIChatConfiguration(provider: .ollama, model: "gemma4"),
+            instructions: "Be brief.",
+            prompt: "Hello",
+            maximumResponseTokens: 90
+        )
+
+        #expect(requests == 2)
+        #expect(result == "Complete local answer")
     }
 
     @Test("Ollama lists installed models")

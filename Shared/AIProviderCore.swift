@@ -57,7 +57,7 @@ enum AIProviderError: LocalizedError {
         case .emptyResponse:
             "The model returned no text. Try again or choose a different model."
         case .truncatedResponse:
-            "The model stopped before finishing its answer. Try a shorter prompt or transcript."
+            "The model could not finish within the available response limit. Try a shorter prompt or transcript, or choose a different model."
         case let .httpStatus(status, message):
             message.isEmpty ? "The model service returned HTTP \(status)." : "The model service returned HTTP \(status): \(message)"
         case .ollamaUnavailable:
@@ -88,78 +88,102 @@ struct AIChatClient {
             ["role": "user", "content": prompt],
         ]
         let url: URL
-        var body: [String: Any] = [
-            "model": configuration.model,
-            "messages": messages,
-            "stream": false,
-        ]
-
         switch configuration.provider {
         case .appleIntelligence:
             throw AIProviderError.unsupportedProvider
         case .openAI:
             url = URL(string: "https://api.openai.com/v1/chat/completions")!
-            body["max_completion_tokens"] = maximumResponseTokens
-            body["store"] = false
         case .openRouter:
             url = URL(string: "https://openrouter.ai/api/v1/chat/completions")!
-            body["max_tokens"] = maximumResponseTokens
         case .ollama:
             url = Self.ollamaBaseURL.appendingPathComponent("chat")
-            body["options"] = ["num_predict": maximumResponseTokens]
         }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.timeoutInterval = 180
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-
-        if configuration.provider == .openAI || configuration.provider == .openRouter {
-            guard let key = configuration.apiKey, !key.isEmpty else {
-                throw AIProviderError.missingAPIKey
+        let tokenLimits = Self.responseTokenLimits(
+            provider: configuration.provider,
+            requested: maximumResponseTokens
+        )
+        for (attempt, tokenLimit) in tokenLimits.enumerated() {
+            var body: [String: Any] = [
+                "model": configuration.model,
+                "messages": messages,
+                "stream": false,
+            ]
+            switch configuration.provider {
+            case .appleIntelligence:
+                throw AIProviderError.unsupportedProvider
+            case .openAI:
+                body["max_completion_tokens"] = tokenLimit
+                body["store"] = false
+            case .openRouter:
+                // max_tokens is deprecated by OpenRouter. Reasoning models count
+                // their hidden reasoning against this same completion budget.
+                body["max_completion_tokens"] = tokenLimit
+            case .ollama:
+                body["options"] = ["num_predict": tokenLimit]
             }
-            request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
-        }
 
-        let data: Data
-        let response: URLResponse
-        do {
-            (data, response) = try await session.data(for: request)
-        } catch let error as URLError where configuration.provider == .ollama
-            && (error.code == .cannotConnectToHost || error.code == .cannotFindHost
-                || error.code == .networkConnectionLost) {
-            throw AIProviderError.ollamaUnavailable
-        }
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.timeoutInterval = 180
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        guard let response = response as? HTTPURLResponse else {
-            throw AIProviderError.invalidResponse
-        }
-        guard (200..<300).contains(response.statusCode) else {
-            throw AIProviderError.httpStatus(response.statusCode, Self.serviceError(from: data))
-        }
+            if configuration.provider == .openAI || configuration.provider == .openRouter {
+                guard let key = configuration.apiKey, !key.isEmpty else {
+                    throw AIProviderError.missingAPIKey
+                }
+                request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+            }
 
-        let result: String
-        switch configuration.provider {
-        case .openAI, .openRouter:
-            guard let decoded = try? JSONDecoder().decode(ChatCompletionResponse.self, from: data) else {
+            let data: Data
+            let response: URLResponse
+            do {
+                (data, response) = try await session.data(for: request)
+            } catch let error as URLError where configuration.provider == .ollama
+                && (error.code == .cannotConnectToHost || error.code == .cannotFindHost
+                    || error.code == .networkConnectionLost) {
+                throw AIProviderError.ollamaUnavailable
+            }
+
+            guard let response = response as? HTTPURLResponse else {
                 throw AIProviderError.invalidResponse
             }
-            guard let choice = decoded.choices.first else { throw AIProviderError.invalidResponse }
-            if choice.finishReason == "length" { throw AIProviderError.truncatedResponse }
-            result = choice.message.content ?? ""
-        case .ollama:
-            guard let decoded = try? JSONDecoder().decode(OllamaChatResponse.self, from: data) else {
-                throw AIProviderError.invalidResponse
+            guard (200..<300).contains(response.statusCode) else {
+                throw AIProviderError.httpStatus(response.statusCode, Self.serviceError(from: data))
             }
-            result = decoded.message.content
-        case .appleIntelligence:
-            throw AIProviderError.unsupportedProvider
+
+            let result: String
+            switch configuration.provider {
+            case .openAI, .openRouter:
+                guard let decoded = try? JSONDecoder().decode(ChatCompletionResponse.self, from: data) else {
+                    throw AIProviderError.invalidResponse
+                }
+                guard let choice = decoded.choices.first else { throw AIProviderError.invalidResponse }
+                if choice.finishReason == "length" {
+                    if attempt < tokenLimits.count - 1 { continue }
+                    throw AIProviderError.truncatedResponse
+                }
+                result = choice.message.content ?? ""
+            case .ollama:
+                guard let decoded = try? JSONDecoder().decode(OllamaChatResponse.self, from: data) else {
+                    throw AIProviderError.invalidResponse
+                }
+                if decoded.doneReason == "length" {
+                    if attempt < tokenLimits.count - 1 { continue }
+                    throw AIProviderError.truncatedResponse
+                }
+                result = decoded.message.content
+            case .appleIntelligence:
+                throw AIProviderError.unsupportedProvider
+            }
+
+            let trimmed = result.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { throw AIProviderError.emptyResponse }
+            return trimmed
         }
 
-        let trimmed = result.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { throw AIProviderError.emptyResponse }
-        return trimmed
+        throw AIProviderError.truncatedResponse
     }
 
     func installedOllamaModels() async throws -> [String] {
@@ -195,6 +219,18 @@ struct AIChatClient {
         // Avoid showing a server's entire response or an echoed prompt in the UI.
         return String(message.prefix(240))
     }
+
+    private static func responseTokenLimits(
+        provider: AIProviderKind,
+        requested: Int
+    ) -> [Int] {
+        guard provider != .appleIntelligence else { return [requested] }
+
+        // One bounded retry recovers when a provider's reasoning tokens consume
+        // the first budget without creating an unbounded or unexpectedly costly loop.
+        let retryLimit = min(max(requested * 2, requested + 512), 4_096)
+        return retryLimit > requested ? [requested, retryLimit] : [requested]
+    }
 }
 
 private struct ChatCompletionResponse: Decodable {
@@ -214,6 +250,12 @@ private struct ChatCompletionResponse: Decodable {
 private struct OllamaChatResponse: Decodable {
     struct Message: Decodable { let content: String }
     let message: Message
+    let doneReason: String?
+
+    enum CodingKeys: String, CodingKey {
+        case message
+        case doneReason = "done_reason"
+    }
 }
 
 private struct OllamaModelsResponse: Decodable {
