@@ -12,8 +12,13 @@ fail() {
     exit 1
 }
 
-[[ $# -eq 1 ]] || fail "usage: scripts/copy-models.sh /path/to/App.app[/Contents/Resources]/Models"
+[[ $# -eq 2 ]] || fail "usage: scripts/copy-models.sh /path/to/App.app[/Contents/Resources]/Models model-directory"
 destination="$1"
+model_dir="$2"
+case "$model_dir" in
+    "$YAPRFLOW_MAC_ASR_MODEL_DIR"|"$YAPRFLOW_IOS_ASR_MODEL_DIR") ;;
+    *) fail "unsupported model directory: $model_dir" ;;
+esac
 [[ "$destination" == /* ]] || fail "model destination must be an absolute path"
 case "$destination" in
     /*.app/Models|/*.app/Contents/Resources/Models) ;;
@@ -38,13 +43,13 @@ trap cleanup EXIT
 stage_models="$stage_root/Models"
 mkdir "$stage_models"
 
-for model_dir in "$YAPRFLOW_ASR_MODEL_DIR" silero-vad; do
+for staged_model_dir in "$model_dir" silero-vad; do
     rsync -a \
         --exclude '.cache' \
         --exclude '.DS_Store' \
-        "$ROOT/Models/$model_dir" "$stage_models/"
+        "$ROOT/Models/$staged_model_dir" "$stage_models/"
 done
-yaprflow_verify_model_inventory "$stage_root" "$MODEL_CHECKSUMS" || exit 1
+yaprflow_verify_model_inventory "$stage_root" "$MODEL_CHECKSUMS" "$model_dir" || exit 1
 
 if [[ -e "$destination" ]]; then
     [[ -d "$destination" && ! -L "$destination" ]] \

@@ -103,6 +103,35 @@ public struct BundledModelFile: Equatable, Sendable {
 /// Cryptographic verification for fetched and release assets lives in the
 /// checked-in scripts/model-checksums.sha256 manifest.
 public enum BundledModelInventory {
+    /// macOS direct-distribution model. Keep this separate from `speechFiles`:
+    /// the iOS target still uses the smaller streaming ONNX export.
+    public static let parakeetSpeechDirectory =
+        "Models/parakeet-tdt-0.6b-v3"
+    public static let parakeetSpeechFiles = [
+        BundledModelFile(name: "Preprocessor.mlmodelc/analytics/coremldata.bin", byteCount: 243),
+        BundledModelFile(name: "Preprocessor.mlmodelc/coremldata.bin", byteCount: 486),
+        BundledModelFile(name: "Preprocessor.mlmodelc/metadata.json", byteCount: 2_841),
+        BundledModelFile(name: "Preprocessor.mlmodelc/model.mil", byteCount: 28_181),
+        BundledModelFile(name: "Preprocessor.mlmodelc/weights/weight.bin", byteCount: 491_072),
+        BundledModelFile(name: "Encoder.mlmodelc/analytics/coremldata.bin", byteCount: 243),
+        BundledModelFile(name: "Encoder.mlmodelc/coremldata.bin", byteCount: 485),
+        BundledModelFile(name: "Encoder.mlmodelc/metadata.json", byteCount: 2_921),
+        BundledModelFile(name: "Encoder.mlmodelc/model.mil", byteCount: 959_769),
+        BundledModelFile(name: "Encoder.mlmodelc/weights/weight.bin", byteCount: 445_187_200),
+        BundledModelFile(name: "Decoder.mlmodelc/analytics/coremldata.bin", byteCount: 243),
+        BundledModelFile(name: "Decoder.mlmodelc/coremldata.bin", byteCount: 554),
+        BundledModelFile(name: "Decoder.mlmodelc/metadata.json", byteCount: 3_427),
+        BundledModelFile(name: "Decoder.mlmodelc/model.mil", byteCount: 13_110),
+        BundledModelFile(name: "Decoder.mlmodelc/weights/weight.bin", byteCount: 23_604_992),
+        BundledModelFile(name: "JointDecision.mlmodelc/analytics/coremldata.bin", byteCount: 243),
+        BundledModelFile(name: "JointDecision.mlmodelc/coremldata.bin", byteCount: 534),
+        BundledModelFile(name: "JointDecision.mlmodelc/metadata.json", byteCount: 2_936),
+        BundledModelFile(name: "JointDecision.mlmodelc/model.mil", byteCount: 9_723),
+        BundledModelFile(name: "JointDecision.mlmodelc/weights/weight.bin", byteCount: 12_642_764),
+        BundledModelFile(name: "parakeet_vocab.json", byteCount: 151_122),
+    ]
+
+    /// iOS streaming model inventory.
     public static let speechDirectory =
         "Models/nemotron-3.5-asr-streaming-0.6b-1120ms"
     public static let speechFiles = [

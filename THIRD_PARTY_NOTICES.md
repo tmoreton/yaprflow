@@ -12,20 +12,34 @@ agreement.
 The canonical in-app acknowledgement copy is maintained in
 [`yaprflow/Acknowledgements.txt`](yaprflow/Acknowledgements.txt).
 
-## FluidAudio-derived VAD adapter
+## FluidAudio
 
 - Version: 0.13.6, revision `57551cd90e0bbec342766244358bcf08afb05290`
 - Project: <https://github.com/FluidInference/FluidAudio>
 - License: Apache License 2.0
-- Use: adapted Core ML model invocation and streaming VAD hysteresis
+- Use: Parakeet Core ML inference on macOS, plus adapted Core ML VAD invocation
+  and streaming VAD hysteresis
 
-Yaprflow keeps a modified, narrow implementation in
-[`Shared/AudioProcessing.swift`](Shared/AudioProcessing.swift). The FluidAudio
-package is not linked into either application. Its downloader, diarization,
-clustering, and TTS code—and its VBx and fastcluster dependencies—are not
-distributed. The Apache License 2.0 text is preserved in
+Yaprflow for Mac links the pinned FluidAudio package for Parakeet inference and
+keeps a modified VAD implementation in
+[`Shared/AudioProcessing.swift`](Shared/AudioProcessing.swift). Optional
+diarization and TTS features are not used. The Apache License 2.0 text is preserved in
 [`LICENSES/Apache-2.0.txt`](LICENSES/Apache-2.0.txt), and the modification is
 identified both in source and in the bundled Acknowledgements file.
+
+## NVIDIA Parakeet TDT 0.6B v3 Core ML model
+
+- Source model: <https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3>
+- Core ML distribution: <https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml>
+- License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+- License URL: <https://creativecommons.org/licenses/by/4.0/>
+- Use: bundled, offline speech recognition in Yaprflow for Mac
+- Integrity: exact compiled-file hashes are recorded in
+  [`scripts/model-checksums.sha256`](scripts/model-checksums.sha256)
+
+Yaprflow for Mac bundles the compiled Core ML components and vocabulary without
+modifying their contents. FluidInference performed the Core ML conversion from
+NVIDIA's Parakeet TDT 0.6B v3 model.
 
 ## sherpa-onnx ASR runtime
 

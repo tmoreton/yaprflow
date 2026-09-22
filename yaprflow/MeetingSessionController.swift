@@ -1,6 +1,7 @@
 @preconcurrency import AVFoundation
 import AppKit
 import Combine
+import FluidAudio
 import Foundation
 import ScreenCaptureKit
 
@@ -27,48 +28,42 @@ struct MeetingAudioSeparationSmokeTestResult {
 
 @MainActor
 private final class MeetingRecognitionPipeline {
-    private static let maximumSegmentSamples = 25 * NemotronStreamingRecognizer.sampleRate
+    private static let sampleRate = 16_000
+    private static let maximumSegmentSamples = 25 * sampleRate
 
     let speaker: MeetingSpeaker
-    private let recognizer: NemotronStreamingRecognizer
+    private let recognizer: AsrManager
     private let converter = StreamingAudioConverter()
-    private let language: SpeechLanguage
+    private var segmentSamples: [Float] = []
     private var segmentStartSample = 0
     private var segmentFirstAudibleSample: Int?
-    private var segmentSampleCount = 0
     private var totalSampleCount = 0
     private(set) var recentlyHadAudio = false
 
     init(
         speaker: MeetingSpeaker,
-        recognizer: NemotronStreamingRecognizer,
-        language: SpeechLanguage
+        recognizer: AsrManager
     ) {
         self.speaker = speaker
         self.recognizer = recognizer
-        self.language = language
     }
 
-    func start() async {
+    func start() {
         converter.reset()
+        segmentSamples.removeAll(keepingCapacity: true)
+        segmentSamples.reserveCapacity(Self.maximumSegmentSamples)
         segmentStartSample = 0
         segmentFirstAudibleSample = nil
-        segmentSampleCount = 0
         totalSampleCount = 0
-        await recognizer.beginStream(language: language)
     }
 
     func consume(_ buffer: AVAudioPCMBuffer) async throws -> [MeetingTranscriptSegment] {
         try await consume(samples: converter.resampleBuffer(buffer))
     }
 
-    func finish() async -> [MeetingTranscriptSegment] {
-        guard segmentSampleCount > 0 else {
-            await recognizer.discardStream()
-            return []
-        }
-        let finalText = await recognizer.finishStream()
-        return makeSegment(text: finalText).map { [$0] } ?? []
+    func finish() async throws -> [MeetingTranscriptSegment] {
+        guard !segmentSamples.isEmpty else { return [] }
+        return try await transcribeCurrentSegment().map { [$0] } ?? []
     }
 
     private func consume(samples: [Float]) async throws -> [MeetingTranscriptSegment] {
@@ -76,7 +71,7 @@ private final class MeetingRecognitionPipeline {
         var offset = 0
         var hadAudibleAudio = false
         while offset < samples.count {
-            let remaining = Self.maximumSegmentSamples - segmentSampleCount
+            let remaining = Self.maximumSegmentSamples - segmentSamples.count
             let count = min(remaining, samples.count - offset)
             let part = Array(samples[offset..<(offset + count)])
             let meanSquare = part.reduce(0.0) { $0 + Double($1 * $1) } / Double(part.count)
@@ -87,25 +82,29 @@ private final class MeetingRecognitionPipeline {
                     segmentFirstAudibleSample = totalSampleCount
                 }
             }
-            // Recognition still runs incrementally to keep memory bounded, but
-            // meeting UI only receives finalized sections. Partial hypotheses
-            // are too unstable when two audio sources contain the same speech.
-            _ = await recognizer.accept(part)
-            segmentSampleCount += count
+            segmentSamples.append(contentsOf: part)
             totalSampleCount += count
             offset += count
 
-            if segmentSampleCount >= Self.maximumSegmentSamples {
-                let text = await recognizer.finishStream()
-                if let segment = makeSegment(text: text) { completed.append(segment) }
+            if segmentSamples.count >= Self.maximumSegmentSamples {
+                if let segment = try await transcribeCurrentSegment() {
+                    completed.append(segment)
+                }
                 segmentStartSample = totalSampleCount
                 segmentFirstAudibleSample = nil
-                segmentSampleCount = 0
-                await recognizer.beginStream(language: language)
             }
         }
         recentlyHadAudio = hadAudibleAudio
         return completed
+    }
+
+    private func transcribeCurrentSegment() async throws -> MeetingTranscriptSegment? {
+        guard !segmentSamples.isEmpty else { return nil }
+        let audio = segmentSamples
+        segmentSamples.removeAll(keepingCapacity: true)
+        let source: AudioSource = speaker == .me ? .microphone : .system
+        let result = try await recognizer.transcribe(audio, source: source)
+        return makeSegment(text: result.text)
     }
 
     private func makeSegment(text: String) -> MeetingTranscriptSegment? {
@@ -114,8 +113,8 @@ private final class MeetingRecognitionPipeline {
         return MeetingTranscriptSegment(
             speaker: speaker,
             startTime: Double(segmentFirstAudibleSample ?? segmentStartSample)
-                / Double(NemotronStreamingRecognizer.sampleRate),
-            endTime: Double(totalSampleCount) / Double(NemotronStreamingRecognizer.sampleRate),
+                / Double(Self.sampleRate),
+            endTime: Double(totalSampleCount) / Double(Self.sampleRate),
             text: TranscriptSegments.capitalizingFirstLetter(in: polished)
         )
     }
@@ -267,29 +266,16 @@ final class MeetingSessionController: ObservableObject {
                 throw MeetingSystemAudioError.permissionDenied
             }
             phase = .preparing("Loading meeting transcription models…")
-            let directory = try Self.bundledModelDirectory()
-            async let meRecognizer = Task.detached(priority: .userInitiated) {
-                try NemotronStreamingRecognizer(modelDirectory: directory)
-            }.value
-            async let themRecognizer = Task.detached(priority: .userInitiated) {
-                try NemotronStreamingRecognizer(modelDirectory: directory)
-            }.value
-            let pipelines = try await (
-                MeetingRecognitionPipeline(
-                    speaker: .me,
-                    recognizer: meRecognizer,
-                    language: AppState.shared.speechLanguage
-                ),
-                MeetingRecognitionPipeline(
-                    speaker: .them,
-                    recognizer: themRecognizer,
-                    language: AppState.shared.speechLanguage
-                )
+            let recognizer = try await TranscriptionController.shared
+                .speechRecognizerForMeeting()
+            let pipelines = (
+                MeetingRecognitionPipeline(speaker: .me, recognizer: recognizer),
+                MeetingRecognitionPipeline(speaker: .them, recognizer: recognizer)
             )
             mePipeline = pipelines.0
             themPipeline = pipelines.1
-            await mePipeline?.start()
-            await themPipeline?.start()
+            mePipeline?.start()
+            themPipeline?.start()
 
             sessionGeneration &+= 1
             let generation = sessionGeneration
@@ -341,11 +327,13 @@ final class MeetingSessionController: ObservableObject {
             phase = .failed(Self.friendlyCaptureMessage(for: error))
             mePipeline = nil
             themPipeline = nil
+            TranscriptionController.shared.meetingRecognitionDidEnd()
         }
     }
 
     fileprivate func stop(reason: String?) async {
         guard phase.isCapturing else { return }
+        var finalizationReason = reason
         phase = .finalizing("Finishing transcript…")
         elapsedTask?.cancel()
         automaticStopTask?.cancel()
@@ -361,18 +349,24 @@ final class MeetingSessionController: ObservableObject {
         systemTask = nil
         acceptsAudio = false
 
-        let meSegments = await mePipeline?.finish() ?? []
-        let themSegments = await themPipeline?.finish() ?? []
-        appendTranscriptSegments(meSegments + themSegments)
+        do {
+            let meSegments = try await mePipeline?.finish() ?? []
+            let themSegments = try await themPipeline?.finish() ?? []
+            appendTranscriptSegments(meSegments + themSegments)
+        } catch {
+            finalizationReason = finalizationReason
+                ?? "Meeting transcription failed: \(error.localizedDescription)"
+        }
         flushPendingMicrophoneSegments()
         meeting.endedAt = Date()
         mePipeline = nil
         themPipeline = nil
+        TranscriptionController.shared.meetingRecognitionDidEnd()
 
         do {
             try MeetingStore.shared.save(meeting)
             if meeting.transcript.isEmpty {
-                phase = .failed(reason ?? "No speech was detected in this meeting.")
+                phase = .failed(finalizationReason ?? "No speech was detected in this meeting.")
             } else {
                 #if DEBUG
                 if suppressAutomaticSummaryForSmokeTest {
@@ -386,7 +380,9 @@ final class MeetingSessionController: ObservableObject {
                 if droppedMicrophoneAudio || droppedSystemAudio, phase == .complete {
                     phase = .failed("Meeting saved, but audio processing fell behind and part of the transcript may be missing.")
                 }
-                if let reason, phase == .complete { phase = .failed(reason) }
+                if let finalizationReason, phase == .complete {
+                    phase = .failed(finalizationReason)
+                }
             }
         } catch {
             phase = .failed("The meeting ended, but its notes could not be saved: \(error.localizedDescription)")
@@ -564,22 +560,18 @@ final class MeetingSessionController: ObservableObject {
             }
             try await Task.sleep(for: .seconds(5))
 
-            // Stop the system stream, then send a second acoustic phrase to
-            // the raw microphone. This catches a capture engine that starts
-            // successfully but delivers silence, which the old smoke test
-            // could not detect.
+            // Stop the system stream, then inject a deterministic synthesized
+            // buffer through the meeting's microphone recognition path. The
+            // separate Quick Dictation smoke test exercises the physical mic;
+            // this avoids making the separation test depend on speaker volume,
+            // headphones, or room acoustics.
             await systemAudio.stop()
             try await Task.sleep(for: .seconds(1))
-            guard try await Self.playSmokeTestPhrase(microphonePhrase) else {
-                await stop(reason: nil)
-                suppressAutomaticSummaryForSmokeTest = false
-                _ = MeetingStore.shared.delete(meeting)
-                return MeetingAudioSeparationSmokeTestResult(
-                    succeeded: false,
-                    message: "The microphone test phrase could not be played."
-                )
-            }
-            try await Task.sleep(for: .seconds(5))
+            let microphoneBuffer = try await Self.synthesizedSmokeTestBuffer(
+                microphonePhrase
+            )
+            await consumeMicrophone(microphoneBuffer)
+            try await Task.sleep(for: .seconds(2))
         } catch {
             await stop(reason: nil)
             suppressAutomaticSummaryForSmokeTest = false
@@ -649,6 +641,36 @@ final class MeetingSessionController: ObservableObject {
         return speaker.terminationStatus == 0
     }
 
+    private static func synthesizedSmokeTestBuffer(
+        _ phrase: String
+    ) async throws -> AVAudioPCMBuffer {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "yaprflow-meeting-microphone-\(UUID().uuidString).aiff"
+        )
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let speaker = Process()
+        speaker.executableURL = URL(fileURLWithPath: "/usr/bin/say")
+        speaker.arguments = ["-r", "150", "-o", url.path, phrase]
+        try speaker.run()
+        while speaker.isRunning {
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        guard speaker.terminationStatus == 0 else {
+            throw CocoaError(.fileReadUnknown)
+        }
+
+        let file = try AVAudioFile(forReading: url)
+        guard let buffer = AVAudioPCMBuffer(
+            pcmFormat: file.processingFormat,
+            frameCapacity: AVAudioFrameCount(file.length)
+        ) else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        try file.read(into: buffer)
+        return buffer
+    }
+
     private static func markerCount(in text: String, markers: Set<String>) -> Int {
         let words = Set(text.lowercased().split { !$0.isLetter }.map(String.init))
         return words.intersection(markers).count
@@ -708,23 +730,6 @@ final class MeetingSessionController: ObservableObject {
         @unknown default:
             throw TranscriptionError.microphoneDenied
         }
-    }
-
-    private static func bundledModelDirectory() throws -> URL {
-        guard let resources = Bundle.main.resourceURL else {
-            throw CocoaError(.fileNoSuchFile)
-        }
-        let directory = resources.appendingPathComponent(
-            BundledModelInventory.speechDirectory,
-            isDirectory: true
-        )
-        for file in BundledModelInventory.speechFiles {
-            let url = directory.appendingPathComponent(file.name)
-            guard FileManager.default.fileExists(atPath: url.path) else {
-                throw NemotronRecognizerError.incompleteModel(url)
-            }
-        }
-        return directory
     }
 
     private static func friendlyCaptureMessage(for error: Error) -> String {

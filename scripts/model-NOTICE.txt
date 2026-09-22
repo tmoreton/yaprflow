@@ -1,5 +1,17 @@
 Yaprflow model mirror — third-party notices
 
+NVIDIA Parakeet TDT 0.6B v3 Core ML model
+
+Source model: https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3
+Core ML distribution: https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml
+Core ML integration: https://github.com/FluidInference/FluidAudio
+License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+License URL: https://creativecommons.org/licenses/by/4.0/
+
+Yaprflow for Mac bundles the unmodified compiled Core ML components and
+vocabulary, transcribes offline in bounded segments, and relies on Parakeet's
+automatic detection for its 25 supported European languages.
+
 NVIDIA Nemotron 3.5 ASR Streaming 0.6B, 1120 ms chunk-size INT8 ONNX export
 
 Source model: https://huggingface.co/nvidia/nemotron-3.5-asr-streaming-0.6b
@@ -14,13 +26,10 @@ Canonical license URL: https://openmdw.ai/license/1-1/
 License text source revision: b26b32b34ad2edcc29a7707abb68dcfb25a538c1
 License text SHA-256: 2ab44b68365473c112f5092211a38f231cb23e50de68b75a13369adbd76a74df
 
-Yaprflow bundles the 1120 ms chunk-size INT8 encoder, decoder, joiner, and
-token table without modifying their contents. The source model supports 40
+Yaprflow's iOS target bundles the 1120 ms chunk-size INT8 encoder, decoder,
+joiner, and token table without modifying their contents. The source model supports 40
 language-locales across 35 languages: 32 locales transcribe out of the box and
-8 adaptation-ready locales require fine-tuning. Yaprflow for Mac exposes all
-32 production-ready locales as explicit choices, defaults to English (United
-States), and also offers Automatic detection. The current iOS source target
-uses Automatic detection.
+8 adaptation-ready locales require fine-tuning.
 
 The export repository links to the NVIDIA source model but does not record the
 exact NVIDIA commit used for conversion. The exported binaries are pinned by

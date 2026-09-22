@@ -1,6 +1,7 @@
 @preconcurrency import AVFoundation
 import AppKit
 import CoreML
+import FluidAudio
 import Foundation
 import OSLog
 
@@ -132,11 +133,10 @@ final class TranscriptionController {
     private let memoryPressureSource: DispatchSourceMemoryPressure
 
     // Models stay warm between nearby recordings, then unload while idle.
-    // Nemotron is comparatively large, so return its ONNX Runtime allocation
-    // after dictation has not been used for a while.
-    private var speechRecognizer: NemotronStreamingRecognizer?
+    // Parakeet's Core ML weights are shared by quick dictation and meetings.
+    private var speechRecognizer: AsrManager?
     private var vadManager: VoiceActivityDetector?
-    private var speechRecognizerLoadingTask: Task<NemotronStreamingRecognizer, Error>?
+    private var speechRecognizerLoadingTask: Task<AsrManager, Error>?
     private var voiceDetectorLoadingTask: Task<Void, Never>?
     private var modelUnloadTask: Task<Void, Never>?
 
@@ -151,13 +151,13 @@ final class TranscriptionController {
     private var volatileText = ""
     private var vocabularyReplacementCount = 0
     private var sessionSourceApplication: String?
-    private var sessionSpeechLanguage: SpeechLanguage = .defaultSelection
     private var audioWorkerTask: Task<Void, Never>?
     private var transcriptProcessor: TranscriptProcessor?
     private var sessionGeneration: UInt = 0
     private var recognizerStreamIsOpen = false
     private var recognizerStreamHasLeadingOverlap = false
     private var usesVoiceDetectorForCurrentSession = false
+    private var recognitionFailure: Error?
 
     private var lifecycle: RecordingLifecyclePhase = .idle
     private var isActive: Bool {
@@ -176,7 +176,7 @@ final class TranscriptionController {
     private var suppressTranscriptSideEffectsForSmokeTest = false
     private var autoHideTask: Task<Void, Never>?
 
-    private static let sampleRate = NemotronStreamingRecognizer.sampleRate
+    private static let sampleRate = 16_000
     private static let hardSegmentSamples = 30 * sampleRate
     private static let shortRecordingFallbackSamples = hardSegmentSamples
     private static let forcedSegmentOverlapSamples = sampleRate / 2
@@ -274,8 +274,8 @@ final class TranscriptionController {
         }
     }
 
-    /// Warm the compact streaming recognizer at launch so the first recording
-    /// does not have to wait for ONNX Runtime to initialize its graphs.
+    /// Warm Parakeet at launch so the first recording does not have to wait for
+    /// Core ML to initialize its graphs.
     func prepareSpeechRecognizer() {
         guard speechRecognizer == nil, speechRecognizerLoadingTask == nil else { return }
 
@@ -416,12 +416,12 @@ final class TranscriptionController {
         vocabularyReplacementCount = 0
         transcriptProcessor = state.makeTranscriptProcessor()
         sessionSourceApplication = Self.frontmostApplicationName()
-        sessionSpeechLanguage = state.speechLanguage
         audioWorkerTask = nil
         audioConverter.reset()
         sessionAudio.reset(keepingCapacity: true)
         lastFinalizedAudioEnd = 0
         recognizerStreamHasLeadingOverlap = false
+        recognitionFailure = nil
         state.liveTranscript = ""
         // Present honest startup progress immediately. Do not claim to be
         // listening until the recognizer is ready and microphone capture has
@@ -439,7 +439,7 @@ final class TranscriptionController {
             }
             try capture.validateInputAvailable()
             prepareVoiceDetector()
-            let recognizer = try await ensureLoaded()
+            _ = try await ensureLoaded()
             guard startRequested else {
                 log.info("Pending recording cancelled after model loading")
                 transcriptProcessor = nil
@@ -453,27 +453,23 @@ final class TranscriptionController {
                 vadState = await vad.makeStreamState()
             } else {
                 vadState = nil
-                log.info("Voice detector is not ready; recording will use bounded continuous streaming")
+                log.info("Voice detector is not ready; recording will use bounded offline segments")
             }
             currentSpeechStart = nil
             currentSpeechFedThrough = nil
 
-            // With VAD, start a recognizer stream only when speech begins and
-            // backfill the detector's padded onset. Without VAD, keep the
-            // bounded continuous fallback streaming from the first frame.
+            // With VAD, open a segment only when speech begins and backfill the
+            // detector's padded onset. Without VAD, continuously form bounded
+            // offline segments from the first frame.
             recognizerStreamIsOpen = false
             if !usesVoiceDetectorForCurrentSession {
-                await recognizer.beginStream(language: sessionSpeechLanguage)
                 recognizerStreamIsOpen = true
                 currentSpeechStart = 0
                 currentSpeechFedThrough = 0
             }
 
             guard startRequested else {
-                if recognizerStreamIsOpen {
-                    await recognizer.discardStream()
-                    recognizerStreamIsOpen = false
-                }
+                recognizerStreamIsOpen = false
                 log.info("Pending recording cancelled before microphone capture")
                 transcriptProcessor = nil
                 scheduleModelUnload()
@@ -503,10 +499,7 @@ final class TranscriptionController {
             let shouldReportError = startRequested
             startRequested = false
             transcriptProcessor = nil
-            if recognizerStreamIsOpen {
-                await speechRecognizer?.discardStream()
-                recognizerStreamIsOpen = false
-            }
+            recognizerStreamIsOpen = false
             guard shouldReportError else {
                 log.info("Suppressed start error after the pending recording was cancelled")
                 state.status = .idle
@@ -554,9 +547,9 @@ final class TranscriptionController {
                 lastFinalizedAudioEnd,
                 currentSpeechFedThrough ?? sessionEnd
             )
+            await finishRecognizerStream()
             currentSpeechStart = nil
             currentSpeechFedThrough = nil
-            await finishRecognizerStream()
         } else if usesVoiceDetectorForCurrentSession, !sessionAudio.isEmpty {
             // VAD may not emit an event for a very short final utterance. Feed
             // only the retained tail rather than ever replaying an hour-long
@@ -570,9 +563,9 @@ final class TranscriptionController {
                     lastFinalizedAudioEnd,
                     currentSpeechFedThrough ?? sessionEnd
                 )
+                await finishRecognizerStream()
                 currentSpeechStart = nil
                 currentSpeechFedThrough = nil
-                await finishRecognizerStream()
             }
         }
         let finalText = TranscriptSegments.capitalizingFirstLetter(
@@ -580,7 +573,7 @@ final class TranscriptionController {
         )
         let capturedSeconds = Double(sessionEnd) / Double(Self.sampleRate)
         var telemetryFailure: TelemetryFailure?
-        log.info("Finalized \(capturedSeconds, format: .fixed(precision: 2), privacy: .public) seconds of streaming audio")
+        log.info("Finalized \(capturedSeconds, format: .fixed(precision: 2), privacy: .public) seconds of bounded audio")
 
         sessionAudio.reset(keepingCapacity: false)
         vadPending.removeAll(keepingCapacity: false)
@@ -620,6 +613,10 @@ final class TranscriptionController {
 
                 if case .error = state.status {
                     // Keep the more specific archive failure visible.
+                } else if let recognitionFailure {
+                    state.status = .error("Copied partial text; transcription failed: \(recognitionFailure.localizedDescription)")
+                    telemetryFailure = .startup
+                    scheduleAutoHide(after: 3.5)
                 } else if droppedCapturedAudio {
                     state.status = .error("Audio processing fell behind; copied text may be incomplete")
                     telemetryFailure = .audioOverrun
@@ -647,13 +644,18 @@ final class TranscriptionController {
         } else {
             // Do not silently dismiss the overlay. This makes a genuinely
             // empty recording distinguishable from a missing confirmation.
-            switch reason {
-            case .userInitiated:
-                state.status = .error("No speech detected")
-                telemetryFailure = .noSpeech
-            case .audioConfigurationChanged:
-                state.status = .error("Microphone changed; recording stopped")
-                telemetryFailure = .microphoneChanged
+            if let recognitionFailure {
+                state.status = .error("Transcription failed: \(recognitionFailure.localizedDescription)")
+                telemetryFailure = .startup
+            } else {
+                switch reason {
+                case .userInitiated:
+                    state.status = .error("No speech detected")
+                    telemetryFailure = .noSpeech
+                case .audioConfigurationChanged:
+                    state.status = .error("Microphone changed; recording stopped")
+                    telemetryFailure = .microphoneChanged
+                }
             }
             scheduleAutoHide(after: 2.4)
             log.info("No speech was detected in the completed recording")
@@ -739,9 +741,9 @@ final class TranscriptionController {
                     lastFinalizedAudioEnd,
                     currentSpeechFedThrough ?? clampedEnd
                 )
+                await finishRecognizerStream()
                 currentSpeechStart = nil
                 currentSpeechFedThrough = nil
-                await finishRecognizerStream()
                 trimRetainedSessionAudio()
             }
         }
@@ -757,9 +759,9 @@ final class TranscriptionController {
                 lastFinalizedAudioEnd,
                 currentSpeechFedThrough ?? sessionAudio.endIndex
             )
+            await finishRecognizerStream()
             currentSpeechStart = nil
             currentSpeechFedThrough = nil
-            await finishRecognizerStream()
         }
 
         let start = max(
@@ -778,7 +780,6 @@ final class TranscriptionController {
         )
 
         while recognizerStreamIsOpen,
-              let recognizer = speechRecognizer,
               let segmentStart = currentSpeechStart,
               let fedThrough = currentSpeechFedThrough
         {
@@ -786,23 +787,18 @@ final class TranscriptionController {
             let feedEnd = min(targetEnd, hardEnd)
 
             if feedEnd > fedThrough {
-                let samples = sessionAudio.samples(from: fedThrough, to: feedEnd)
                 currentSpeechFedThrough = feedEnd
-                if !samples.isEmpty {
-                    let partialText = await recognizer.accept(samples)
-                    updateVolatileText(partialText)
-                }
             }
 
             guard feedEnd >= hardEnd else { break }
 
-            // The VAD owns pause boundaries; ASR segment duration is enforced here.
-            // Close this decoder ourselves, then reopen with a short overlap so
-            // a word crossing the artificial boundary is not lost.
+            // The VAD owns pause boundaries; offline ASR duration is enforced
+            // here. Reopen with a short overlap so a word crossing an
+            // artificial boundary is not lost.
             lastFinalizedAudioEnd = max(lastFinalizedAudioEnd, hardEnd)
+            await finishRecognizerStream()
             currentSpeechStart = nil
             currentSpeechFedThrough = nil
-            await finishRecognizerStream()
 
             let continuationStart = max(
                 sessionAudio.startIndex,
@@ -811,7 +807,7 @@ final class TranscriptionController {
             currentSpeechStart = continuationStart
             currentSpeechFedThrough = continuationStart
             await beginRecognizerStream(hasLeadingOverlap: true)
-            log.info("Forced a streaming ASR segment boundary at 30 seconds")
+            log.info("Forced an offline ASR segment boundary at 30 seconds")
         }
     }
 
@@ -839,9 +835,8 @@ final class TranscriptionController {
 
     private func beginRecognizerStream(hasLeadingOverlap: Bool = false) async {
         guard !recognizerStreamIsOpen,
-              let recognizer = speechRecognizer
+              speechRecognizer != nil
         else { return }
-        await recognizer.beginStream(language: sessionSpeechLanguage)
         recognizerStreamIsOpen = true
         recognizerStreamHasLeadingOverlap = hasLeadingOverlap
     }
@@ -851,25 +846,34 @@ final class TranscriptionController {
               let recognizer = speechRecognizer
         else { return }
 
+        let start = currentSpeechStart ?? sessionAudio.startIndex
+        let end = currentSpeechFedThrough ?? start
+        let samples = sessionAudio.samples(from: start, to: end)
+
         // Close the flag before awaiting so a stop that resumes on the main
-        // actor cannot finalize this stream a second time.
+        // actor cannot finalize this segment a second time.
         recognizerStreamIsOpen = false
         let shouldDeduplicate = recognizerStreamHasLeadingOverlap
         recognizerStreamHasLeadingOverlap = false
-        let rawText = await recognizer.finishStream()
-        appendConfirmedText(
-            rawText,
-            deduplicatingLeadingOverlap: shouldDeduplicate
-        )
+        guard !samples.isEmpty else { return }
+        do {
+            let result = try await recognizer.transcribe(samples, source: .microphone)
+            appendConfirmedText(
+                result.text,
+                deduplicatingLeadingOverlap: shouldDeduplicate
+            )
+        } catch {
+            recognitionFailure = error
+            log.error("Parakeet transcription failed: \(error.localizedDescription)")
+        }
     }
 
     private func trimRetainedSessionAudio() {
         let retainFrom: Int
-        if let fedThrough = currentSpeechFedThrough {
-            retainFrom = max(
-                sessionAudio.startIndex,
-                fedThrough - Self.forcedSegmentOverlapSamples
-            )
+        if let segmentStart = currentSpeechStart {
+            // Offline recognition needs the complete active segment. Do not
+            // apply the former streaming trim to audio not yet decoded.
+            retainFrom = max(sessionAudio.startIndex, segmentStart)
         } else {
             retainFrom = max(
                 sessionAudio.startIndex,
@@ -877,12 +881,6 @@ final class TranscriptionController {
             )
         }
         sessionAudio.discard(before: retainFrom)
-    }
-
-    private func updateVolatileText(_ rawText: String) {
-        let processed = processRecognizerText(rawText)
-        volatileText = processed.text
-        state.liveTranscript = livePreviewText()
     }
 
     private func appendConfirmedText(
@@ -914,8 +912,8 @@ final class TranscriptionController {
         return processor.process(Self.normalizedRecognizerText(rawText))
     }
 
-    /// Nemotron normally emits punctuation and casing. Keep those intact while
-    /// retaining compatibility with an all-uppercase compatible export.
+    /// Parakeet normally emits punctuation and casing. Keep those intact while
+    /// retaining compatibility with all-uppercase text from older exports.
     private static func normalizedRecognizerText(_ rawText: String) -> String {
         let collapsed = rawText
             .split(whereSeparator: { $0.isWhitespace })
@@ -1011,20 +1009,31 @@ final class TranscriptionController {
 
     private func ensureLoaded(
         showLoadingStatus: Bool = true
-    ) async throws -> NemotronStreamingRecognizer {
+    ) async throws -> AsrManager {
         if let recognizer = speechRecognizer { return recognizer }
         if showLoadingStatus {
             state.status = .preparing("Loading voice model…")
         }
 
-        let task: Task<NemotronStreamingRecognizer, Error>
+        let task: Task<AsrManager, Error>
         if let existing = speechRecognizerLoadingTask {
             task = existing
         } else {
             let modelDir = try Self.bundledModelDirectory()
             log.info("Loading ASR model from \(modelDir.path, privacy: .public)")
-            task = Task.detached(priority: .userInitiated) {
-                try NemotronStreamingRecognizer(modelDirectory: modelDir)
+            task = Task(priority: .userInitiated) {
+                let configuration = MLModelConfiguration()
+                // This is the known-stable configuration for the v3 Core ML
+                // export and avoids Neural Engine compilation/cache churn.
+                configuration.computeUnits = .cpuAndGPU
+                let models = try await AsrModels.load(
+                    from: modelDir,
+                    configuration: configuration,
+                    version: .v3
+                )
+                let recognizer = AsrManager(config: .default)
+                try await recognizer.loadModels(models)
+                return recognizer
             }
             speechRecognizerLoadingTask = task
         }
@@ -1048,11 +1057,11 @@ final class TranscriptionController {
         }
 
         let dir = resources.appendingPathComponent(
-            BundledModelInventory.speechDirectory,
+            BundledModelInventory.parakeetSpeechDirectory,
             isDirectory: true
         )
         let fm = FileManager.default
-        for file in BundledModelInventory.speechFiles {
+        for file in BundledModelInventory.parakeetSpeechFiles {
             let url = dir.appendingPathComponent(file.name)
             guard
                 fm.fileExists(atPath: url.path),
@@ -1067,6 +1076,19 @@ final class TranscriptionController {
             }
         }
         return dir
+    }
+
+    /// Meetings share the already-loaded Parakeet models with dictation. The
+    /// manager is an actor and maintains independent microphone/system decoder
+    /// state, so two sources cannot corrupt one another.
+    func speechRecognizerForMeeting() async throws -> AsrManager {
+        modelUnloadTask?.cancel()
+        modelUnloadTask = nil
+        return try await ensureLoaded(showLoadingStatus: false)
+    }
+
+    func meetingRecognitionDidEnd() {
+        scheduleModelUnload()
     }
 
     private static func bundledVADModelURL() -> URL? {

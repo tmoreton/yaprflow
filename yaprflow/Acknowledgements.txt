@@ -22,11 +22,11 @@ respective permissive licenses. The complete upstream license inventory is
 bundled as Sparkle-2.10.0.txt.
 https://github.com/sparkle-project/Sparkle
 
-FluidAudio 0.13.6 (adapted VAD portions only)
+FluidAudio 0.13.6
 Licensed under the Apache License 2.0.
-Yaprflow retains a modified Core ML VAD invocation and streaming hysteresis
-implementation. The FluidAudio package, VBx, fastcluster, diarization,
-clustering, downloader, and TTS code are not linked or distributed.
+Yaprflow for Mac links FluidAudio's Parakeet Core ML implementation. Yaprflow
+also retains a modified Core ML VAD invocation and streaming hysteresis
+implementation. FluidAudio's optional diarization and TTS features are unused.
 https://github.com/FluidInference/FluidAudio
 
 sherpa-onnx 1.13.8
@@ -63,9 +63,17 @@ Licensed under the MIT License reproduced below. The complete upstream notice
 inventory is bundled as ONNXRuntime-ThirdPartyNotices-v1.28.2.txt.
 https://github.com/microsoft/onnxruntime
 
+NVIDIA Parakeet TDT 0.6B v3 Core ML model
+Core ML conversion by FluidInference, based on NVIDIA's Parakeet TDT 0.6B v3.
+Licensed under Creative Commons Attribution 4.0 International (CC BY 4.0).
+Yaprflow for Mac bundles the compiled model components without modifying them.
+https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml
+https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3
+https://creativecommons.org/licenses/by/4.0/
+
 NVIDIA Nemotron 3.5 ASR Streaming 0.6B, 1120 ms chunk-size INT8 ONNX export
 Model materials are governed by the OpenMDW License Agreement, version 1.1.
-Yaprflow bundles the selected model files without modifying their contents.
+Yaprflow's iOS target bundles the selected model files without modifying them.
 The complete agreement is bundled as OpenMDW-1.1.txt; NOTICE.txt retains the
 model origin. Source model/model-card revision reviewed:
 ea30d66debe3740a08b573244286791d423d6b3e. Exact export mirror revision:

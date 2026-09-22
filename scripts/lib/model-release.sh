@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Shared, read-only validation for Yaprflow's pinned model inventory.
 
-YAPRFLOW_ASR_MODEL_DIR="nemotron-3.5-asr-streaming-0.6b-1120ms"
-YAPRFLOW_MODEL_MANIFEST_ENTRY_COUNT=10
+YAPRFLOW_MAC_ASR_MODEL_DIR="parakeet-tdt-0.6b-v3"
+YAPRFLOW_IOS_ASR_MODEL_DIR="nemotron-3.5-asr-streaming-0.6b-1120ms"
+YAPRFLOW_MODEL_MANIFEST_ENTRY_COUNT=31
 YAPRFLOW_UPSTREAM_SHERPA_WRAPPER_SHA256="a7ff8bbc35fc27017dc4f47271592054a2138b6e716c2abb5d8b5bdcbcf49ffd"
 YAPRFLOW_SHERPA_WRAPPER_SHA256="d4731a95c3c7015f9e2f9acb024e6f1d3dfd3b1957836403b240805d9eb718a4"
 
@@ -30,9 +31,11 @@ yaprflow_validate_model_checksum_manifest() {
     }
     manifest="$(cd "$(dirname "$manifest")" && pwd)/$(basename "$manifest")"
     awk -v expected_count="$YAPRFLOW_MODEL_MANIFEST_ENTRY_COUNT" \
-        -v asr_prefix="Models/$YAPRFLOW_ASR_MODEL_DIR/" '
+        -v mac_prefix="Models/$YAPRFLOW_MAC_ASR_MODEL_DIR/" \
+        -v ios_prefix="Models/$YAPRFLOW_IOS_ASR_MODEL_DIR/" '
         NF != 2 || length($1) != 64 || $1 ~ /[^0-9a-f]/ ||
-        (index($2, asr_prefix) != 1 && index($2, "Models/silero-vad/") != 1) ||
+        (index($2, mac_prefix) != 1 && index($2, ios_prefix) != 1 &&
+            index($2, "Models/silero-vad/") != 1) ||
         $2 ~ /(^|\/)\.{1,2}(\/|$)/ || seen[$2]++ { exit 1 }
         END { if (NR != expected_count) exit 1 }
     ' "$manifest" || {
@@ -44,6 +47,7 @@ yaprflow_validate_model_checksum_manifest() {
 yaprflow_verify_model_inventory() {
     local inventory_root="$1"
     local manifest="$2"
+    local selected_model_dir="${3:-}"
     local model_hash model_path actual_path inventory_diff
 
     yaprflow_validate_model_checksum_manifest "$manifest" || return 1
@@ -62,6 +66,11 @@ yaprflow_verify_model_inventory() {
     }
 
     while read -r model_hash model_path; do
+        if [[ -n "$selected_model_dir" \
+           && "$model_path" != "Models/$selected_model_dir/"* \
+           && "$model_path" != "Models/silero-vad/"* ]]; then
+            continue
+        fi
         actual_path="$inventory_root/$model_path"
         [[ -f "$actual_path" ]] || {
             echo "error: pinned model file is missing: $model_path" >&2
@@ -76,7 +85,10 @@ yaprflow_verify_model_inventory() {
     inventory_diff="$({
         cd "$inventory_root" || exit 1
         comm -3 \
-            <(awk '{print $2}' "$manifest" | LC_ALL=C sort) \
+            <(awk -v selected="$selected_model_dir" '
+                selected == "" || index($2, "Models/" selected "/") == 1 ||
+                    index($2, "Models/silero-vad/") == 1 { print $2 }
+            ' "$manifest" | LC_ALL=C sort) \
             <(find Models -type f -print | LC_ALL=C sort)
     })" || return 1
     [[ -z "$inventory_diff" ]] || {

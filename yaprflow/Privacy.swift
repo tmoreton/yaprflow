@@ -23,24 +23,20 @@ struct SettingsView: View {
                 settingsGroup("General") {
                     VStack(spacing: 0) {
                         HStack(spacing: 12) {
-                            settingLabel("Speech language", detail: speechLanguageDetail)
+                            settingLabel(
+                                "Speech language",
+                                detail: "Parakeet automatically detects 25 supported European languages."
+                            )
                             Spacer(minLength: 16)
-                            Picker("Speech language", selection: speechLanguageBinding) {
-                                ForEach(SpeechLanguage.allCases) { language in
-                                    Text(language.displayName).tag(language)
-                                }
-                            }
-                            .labelsHidden()
-                            .pickerStyle(.menu)
-                            .frame(width: 190)
-                            .accessibilityLabel("Speech language")
+                            Text("Automatic")
+                                .foregroundStyle(.secondary)
                         }
                         .padding(.vertical, 9)
 
                         Divider()
 
                         HStack(spacing: 12) {
-                            settingLabel("Desktop preview", detail: "Show live text while dictating.")
+                            settingLabel("Desktop preview", detail: "Show finalized text after each pause.")
                             Spacer(minLength: 16)
                             Toggle("Desktop preview", isOn: desktopPreviewBinding)
                                 .labelsHidden()
@@ -235,23 +231,6 @@ struct SettingsView: View {
         )
     }
 
-    private var speechLanguageBinding: Binding<SpeechLanguage> {
-        Binding(
-            get: { appState.speechLanguage },
-            set: { appState.speechLanguage = $0 }
-        )
-    }
-
-    private var speechLanguageDetail: String {
-        switch appState.speechLanguage {
-        case .automatic:
-            "Detect each speech segment."
-        case .englishUS, .englishUK:
-            "Keep recognition in English."
-        default:
-            "Keep recognition in the selected language."
-        }
-    }
 }
 
 private struct PromptPresetSettingsView: View {

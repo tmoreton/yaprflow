@@ -20,15 +20,18 @@ UPSTREAM_MODEL_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-
 UPSTREAM_MODEL_SHA256="adbdd5e9fef87300c37cebfcfc4f1ebe56845c860c8a760af0a1dd65ce9beed3"
 VAD_REPO="FluidInference/silero-vad-coreml"
 VAD_REVISION="724adb2158b5fa0538c528e33ba9963e977e1633"
+PARAKEET_REPO="FluidInference/parakeet-tdt-0.6b-v3-coreml"
+PARAKEET_NAME="parakeet-tdt-0.6b-v3"
 MODEL_NAME="nemotron-3.5-asr-streaming-0.6b-1120ms"
 LEGACY_MODEL_NAME="nemotron-streaming-en-0.6b-1120ms"
 VAD_NAME="silero-vad"
 DEST="$ROOT/Models/$MODEL_NAME"
+PARAKEET_DEST="$ROOT/Models/$PARAKEET_NAME"
 VAD_DEST="$ROOT/Models/$VAD_NAME"
 VAD_MODEL="silero-vad-unified-256ms-v6.0.0.mlmodelc"
 CHECKSUMS="$ROOT/scripts/model-checksums.sha256"
 MODEL_LICENSE="$ROOT/LICENSES/$LICENSE_ASSET"
-REQUIRED_NOTICE="$ROOT/NOTICE.txt"
+REQUIRED_NOTICE="$ROOT/scripts/nemotron-origin-NOTICE.txt"
 
 MODEL_FILES=(
     "decoder.int8.onnx"
@@ -107,6 +110,36 @@ verify_asr_tree() {
     )"
     [[ -z "$inventory_diff" ]] \
         || fail "model archive inventory does not match the checksum manifest: $inventory_diff"
+}
+
+verify_parakeet_tree() {
+    local candidate="$1"
+    local model_hash model_path relative_path inventory_diff
+
+    [[ -d "$candidate" ]] || fail "model inventory did not contain $PARAKEET_NAME"
+    [[ -z "$(find "$candidate" -type l -print -quit)" ]] \
+        || fail "symbolic links are not allowed in the Parakeet model"
+    [[ -z "$(find "$candidate" ! -type d ! -type f -print -quit)" ]] \
+        || fail "special files are not allowed in the Parakeet model"
+
+    while read -r model_hash model_path; do
+        [[ "$model_path" == "Models/$PARAKEET_NAME/"* ]] || continue
+        relative_path="${model_path#"Models/$PARAKEET_NAME/"}"
+        [[ -f "$candidate/$relative_path" ]] \
+            || fail "Parakeet model is missing $relative_path"
+        [[ "$(shasum -a 256 "$candidate/$relative_path" | awk '{print $1}')" == "$model_hash" ]] \
+            || fail "Parakeet model checksum failed for $relative_path"
+    done < "$CHECKSUMS"
+
+    inventory_diff="$(
+        comm -3 \
+            <(awk -v prefix="Models/$PARAKEET_NAME/" \
+                'index($2, prefix) == 1 {print substr($2, length(prefix) + 1)}' \
+                "$CHECKSUMS" | LC_ALL=C sort) \
+            <(cd "$candidate" && find . -type f -print | sed 's#^\./##' | LC_ALL=C sort)
+    )"
+    [[ -z "$inventory_diff" ]] \
+        || fail "Parakeet inventory does not match the checksum manifest: $inventory_diff"
 }
 
 verify_vad_tree() {
@@ -212,7 +245,7 @@ verify_models() {
 
 validate_checksum_manifest
 echo "Model provenance: source/model-card reviewed at $SOURCE_MODEL_REVIEW_REVISION; export pinned at $EXPORT_MODEL_REVISION"
-[[ ! -L "$ROOT/Models" && ! -L "$DEST" && ! -L "$VAD_DEST" ]] \
+[[ ! -L "$ROOT/Models" && ! -L "$DEST" && ! -L "$PARAKEET_DEST" && ! -L "$VAD_DEST" ]] \
     || fail "managed model directories must not be symbolic links"
 
 mkdir -p "$ROOT/Models"
@@ -250,6 +283,27 @@ if [[ ! -d "$VAD_DEST" ]]; then
     rm -rf "$vad_stage/.cache"
     verify_vad_tree "$vad_stage"
     mv "$vad_stage" "$VAD_DEST"
+fi
+
+if [[ -d "$PARAKEET_DEST" ]] && ! (verify_parakeet_tree "$PARAKEET_DEST"); then
+    echo "Existing Parakeet model is incomplete or invalid; repairing it"
+    rm -rf "$PARAKEET_DEST"
+fi
+if [[ ! -d "$PARAKEET_DEST" ]]; then
+    command -v hf >/dev/null 2>&1 \
+        || fail "'hf' is required to fetch Parakeet (brew install huggingface-cli)"
+    echo "Downloading checksum-pinned Parakeet Core ML model…"
+    parakeet_stage="$tmp_root/$PARAKEET_NAME"
+    HF_HUB_DISABLE_XET=1 hf download "$PARAKEET_REPO" \
+        --include "Preprocessor.mlmodelc/*" \
+        --include "Encoder.mlmodelc/*" \
+        --include "Decoder.mlmodelc/*" \
+        --include "JointDecision.mlmodelc/*" \
+        --include "parakeet_vocab.json" \
+        --local-dir "$parakeet_stage"
+    rm -rf "$parakeet_stage/.cache"
+    verify_parakeet_tree "$parakeet_stage"
+    mv "$parakeet_stage" "$PARAKEET_DEST"
 fi
 
 if [[ -f "$DEST/${MODEL_FILES[0]}" && -f "$DEST/${MODEL_FILES[1]}" \

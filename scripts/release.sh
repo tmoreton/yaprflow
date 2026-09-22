@@ -108,49 +108,17 @@ EXPORT_DIR="$BUILD_DIR/export"
 STAGING_DIR="$BUILD_DIR/dmg-staging"
 EXPORT_OPTIONS="$BUILD_DIR/ExportOptions.plist"
 MODEL_CHECKSUMS="$(pwd)/scripts/model-checksums.sha256"
-NATIVE_ASR_CHECKSUMS="$(pwd)/scripts/native-asr-checksums.sha256"
 ACKNOWLEDGEMENTS_SOURCE="$(pwd)/yaprflow/Acknowledgements.txt"
 MODEL_NOTICE_SOURCE="$(pwd)/scripts/model-NOTICE.txt"
 MODEL_ORIGIN_NOTICE_SOURCE="$(pwd)/NOTICE.txt"
-MODEL_LICENSE_SOURCE="$(pwd)/LICENSES/OpenMDW-1.1.txt"
 PRIVACY_MANIFEST_SOURCE="$(pwd)/yaprflow/PrivacyInfo.xcprivacy"
-ONNXRUNTIME_NOTICES_SOURCE="$(pwd)/LICENSES/ONNXRuntime-ThirdPartyNotices-v1.28.2.txt"
 SPARKLE_LICENSE_SOURCE="$(pwd)/LICENSES/Sparkle-2.10.0.txt"
-SHERPA_NOTICES_SOURCE="$(pwd)/LICENSES/SherpaOnnx-ThirdParty-v1.13.8"
-SHERPA_ARTIFACTS_ROOT="$(pwd)/Vendor/SherpaOnnxASR/Artifacts"
 EXPECTED_BUNDLE_ID="com.tmoreton.yaprflow"
 EXPECTED_TEAM_ID="GVXC5FQ2RP"
 EXPECTED_SPARKLE_FEED="https://yaprflow.com/appcast.xml"
 EXPECTED_SPARKLE_PUBLIC_KEY="+pDUc2ivfnr9FJrMcu8LIS+S19ek19DfS3XT209PmKE="
 
 source "$(pwd)/scripts/lib/model-release.sh"
-
-require_native_asr_artifacts() {
-    if ! yaprflow_verify_native_asr_artifacts "$(pwd)" "$NATIVE_ASR_CHECKSUMS"; then
-        echo "       Run scripts/build-sherpa-onnx-asr.sh, then retry the release." >&2
-        exit 1
-    fi
-}
-
-require_native_asr_framework_layout() {
-    local mac_ort_bundle mac_ort_component
-    mac_ort_bundle="$SHERPA_ARTIFACTS_ROOT/OnnxRuntimeMacOS.xcframework/macos-arm64_x86_64/onnxruntime.framework"
-
-    [[ -L "$mac_ort_bundle/Versions/Current" \
-       && "$(readlink "$mac_ort_bundle/Versions/Current")" == "A" \
-       && -e "$mac_ort_bundle/Versions/Current" ]] || {
-        echo "error: invalid ONNX Runtime framework link: Versions/Current" >&2
-        return 1
-    }
-    for mac_ort_component in onnxruntime Headers Modules Resources; do
-        if [[ ! -L "$mac_ort_bundle/$mac_ort_component" \
-           || "$(readlink "$mac_ort_bundle/$mac_ort_component")" != "Versions/Current/$mac_ort_component" \
-           || ! -e "$mac_ort_bundle/$mac_ort_component" ]]; then
-            echo "error: invalid ONNX Runtime framework link: $mac_ort_component" >&2
-            return 1
-        fi
-    done
-}
 
 load_release_env() {
     local env_file="$1"
@@ -200,11 +168,6 @@ if [[ "$PUBLISH_BINARY" == true && -z "${USE_APP:-}" && ! "${APTABASE_APP_KEY:-}
     echo "error: --publish requires an Aptabase app key (A-US-... or A-EU-...) in APTABASE_APP_KEY" >&2
     exit 2
 fi
-
-# A pre-built bundle must not turn off source provenance enforcement. The app
-# itself is checked again by verify_bundled_app below.
-require_native_asr_artifacts
-require_native_asr_framework_layout
 
 read_project_setting() {
     local setting_name="$1"
@@ -366,10 +329,8 @@ verify_bundled_app() {
 
     if [[ ! -f "$MODEL_CHECKSUMS" || ! -f "$ACKNOWLEDGEMENTS_SOURCE" \
        || ! -f "$MODEL_NOTICE_SOURCE" || ! -f "$MODEL_ORIGIN_NOTICE_SOURCE" \
-       || ! -f "$MODEL_LICENSE_SOURCE" \
-       || ! -f "$PRIVACY_MANIFEST_SOURCE" || ! -f "$ONNXRUNTIME_NOTICES_SOURCE" \
-       || ! -f "$SPARKLE_LICENSE_SOURCE" \
-       || ! -d "$SHERPA_NOTICES_SOURCE" ]]; then
+       || ! -f "$PRIVACY_MANIFEST_SOURCE" \
+       || ! -f "$SPARKLE_LICENSE_SOURCE" ]]; then
         echo "error: release verification sources are missing" >&2
         return 1
     fi
@@ -437,27 +398,9 @@ verify_bundled_app() {
         return 1
     fi
     if ! cmp -s \
-        "$MODEL_LICENSE_SOURCE" \
-        "$resources_path/OpenMDW-1.1.txt"; then
-        echo "error: bundled OpenMDW-1.1 license is missing or changed" >&2
-        return 1
-    fi
-    if ! cmp -s \
-        "$ONNXRUNTIME_NOTICES_SOURCE" \
-        "$resources_path/ONNXRuntime-ThirdPartyNotices-v1.28.2.txt"; then
-        echo "error: bundled ONNX Runtime notices are missing or do not match the source" >&2
-        return 1
-    fi
-    if ! cmp -s \
         "$SPARKLE_LICENSE_SOURCE" \
         "$resources_path/Sparkle-2.10.0.txt"; then
         echo "error: bundled Sparkle license inventory is missing or changed" >&2
-        return 1
-    fi
-    if ! diff -qr \
-        "$SHERPA_NOTICES_SOURCE" \
-        "$resources_path/SherpaOnnx-ThirdParty-v1.13.8" >/dev/null; then
-        echo "error: bundled sherpa-onnx dependency notices are missing or changed" >&2
         return 1
     fi
     if [[ ! -f "$resources_path/PrivacyInfo.xcprivacy" ]] \
@@ -470,7 +413,8 @@ verify_bundled_app() {
         return 1
     fi
 
-    yaprflow_verify_model_inventory "$resources_path" "$MODEL_CHECKSUMS" || return 1
+    yaprflow_verify_model_inventory \
+        "$resources_path" "$MODEL_CHECKSUMS" "$YAPRFLOW_MAC_ASR_MODEL_DIR" || return 1
 
     executable_name="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$info_plist")"
     executable_path="$app_path/Contents/MacOS/$executable_name"
@@ -483,12 +427,6 @@ verify_bundled_app() {
         echo "error: app executable contains prohibited optional TTS symbols" >&2
         return 1
     fi
-    if nm -gU "$executable_path" 2>/dev/null \
-        | grep -F '$s10FluidAudio' >/dev/null; then
-        echo "error: app executable links the full FluidAudio package" >&2
-        return 1
-    fi
-
     echo "==> Verified app identity, privacy manifest, notices, and pinned models"
 }
 

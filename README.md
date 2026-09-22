@@ -61,11 +61,10 @@ licensed noncommercial builds.
 - **Smart Markdown archive**: each completed Mac transcript is saved locally;
   Apple Intelligence can add a title, topic, and description on supported Macs.
   Automatic titles with another provider require a separate opt-in.
-- **True streaming multilingual transcription**: a bundled Nemotron 3.5 ASR
-  0.6B 1120 ms chunk-size export produces local partial results in 32
-  production-ready locales. On Mac, English (United States) is the default;
-  choose a different locale or Automatic in Settings, with no cloud round
-  trips.
+- **Accurate offline multilingual transcription**: the Mac app uses bundled
+  Parakeet TDT 0.6B v3 Core ML models with automatic detection across 25
+  supported European languages. Dictation is finalized at natural pauses, and
+  long meetings are decoded in bounded chunks with no cloud round trips.
 - **Inspectable source**: current Yaprflow-owned code is source-available under
   PolyForm Noncommercial 1.0.0. Commercial use requires a separate license;
   the historical Apache-2.0 and PolyForm Shield boundaries are preserved.
@@ -176,20 +175,17 @@ measuring app usage without changing this privacy behavior, see
 
 ## How it works
 
-The macOS app is built with AppKit, SwiftUI, AVFoundation,
-[sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) and ONNX Runtime for ASR,
-and Core ML with a narrow Apache-licensed adapter derived from
-[FluidAudio](https://github.com/FluidInference/FluidAudio) for voice activity
-detection. The full FluidAudio package is not linked into the apps.
+The macOS app is built with AppKit, SwiftUI, AVFoundation, Core ML, and the
+pinned [FluidAudio](https://github.com/FluidInference/FluidAudio) package for
+Parakeet inference. The iOS target retains sherpa-onnx and ONNX Runtime.
 
 1. The global hotkey toggles `TranscriptionController`.
 2. `AudioCapture` records microphone buffers with `AVAudioEngine`.
 3. A reusable `AVAudioConverter` resamples the stream and the bundled Silero
    Core ML VAD finds speech endpoints.
-4. The same audio is decoded continuously by the bundled 1120 ms chunk-size
-   Nemotron 3.5 multilingual streaming model through an ASR-only sherpa-onnx
-   build using greedy search and the saved speech-language prompt. English
-   (United States) is the default, and Automatic detection remains available.
+4. Speech segments are decoded offline by the bundled Parakeet TDT 0.6B v3
+   Core ML model. Quick Dictation caps segments at 30 seconds; each meeting
+   source caps them at 25 seconds so memory does not grow with meeting length.
 5. Yaprflow applies local cleanup and vocabulary replacements.
 6. Final text is copied to the clipboard and saved as Markdown.
 7. The selected AI provider creates structured notes for finished meetings or
@@ -197,19 +193,19 @@ detection. The full FluidAudio package is not linked into the apps.
    Intelligence is on-device; cloud providers receive text only when used, and
    automatic cloud archive titles require opt-in.
 
-The complete Nemotron 3.5 ASR and Silero VAD models are bundled in official
-apps. On Mac, background preparation begins at launch, the speech recognizer
-stays warm between nearby dictations, and its large ONNX allocation is released
+The complete Parakeet ASR and Silero VAD models are bundled in the Mac app. On
+Mac, background preparation begins at launch, the speech recognizer stays warm
+between nearby dictations and meetings, and its Core ML allocation is released
 after five idle minutes or memory pressure. A later cold start initializes it
-again. Source builds may fetch pinned model files when they are absent.
+again. Source builds may fetch checksum-pinned model files when absent.
 At runtime, network access is used for optional cloud AI requests and enabled
 usage telemetry.
 
-The upstream Nemotron 3.5 model covers 40 language-locales across 35 languages.
-NVIDIA classifies 19 locales as transcription-ready, 13 as broad-coverage, and
-8 as adaptation-ready. Both apps make the 32 out-of-box locales selectable and
-also offer Automatic detection. The 8 adaptation-ready locales require
-fine-tuning and are not advertised as production-ready.
+Parakeet automatically detects Bulgarian, Croatian, Czech, Danish, Dutch,
+English, Estonian, Finnish, French, German, Greek, Hungarian, Italian, Latvian,
+Lithuanian, Maltese, Polish, Portuguese, Romanian, Russian, Slovak, Slovenian,
+Spanish, Swedish, and Ukrainian. The iOS target continues to use the bundled
+Nemotron streaming model and its explicit language setting.
 
 ## Repository layout
 
@@ -243,8 +239,9 @@ Requirements:
   Foundation Models framework while remaining deployable to macOS 14)
 - CMake 3.24 or later for the initial native ASR runtime build
 - Network access for the initial, checksum-verified dependency and model fetch
-- Hugging Face CLI (`brew install huggingface-cli`) for the bundled Silero VAD;
-  the Nemotron ONNX fallback comes from the pinned official sherpa-onnx release.
+- Hugging Face CLI (`brew install huggingface-cli`) for the bundled Parakeet and
+  Silero VAD models; the iOS Nemotron fallback comes from the pinned official
+  sherpa-onnx release.
 
 ```bash
 git clone https://github.com/tmoreton/yaprflow.git
@@ -429,9 +426,10 @@ than an OSI-approved open-source license.
 Yaprflow currently accepts outside code only under a prior written contributor
 agreement; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-Third-party libraries and models retain their own licenses. Nemotron 3.5 ASR
-model materials are available under OpenMDW-1.1, sherpa-onnx is Apache-2.0,
-and ONNX Runtime and Silero VAD use MIT terms. See
+Third-party libraries and models retain their own licenses. Parakeet TDT 0.6B
+v3 is available under CC BY 4.0; Nemotron 3.5 ASR model materials are available
+under OpenMDW-1.1; FluidAudio and sherpa-onnx are Apache-2.0; and ONNX Runtime
+and Silero VAD use MIT terms. See
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and the in-app
 Acknowledgements.
 

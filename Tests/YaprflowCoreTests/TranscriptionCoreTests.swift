@@ -39,6 +39,18 @@ struct SpeechLanguageTests {
 
 @Suite("Bundled model inventory")
 struct BundledModelInventoryTests {
+    @Test("Parakeet inventory covers every required Core ML component")
+    func parakeetInventoryIsComplete() {
+        let names = BundledModelInventory.parakeetSpeechFiles.map(\.name)
+        #expect(Set(names).count == 21)
+        #expect(names.contains("Preprocessor.mlmodelc/weights/weight.bin"))
+        #expect(names.contains("Encoder.mlmodelc/weights/weight.bin"))
+        #expect(names.contains("Decoder.mlmodelc/weights/weight.bin"))
+        #expect(names.contains("JointDecision.mlmodelc/weights/weight.bin"))
+        #expect(names.contains("parakeet_vocab.json"))
+        #expect(BundledModelInventory.parakeetSpeechFiles.allSatisfy { $0.byteCount > 0 })
+    }
+
     @Test("Speech inventory remains complete and uniquely named")
     func speechInventoryIsComplete() {
         let names = BundledModelInventory.speechFiles.map(\.name)

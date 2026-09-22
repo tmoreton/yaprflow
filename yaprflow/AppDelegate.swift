@@ -58,7 +58,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         TranscriptionController.shared.prepareVoiceDetector()
         let hotkeyRegistered = registerHotkey()
 
-        // Nemotron is warmed above so the first hotkey press avoids its ONNX
+        // Parakeet is warmed above so the first hotkey press avoids its Core ML
         // graph-loading cost; idle and memory-pressure paths still release it.
 
         if !isPreviewSmokeTest, !isMeetingSmokeTest, !OnboardingWindowController.hasCompleted {

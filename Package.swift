@@ -11,6 +11,7 @@ let package = Package(
     products: [
         .library(name: "YaprflowCore", targets: ["YaprflowCore"]),
         .executable(name: "yaprflow-asr-smoke", targets: ["YaprflowASRSmoke"]),
+        .executable(name: "yaprflow-asr-benchmark", targets: ["YaprflowASRBenchmark"]),
     ],
     dependencies: [
         .package(path: "Vendor/SherpaOnnxASR"),
@@ -31,6 +32,13 @@ let package = Package(
                 .product(name: "SherpaOnnxASR", package: "SherpaOnnxASR"),
             ],
             path: "Tools/YaprflowASRSmoke"
+        ),
+        .executableTarget(
+            name: "YaprflowASRBenchmark",
+            dependencies: [
+                .product(name: "SherpaOnnxASR", package: "SherpaOnnxASR"),
+            ],
+            path: "Tools/YaprflowASRBenchmark"
         ),
     ]
 )

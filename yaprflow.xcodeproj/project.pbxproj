@@ -11,11 +11,8 @@
 		9C51000131D1000100000001 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 9C51000131D1000100000002 /* AppIcon.icon */; };
 		2A2FDF2C31C00B9800A00001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 2A2FDF2B31C00B9800A00001 /* PrivacyInfo.xcprivacy */; };
 		2A2FDF2E31C00B9800A00001 /* Acknowledgements.txt in Resources */ = {isa = PBXBuildFile; fileRef = 2A2FDF2D31C00B9800A00001 /* Acknowledgements.txt */; };
-		2A2FDF3031C1000200000001 /* ONNXRuntime-ThirdPartyNotices-v1.28.2.txt in Resources */ = {isa = PBXBuildFile; fileRef = 2A2FDF2F31C1000200000001 /* ONNXRuntime-ThirdPartyNotices-v1.28.2.txt */; };
 		2A2FDF3131C1000200000001 /* ONNXRuntime-ThirdPartyNotices-v1.28.2.txt in Resources */ = {isa = PBXBuildFile; fileRef = 2A2FDF2F31C1000200000001 /* ONNXRuntime-ThirdPartyNotices-v1.28.2.txt */; };
-		2A2FDF3331C1000200000001 /* SherpaOnnx-ThirdParty-v1.13.8 in Resources */ = {isa = PBXBuildFile; fileRef = 2A2FDF3231C1000200000001 /* SherpaOnnx-ThirdParty-v1.13.8 */; };
 		2A2FDF3431C1000200000001 /* SherpaOnnx-ThirdParty-v1.13.8 in Resources */ = {isa = PBXBuildFile; fileRef = 2A2FDF3231C1000200000001 /* SherpaOnnx-ThirdParty-v1.13.8 */; };
-		2A2FDF3531C1000300000001 /* OpenMDW-1.1.txt in Resources */ = {isa = PBXBuildFile; fileRef = 2A2FDF3931C1000300000001 /* OpenMDW-1.1.txt */; };
 		2A2FDF3631C1000300000001 /* OpenMDW-1.1.txt in Resources */ = {isa = PBXBuildFile; fileRef = 2A2FDF3931C1000300000001 /* OpenMDW-1.1.txt */; };
 		2A2FDF3731C1000300000001 /* model-NOTICE.txt in Resources */ = {isa = PBXBuildFile; fileRef = 2A2FDF3A31C1000300000001 /* model-NOTICE.txt */; };
 		2A2FDF3831C1000300000001 /* model-NOTICE.txt in Resources */ = {isa = PBXBuildFile; fileRef = 2A2FDF3A31C1000300000001 /* model-NOTICE.txt */; };
@@ -38,6 +35,8 @@
 		6F53000131C5000100000001 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 6F53000131C5000100000003 /* Sparkle */; };
 		6F53000131C5000100000004 /* Sparkle-2.10.0.txt in Resources */ = {isa = PBXBuildFile; fileRef = 6F53000131C5000100000005 /* Sparkle-2.10.0.txt */; };
 		7A53000131C6000100000001 /* SherpaOnnxASR in Frameworks */ = {isa = PBXBuildFile; productRef = 7A53000131C600010000001A /* SherpaOnnxASR */; };
+		B0FA000131D2000100000004 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = B0FA000131D2000100000002 /* FluidAudio */; };
+		B0FA000131D2000100000005 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = B0FA000131D2000100000003 /* FluidAudio */; };
 		7A53000131C6000100000002 /* TranscriptionCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A57A00131C3000100000012 /* TranscriptionCore.swift */; };
 		7A53000131C6000100000003 /* AudioProcessing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A57A00131C3000100000013 /* AudioProcessing.swift */; };
 		7A53000131C6000100000004 /* TranscriptPolishing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A57A00131C3000100000018 /* TranscriptPolishing.swift */; };
@@ -92,6 +91,7 @@
 			membershipExceptions = (
 				"Info-AppStore.plist",
 				Info.plist,
+				NemotronStreamingRecognizer.swift,
 			);
 			target = AFA2BC962F97E6F00048D99B /* yaprflow */;
 		};
@@ -100,6 +100,7 @@
 			membershipExceptions = (
 				"Info-AppStore.plist",
 				Info.plist,
+				NemotronStreamingRecognizer.swift,
 			);
 			target = 7A53000131C6000100000016 /* yaprflow-AppStore */;
 		};
@@ -130,8 +131,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B0FA000131D2000100000004 /* FluidAudio in Frameworks */,
 				6F53000131C5000100000001 /* Sparkle in Frameworks */,
-				2A57A00131C1000100000001 /* SherpaOnnxASR in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -139,7 +140,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				7A53000131C6000100000001 /* SherpaOnnxASR in Frameworks */,
+				B0FA000131D2000100000005 /* FluidAudio in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -238,7 +239,7 @@
 			name = yaprflow;
 			packageProductDependencies = (
 				6F53000131C5000100000003 /* Sparkle */,
-				2A57A00131C1000100000004 /* SherpaOnnxASR */,
+				B0FA000131D2000100000002 /* FluidAudio */,
 			);
 			productName = yaprflow;
 			productReference = AFA2BC972F97E6F00048D99B /* yaprflow.app */;
@@ -262,7 +263,7 @@
 			);
 			name = "yaprflow-AppStore";
 			packageProductDependencies = (
-				7A53000131C600010000001A /* SherpaOnnxASR */,
+				B0FA000131D2000100000003 /* FluidAudio */,
 			);
 			productName = yaprflow;
 			productReference = 7A53000131C6000100000010 /* yaprflow App Store.app */;
@@ -297,6 +298,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				6F53000131C5000100000002 /* XCRemoteSwiftPackageReference "Sparkle" */,
+				B0FA000131D2000100000001 /* XCRemoteSwiftPackageReference "FluidAudio" */,
 				2A57A00131C1000100000003 /* XCLocalSwiftPackageReference "SherpaOnnxASR" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -317,9 +319,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				6F53000131C5000100000004 /* Sparkle-2.10.0.txt in Resources */,
-				2A2FDF3031C1000200000001 /* ONNXRuntime-ThirdPartyNotices-v1.28.2.txt in Resources */,
-				2A2FDF3331C1000200000001 /* SherpaOnnx-ThirdParty-v1.13.8 in Resources */,
-				2A2FDF3531C1000300000001 /* OpenMDW-1.1.txt in Resources */,
 				2A2FDF3731C1000300000001 /* model-NOTICE.txt in Resources */,
 				2A2FDF3B31C1000300000001 /* NOTICE.txt in Resources */,
 			);
@@ -377,7 +376,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"$SRCROOT/scripts/copy-models.sh\" \"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/Models\"\n";
+			shellScript = "\"$SRCROOT/scripts/copy-models.sh\" \"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/Models\" parakeet-tdt-0.6b-v3\n";
 		};
 		2A57A00131C2000100000001 /* Copy Models */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -400,7 +399,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"$SRCROOT/scripts/copy-models.sh\" \"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/Models\"\n";
+			shellScript = "\"$SRCROOT/scripts/copy-models.sh\" \"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/Models\" nemotron-3.5-asr-streaming-0.6b-1120ms\n";
 		};
 		7A53000131C6000100000015 /* Copy Models */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -423,7 +422,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"$SRCROOT/scripts/copy-models.sh\" \"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/Models\"\n";
+			shellScript = "\"$SRCROOT/scripts/copy-models.sh\" \"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/Models\" parakeet-tdt-0.6b-v3\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -670,7 +669,7 @@
 				CODE_SIGN_ENTITLEMENTS = yaprflow/yaprflow.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 24;
+				CURRENT_PROJECT_VERSION = 25;
 				DEVELOPMENT_TEAM = GVXC5FQ2RP;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -681,7 +680,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 5.2.11;
+				MARKETING_VERSION = 5.2.12;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tmoreton.yaprflow;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -703,7 +702,7 @@
 				CODE_SIGN_ENTITLEMENTS = yaprflow/yaprflow.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 24;
+				CURRENT_PROJECT_VERSION = 25;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = GVXC5FQ2RP;
 				ENABLE_APP_SANDBOX = YES;
@@ -715,7 +714,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 5.2.11;
+				MARKETING_VERSION = 5.2.12;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tmoreton.yaprflow;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -738,7 +737,7 @@
 				CODE_SIGN_ENTITLEMENTS = "yaprflow/yaprflow-AppStore.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 24;
+				CURRENT_PROJECT_VERSION = 25;
 				DEVELOPMENT_TEAM = GVXC5FQ2RP;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -749,7 +748,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 5.2.11;
+				MARKETING_VERSION = 5.2.12;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tmoreton.yaprflow;
 				PRODUCT_NAME = yaprflow;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -771,7 +770,7 @@
 				CODE_SIGN_ENTITLEMENTS = "yaprflow/yaprflow-AppStore.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 24;
+				CURRENT_PROJECT_VERSION = 25;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = GVXC5FQ2RP;
 				ENABLE_APP_SANDBOX = YES;
@@ -783,7 +782,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 5.2.11;
+				MARKETING_VERSION = 5.2.12;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tmoreton.yaprflow;
 				PRODUCT_NAME = yaprflow;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -854,6 +853,14 @@
 				version = 2.10.0;
 			};
 		};
+		B0FA000131D2000100000001 /* XCRemoteSwiftPackageReference "FluidAudio" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/FluidInference/FluidAudio";
+			requirement = {
+				kind = exactVersion;
+				version = 0.13.6;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -876,6 +883,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 2A57A00131C1000100000003 /* XCLocalSwiftPackageReference "SherpaOnnxASR" */;
 			productName = SherpaOnnxASR;
+		};
+		B0FA000131D2000100000002 /* FluidAudio */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B0FA000131D2000100000001 /* XCRemoteSwiftPackageReference "FluidAudio" */;
+			productName = FluidAudio;
+		};
+		B0FA000131D2000100000003 /* FluidAudio */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B0FA000131D2000100000001 /* XCRemoteSwiftPackageReference "FluidAudio" */;
+			productName = FluidAudio;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

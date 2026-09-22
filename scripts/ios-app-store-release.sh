@@ -341,7 +341,8 @@ verify_app_payload() {
         <(plutil -convert xml1 -o - "$app_path/PrivacyInfo.xcprivacy") \
         || fail "bundled PrivacyInfo.xcprivacy does not match the reviewed source"
 
-    yaprflow_verify_model_inventory "$app_path" "$MODEL_CHECKSUMS" \
+    yaprflow_verify_model_inventory \
+        "$app_path" "$MODEL_CHECKSUMS" "$YAPRFLOW_IOS_ASR_MODEL_DIR" \
         || fail "the bundled model inventory failed verification"
     if find "$app_path" -type f \
         \( -iname '*parakeet*' -o -iname '*zipformer*' -o -iname '*moonshine*' \) \
