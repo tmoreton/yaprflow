@@ -67,10 +67,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          xcodebuild -resolvePackageDependencies \
-            -project yaprflow.xcodeproj \
-            -scheme yaprflow \
-            -clonedSourcePackagesDirPath build/SourcePackages
+          sparkle_archive="build/Sparkle-for-Swift-Package-Manager-2.10.0.zip"
+          sparkle_root="build/SourcePackages/artifacts/sparkle/Sparkle"
+          mkdir -p "$sparkle_root"
+          curl --fail --location --proto '=https' --tlsv1.2 \
+            --retry 5 --retry-all-errors \
+            --output "$sparkle_archive" \
+            https://github.com/sparkle-project/Sparkle/releases/download/2.10.0/Sparkle-for-Swift-Package-Manager.zip
+          printf '%s  %s\n' \
+            17e28312b8e18ab7cdbbe09a6fb28cc55a5479ec6c371dbc07cdecd2a14fd959 \
+            "$sparkle_archive" | shasum -a 256 -c -
+          ditto -x -k "$sparkle_archive" "$sparkle_root"
           test -x build/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_appcast
           test -x build/SourcePackages/artifacts/sparkle/Sparkle/bin/sign_update
 
