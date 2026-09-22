@@ -1,38 +1,53 @@
 import SwiftUI
 
+enum NotchOverlayLayout {
+    static func size(for status: TranscriptionStatus) -> CGSize {
+        if case .error = status {
+            return CGSize(width: 480, height: 64)
+        }
+        return CGSize(width: 320, height: 44)
+    }
+}
+
 struct NotchOverlayView: View {
     @ObservedObject var state: AppState
 
-    private static let transcriptFont = Font.system(size: 15, weight: .medium)
-    private static let cornerRadius: CGFloat = 22
+    private static let statusFont = Font.system(size: 14, weight: .medium)
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
+        let size = NotchOverlayLayout.size(for: state.status)
+
+        HStack(alignment: .center, spacing: 10) {
             statusIndicator
-                .frame(width: 18, height: 18)
-                .padding(.top, 3)
+                .frame(width: 16, height: 16)
 
             if state.status == .listening {
                 LiveAudioLevelWaveform(level: state.audioLevel)
                     .frame(maxWidth: .infinity)
             } else {
                 Text(displayText)
-                    .font(Self.transcriptFont)
+                    .font(Self.statusFont)
                     .foregroundStyle(.white)
                     .multilineTextAlignment(.leading)
-                    .lineLimit(2)
+                    .lineLimit(isError ? 2 : 1)
+                    .truncationMode(.tail)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 10)
-        .frame(width: 520, height: 68, alignment: .leading)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .frame(width: size.width, height: size.height, alignment: .leading)
         .background(overlayShape.fill(Color.black.opacity(0.92)))
         .overlay(overlayShape.strokeBorder(Color.white.opacity(0.08), lineWidth: 1))
     }
 
+    private var isError: Bool {
+        if case .error = state.status { return true }
+        return false
+    }
+
     private var overlayShape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
+        RoundedRectangle(cornerRadius: 18, style: .continuous)
     }
 
     private var displayText: String {
@@ -83,15 +98,15 @@ struct NotchOverlayView: View {
 }
 
 private struct LiveAudioLevelWaveform: View {
-    private static let barCount = 48
-    private static let minimumBarHeight: CGFloat = 5
-    private static let maximumBarHeight: CGFloat = 30
+    private static let barCount = 36
+    private static let minimumBarHeight: CGFloat = 4
+    private static let maximumBarHeight: CGFloat = 24
 
     let level: Double
     @State private var history = [Double](repeating: 0, count: Self.barCount)
 
     var body: some View {
-        HStack(spacing: 5) {
+        HStack(spacing: 4) {
             ForEach(history.indices, id: \.self) { index in
                 Capsule(style: .continuous)
                     .fill(Color.white.opacity(0.72))

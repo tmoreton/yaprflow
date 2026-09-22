@@ -319,41 +319,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard let button = statusItem?.button else { return }
 
         let meetingPhase = MeetingSessionController.shared.phase
-        if meetingPhase == .recording || meetingPhase == .paused {
-            button.image = Self.statusItemImage(tint: meetingPhase == .paused ? .systemOrange : .systemRed)
-            button.toolTip = meetingPhase == .paused ? "Yaprflow meeting capture is paused" : "Yaprflow is recording a meeting"
-            button.setAccessibilityLabel(button.toolTip ?? "Yaprflow meeting capture")
-            button.contentTintColor = nil
-            return
-        }
-        if case let .preparing(message) = meetingPhase {
-            button.image = Self.statusItemImage(tint: .systemOrange)
-            button.toolTip = "Yaprflow Meeting Notes: \(message)"
-            button.setAccessibilityLabel(button.toolTip ?? "Yaprflow is preparing Meeting Notes")
-            button.contentTintColor = nil
-            return
-        }
-        if case let .finalizing(message) = meetingPhase {
-            button.image = Self.statusItemImage(tint: .systemOrange)
-            button.toolTip = "Yaprflow Meeting Notes: \(message)"
-            button.setAccessibilityLabel(button.toolTip ?? "Yaprflow is finalizing Meeting Notes")
-            button.contentTintColor = nil
-            return
-        }
-
         let status = AppState.shared.status
+        button.contentTintColor = nil
 
-        switch status {
-        case let .preparing(message):
-            button.image = Self.statusItemImage(tint: .systemOrange)
-            button.toolTip = "Yaprflow: \(message)"
-            button.setAccessibilityLabel("Yaprflow is preparing to record: \(message)")
-        case .listening:
+        // An active recording takes priority over any other work the app may
+        // still be finishing. A paused meeting remains an active session.
+        if status == .listening {
             button.image = Self.statusItemImage(tint: .systemRed)
             button.toolTip = "Yaprflow is recording"
             button.setAccessibilityLabel("Yaprflow is recording")
+            return
+        }
+        if meetingPhase == .recording || meetingPhase == .paused {
+            button.image = Self.statusItemImage(tint: .systemRed)
+            button.toolTip = meetingPhase == .paused ? "Yaprflow meeting capture is paused" : "Yaprflow is recording a meeting"
+            button.setAccessibilityLabel(button.toolTip ?? "Yaprflow meeting capture")
+            return
+        }
+        if case let .preparing(message) = meetingPhase {
+            button.image = Self.statusItemImage(tint: .systemYellow)
+            button.toolTip = "Yaprflow Meeting Notes: \(message)"
+            button.setAccessibilityLabel(button.toolTip ?? "Yaprflow is preparing Meeting Notes")
+            return
+        }
+        if case let .finalizing(message) = meetingPhase {
+            button.image = Self.statusItemImage(tint: .systemYellow)
+            button.toolTip = "Yaprflow Meeting Notes: \(message)"
+            button.setAccessibilityLabel(button.toolTip ?? "Yaprflow is finalizing Meeting Notes")
+            return
+        }
+
+        switch status {
+        case let .preparing(message):
+            button.image = Self.statusItemImage(tint: .systemYellow)
+            button.toolTip = "Yaprflow: \(message)"
+            button.setAccessibilityLabel("Yaprflow is preparing to record: \(message)")
+        case .listening:
+            break // Handled above so recording always wins.
         case let .error(message):
-            button.image = Self.statusItemImage(tint: .systemOrange)
+            button.image = Self.statusItemImage()
             button.toolTip = "Yaprflow: \(message)"
             button.setAccessibilityLabel("Yaprflow error: \(message)")
         default:
@@ -362,11 +366,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             button.setAccessibilityLabel("Yaprflow")
         }
 
-        // A template image can be recolored by the menu bar after
-        // `contentTintColor` is applied, which made the recording state turn
-        // black on some appearances. Colored states above use palette-rendered
-        // non-template images, so keep AppKit's secondary tint disabled.
-        button.contentTintColor = nil
+        // Colored states use palette-rendered non-template images. Applying
+        // contentTintColor to the button can recolor them unexpectedly.
     }
 
     private static func statusItemImage(tint: NSColor? = nil) -> NSImage? {
@@ -535,6 +536,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             try? await Task.sleep(for: .milliseconds(300))
             let copiedResult = NotchOverlayWindowController.shared.smokeTestDescription
 
+            state.status = .error("Audio processing fell behind; copied text may be incomplete")
+            try? await Task.sleep(for: .milliseconds(300))
+            let errorResult = NotchOverlayWindowController.shared.smokeTestDescription
+
+            state.status = .copied
+            try? await Task.sleep(for: .milliseconds(300))
+            let compactAgainResult = NotchOverlayWindowController.shared.smokeTestDescription
+
             state.setDesktopPreviewEnabledForSmokeTest(false)
             try? await Task.sleep(for: .milliseconds(400))
             let hidWhenDisabled = NotchOverlayWindowController.shared.isHiddenForSmokeTest
@@ -547,9 +556,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 && preparingResult.hasPrefix("PASS")
                 && listeningResult.hasPrefix("PASS")
                 && copiedResult.hasPrefix("PASS")
+                && errorResult.hasPrefix("PASS")
+                && compactAgainResult.hasPrefix("PASS")
                 && hidWhenDisabled
                 && reenabledResult.hasPrefix("PASS")
-            let output = "YAPRFLOW_PREVIEW_SMOKE_TEST=\(succeeded ? "PASS" : "FAIL") disabled=\(stayedHiddenWhenDisabled) preparing=[\(preparingResult)] listening=[\(listeningResult)] copied=[\(copiedResult)] toggleOff=\(hidWhenDisabled) toggleOn=[\(reenabledResult)]\n"
+            let output = "YAPRFLOW_PREVIEW_SMOKE_TEST=\(succeeded ? "PASS" : "FAIL") disabled=\(stayedHiddenWhenDisabled) preparing=[\(preparingResult)] listening=[\(listeningResult)] copied=[\(copiedResult)] error=[\(errorResult)] compactAgain=[\(compactAgainResult)] toggleOff=\(hidWhenDisabled) toggleOn=[\(reenabledResult)]\n"
             FileHandle.standardOutput.write(Data(output.utf8))
 
             state.status = .idle

@@ -9,8 +9,6 @@ private let overlayLog = Logger(subsystem: "com.tmoreton.yaprflow", category: "D
 final class NotchOverlayWindowController: NSWindowController, NSWindowDelegate {
     static let shared = NotchOverlayWindowController()
 
-    private static let previewWidth: CGFloat = 520
-    private static let previewHeight: CGFloat = 68
     private static let topMargin: CGFloat = 8
     private var visibilitySequence = 0
     private var hasPositionedWindow = false
@@ -23,8 +21,9 @@ final class NotchOverlayWindowController: NSWindowController, NSWindowDelegate {
         // can otherwise resize the window from inside AppKit's layout pass.
         host.sizingOptions = []
 
+        let initialSize = NotchOverlayLayout.size(for: AppState.shared.status)
         let window = NotchOverlayWindow(
-            contentRect: NSRect(x: 0, y: 0, width: Self.previewWidth, height: Self.previewHeight),
+            contentRect: NSRect(origin: .zero, size: initialSize),
             styleMask: [.borderless],
             backing: .buffered,
             defer: false
@@ -45,7 +44,7 @@ final class NotchOverlayWindowController: NSWindowController, NSWindowDelegate {
         // NSHostingController can report a zero intrinsic size while the
         // preview state is idle. Keep a deterministic content size so the
         // first loading/listening update cannot leave an invisible 0×0 panel.
-        window.setContentSize(NSSize(width: Self.previewWidth, height: Self.previewHeight))
+        window.setContentSize(initialSize)
         window.delegate = self
 
         // Treat visibility as derived state instead of relying on a single
@@ -125,10 +124,12 @@ final class NotchOverlayWindowController: NSWindowController, NSWindowDelegate {
 
     var smokeTestDescription: String {
         guard let window else { return "FAIL window=missing" }
+        let expectedSize = NotchOverlayLayout.size(for: AppState.shared.status)
         let intersectsDisplay = NSScreen.screens.contains { $0.frame.intersects(window.frame) }
-        let hasUsableSize = window.frame.width >= 500 && window.frame.height >= 60
-        let contentHasUsableSize = (window.contentView?.bounds.width ?? 0) >= 500
-            && (window.contentView?.bounds.height ?? 0) >= 60
+        let hasUsableSize = abs(window.frame.width - expectedSize.width) < 1
+            && abs(window.frame.height - expectedSize.height) < 1
+        let contentHasUsableSize = abs((window.contentView?.bounds.width ?? 0) - expectedSize.width) < 1
+            && abs((window.contentView?.bounds.height ?? 0) - expectedSize.height) < 1
         let contentRendered = renderedContentIsVisible(in: window)
         let compositorOnScreen = isWindowOnScreen(window)
         let succeeded = window.isVisible
@@ -155,7 +156,17 @@ final class NotchOverlayWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func prepareForDisplay(_ window: NSWindow) {
-        window.setContentSize(NSSize(width: Self.previewWidth, height: Self.previewHeight))
+        let size = NotchOverlayLayout.size(for: AppState.shared.status)
+        if window.frame.size != size {
+            let previousFrame = window.frame
+            window.setContentSize(size)
+            if hasPositionedWindow {
+                window.setFrameOrigin(NSPoint(
+                    x: previousFrame.midX - window.frame.width / 2,
+                    y: previousFrame.maxY - window.frame.height
+                ))
+            }
+        }
         window.contentView?.needsLayout = true
         window.contentView?.needsDisplay = true
     }
@@ -193,8 +204,8 @@ final class NotchOverlayWindowController: NSWindowController, NSWindowDelegate {
     private func positionOnScreenIfNeeded(_ window: NSWindow, preferredScreen: NSScreen?) {
         let isAlreadyOnScreen = NSScreen.screens.contains { $0.visibleFrame.intersects(window.frame) }
         guard !hasPositionedWindow || !isAlreadyOnScreen, let screen = preferredScreen else { return }
-        let w = Self.previewWidth
-        let h = Self.previewHeight
+        let w = window.frame.width
+        let h = window.frame.height
         let x = screen.frame.midX - w / 2
         let y = screen.visibleFrame.maxY - h - Self.topMargin
         let target = NSRect(x: x, y: y, width: w, height: h)
