@@ -514,7 +514,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func runPreviewSmokeTest() {
         let state = AppState.shared
         let originalPreference = state.isDesktopPreviewEnabled
-        state.liveTranscript = ""
+        state.audioLevel = 0
         state.setDesktopPreviewEnabledForSmokeTest(false)
         state.status = .preparing("Loading voice model…")
 
@@ -526,7 +526,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             try? await Task.sleep(for: .milliseconds(300))
             let preparingResult = NotchOverlayWindowController.shared.smokeTestDescription
 
-            state.liveTranscript = "This is simulated live transcript text."
+            state.audioLevel = 0.75
             state.status = .listening
             try? await Task.sleep(for: .milliseconds(300))
             let listeningResult = NotchOverlayWindowController.shared.smokeTestDescription
@@ -553,7 +553,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             FileHandle.standardOutput.write(Data(output.utf8))
 
             state.status = .idle
-            state.liveTranscript = ""
+            state.audioLevel = 0
             state.setDesktopPreviewEnabledForSmokeTest(originalPreference)
             NSApp.terminate(nil)
         }

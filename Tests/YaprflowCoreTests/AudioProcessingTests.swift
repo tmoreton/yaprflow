@@ -6,6 +6,19 @@ import Testing
 
 @Suite("Shared audio processing", .serialized)
 struct AudioProcessingTests {
+    @Test("Audio meter maps silence and speech into a bounded display level")
+    func audioLevelMeter() {
+        let silence = AudioLevelMeter.normalizedLevel(for: [Float](repeating: 0, count: 512))
+        let quiet = AudioLevelMeter.normalizedLevel(for: [Float](repeating: 0.002, count: 512))
+        let speech = AudioLevelMeter.normalizedLevel(for: [Float](repeating: 0.2, count: 512))
+        let clipped = AudioLevelMeter.normalizedLevel(for: [Float](repeating: 2, count: 512))
+
+        #expect(silence == 0)
+        #expect(quiet > silence)
+        #expect(speech > quiet)
+        #expect(clipped == 1)
+    }
+
     @MainActor
     @Test("Stateful converter preserves a one-second stream across buffer boundaries")
     func streamingConversion() throws {

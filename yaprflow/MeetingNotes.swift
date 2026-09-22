@@ -911,7 +911,7 @@ private struct LiveMeetingWorkspace: View {
     }
 
     private func openScreenCaptureSettings() {
-        _ = MeetingSystemAudioCapture.requestAuthorizationIfNeeded()
+        MeetingSystemAudioCapture.requestAuthorizationIfNeeded()
         if !MeetingSystemAudioCapture.isAuthorized {
             MeetingSystemAudioCapture.openPrivacySettings()
         }

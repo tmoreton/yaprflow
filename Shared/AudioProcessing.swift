@@ -10,6 +10,33 @@
 @preconcurrency import CoreML
 import Foundation
 
+/// Converts PCM amplitude into a stable 0...1 value for recording UI meters.
+/// The logarithmic scale keeps ordinary speech visibly responsive without
+/// letting a single clipped sample dominate the display.
+nonisolated enum AudioLevelMeter {
+    static func normalizedLevel(
+        for samples: [Float],
+        floorDecibels: Float = -55,
+        ceilingDecibels: Float = -8
+    ) -> Float {
+        guard !samples.isEmpty, ceilingDecibels > floorDecibels else { return 0 }
+
+        var sumOfSquares: Double = 0
+        for sample in samples {
+            let value = Double(sample)
+            sumOfSquares += value * value
+        }
+        let rootMeanSquare = sqrt(sumOfSquares / Double(samples.count))
+        guard rootMeanSquare > 0 else { return 0 }
+
+        let decibels = Float(20 * log10(rootMeanSquare))
+        return min(
+            1,
+            max(0, (decibels - floorDecibels) / (ceilingDecibels - floorDecibels))
+        )
+    }
+}
+
 /// A reusable, low-latency PCM converter for microphone buffers.
 ///
 /// `AVAudioConverter` preserves its sample-rate state across adjacent capture

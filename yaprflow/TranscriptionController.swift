@@ -148,7 +148,6 @@ final class TranscriptionController {
     private var currentSpeechFedThrough: Int?
     private var lastFinalizedAudioEnd = 0
     private var confirmedText = ""
-    private var volatileText = ""
     private var vocabularyReplacementCount = 0
     private var sessionSourceApplication: String?
     private var audioWorkerTask: Task<Void, Never>?
@@ -180,7 +179,6 @@ final class TranscriptionController {
     private static let hardSegmentSamples = 30 * sampleRate
     private static let shortRecordingFallbackSamples = hardSegmentSamples
     private static let forcedSegmentOverlapSamples = sampleRate / 2
-    private static let livePreviewCharacterLimit = 512
 
     // Natural pauses are preferred boundaries. The controller independently
     // enforces the 30-second segment ceiling used by the speech recognizer.
@@ -236,7 +234,7 @@ final class TranscriptionController {
                 // either abandon the pending start or resume it when the shared
                 // cold-load task completes.
                 startRequested.toggle()
-                state.liveTranscript = ""
+                state.audioLevel = 0
                 state.status = startRequested
                     ? .preparing("Preparing voice model…")
                     : .idle
@@ -412,7 +410,6 @@ final class TranscriptionController {
         modelUnloadTask?.cancel()
         modelUnloadTask = nil
         confirmedText = ""
-        volatileText = ""
         vocabularyReplacementCount = 0
         transcriptProcessor = state.makeTranscriptProcessor()
         sessionSourceApplication = Self.frontmostApplicationName()
@@ -422,7 +419,7 @@ final class TranscriptionController {
         lastFinalizedAudioEnd = 0
         recognizerStreamHasLeadingOverlap = false
         recognitionFailure = nil
-        state.liveTranscript = ""
+        state.audioLevel = 0
         // Present honest startup progress immediately. Do not claim to be
         // listening until the recognizer is ready and microphone capture has
         // actually started.
@@ -528,7 +525,7 @@ final class TranscriptionController {
         startRequested = false
         autoHideTask?.cancel()
         capture.stop()
-        state.liveTranscript = ""
+        state.audioLevel = 0
         state.status = .idle
 
         // AudioCapture.stop() drains callbacks already executing. Finish the
@@ -689,6 +686,9 @@ final class TranscriptionController {
     }
 
     private func feed(_ samples: [Float]) async {
+        let measuredLevel = Double(AudioLevelMeter.normalizedLevel(for: samples))
+        state.audioLevel = state.audioLevel * 0.35 + measuredLevel * 0.65
+
         let appendStart = sessionAudio.endIndex
         sessionAudio.append(samples)
 
@@ -896,8 +896,6 @@ final class TranscriptionController {
             )
             vocabularyReplacementCount += processed.vocabularyReplacementCount
         }
-        volatileText = ""
-        state.liveTranscript = livePreviewText()
     }
 
     private func processRecognizerText(_ rawText: String) -> TranscriptProcessingResult {
@@ -936,25 +934,6 @@ final class TranscriptionController {
     private static let standalonePronounRegex = try! NSRegularExpression(
         pattern: #"\bi\b"#
     )
-
-    private func livePreviewText() -> String {
-        let volatileTail = String(volatileText.suffix(Self.livePreviewCharacterLimit))
-        let separatorCount = confirmedText.isEmpty || volatileTail.isEmpty ? 0 : 1
-        let confirmedBudget = max(
-            0,
-            Self.livePreviewCharacterLimit - volatileTail.count - separatorCount
-        )
-        let confirmedTail = String(confirmedText.suffix(confirmedBudget))
-
-        let text: String
-        switch (confirmedTail.isEmpty, volatileTail.isEmpty) {
-        case (true, true):   text = ""
-        case (false, true):  text = confirmedTail
-        case (true, false):  text = volatileTail
-        case (false, false): text = confirmedTail + " " + volatileTail
-        }
-        return TranscriptSegments.capitalizingFirstLetter(in: text)
-    }
 
     private static func frontmostApplicationName() -> String? {
         NSWorkspace.shared.frontmostApplication?.localizedName
@@ -1133,7 +1112,7 @@ final class TranscriptionController {
                 return
             }
             state.status = .idle
-            state.liveTranscript = ""
+            state.audioLevel = 0
         }
     }
 

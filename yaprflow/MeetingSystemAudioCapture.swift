@@ -105,11 +105,14 @@ final class MeetingSystemAudioCapture {
 
     /// Registers Yaprflow with macOS and presents the native permission prompt
     /// the first time Meeting Notes needs Screen & System Audio access.
-    @discardableResult
-    static func requestAuthorizationIfNeeded() -> Bool {
-        guard !isAuthorized else { return true }
+    ///
+    /// `CGPreflightScreenCaptureAccess()` is advisory here. macOS can briefly
+    /// report `false` after Sparkle replaces and relaunches an authorized app,
+    /// even though ScreenCaptureKit can use the existing grant. The capture
+    /// attempt below is the authoritative check.
+    static func requestAuthorizationIfNeeded() {
+        guard !isAuthorized else { return }
         _ = CGRequestScreenCaptureAccess()
-        return isAuthorized
     }
 
     static func openPrivacySettings() {
@@ -121,7 +124,6 @@ final class MeetingSystemAudioCapture {
 
     func start() async throws {
         guard stream == nil else { return }
-        guard Self.isAuthorized else { throw MeetingSystemAudioError.permissionDenied }
         let content = try await SCShareableContent.excludingDesktopWindows(
             false,
             onScreenWindowsOnly: true

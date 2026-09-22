@@ -118,7 +118,7 @@ final class AppState: ObservableObject {
     private var shouldPersistDesktopPreviewPreference = true
 
     @Published var status: TranscriptionStatus = .idle
-    @Published var liveTranscript: String = ""
+    @Published var audioLevel: Double = 0
     @Published var hotkey: HotkeyConfig = HotkeyConfig.load() ?? .defaultHotkey
     @Published var isDesktopPreviewEnabled: Bool {
         didSet {

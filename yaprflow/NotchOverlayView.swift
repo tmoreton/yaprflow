@@ -4,7 +4,6 @@ struct NotchOverlayView: View {
     @ObservedObject var state: AppState
 
     private static let transcriptFont = Font.system(size: 15, weight: .medium)
-    private static let maxCharsPerLine = 56
     private static let cornerRadius: CGFloat = 22
 
     var body: some View {
@@ -13,7 +12,10 @@ struct NotchOverlayView: View {
                 .frame(width: 18, height: 18)
                 .padding(.top, 3)
 
-            VStack(alignment: .leading, spacing: 2) {
+            if state.status == .listening {
+                LiveAudioLevelWaveform(level: state.audioLevel)
+                    .frame(maxWidth: .infinity)
+            } else {
                 Text(displayText)
                     .font(Self.transcriptFont)
                     .foregroundStyle(.white)
@@ -21,7 +23,6 @@ struct NotchOverlayView: View {
                     .lineLimit(2)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 10)
@@ -41,7 +42,7 @@ struct NotchOverlayView: View {
         case .preparing(let message):
             return message
         case .listening:
-            return state.liveTranscript.isEmpty ? "Listening…" : Self.wrappedTail(of: state.liveTranscript)
+            return "Listening…"
         case .copied:
             return copiedDisplayText
         case .error(let message):
@@ -52,29 +53,6 @@ struct NotchOverlayView: View {
     /// Shows appropriate text for the copied state.
     private var copiedDisplayText: String {
         return "Copied to clipboard"
-    }
-
-    private static func wrappedTail(of text: String) -> String {
-        wrapLines(text, maxCharsPerLine: maxCharsPerLine)
-            .suffix(2)
-            .joined(separator: "\n")
-    }
-
-    private static func wrapLines(_ text: String, maxCharsPerLine: Int) -> [String] {
-        let words = text.split(separator: " ", omittingEmptySubsequences: true)
-        var lines: [String] = []
-        var current = ""
-        for word in words {
-            let candidate: String = current.isEmpty ? String(word) : current + " " + word
-            if candidate.count <= maxCharsPerLine {
-                current = candidate
-            } else {
-                if !current.isEmpty { lines.append(current) }
-                current = word.count > maxCharsPerLine ? String(word.prefix(maxCharsPerLine)) : String(word)
-            }
-        }
-        if !current.isEmpty { lines.append(current) }
-        return lines
     }
 
     @ViewBuilder
@@ -101,6 +79,39 @@ struct NotchOverlayView: View {
         case .idle:
             Color.clear
         }
+    }
+}
+
+private struct LiveAudioLevelWaveform: View {
+    private static let barCount = 48
+    private static let minimumBarHeight: CGFloat = 5
+    private static let maximumBarHeight: CGFloat = 30
+
+    let level: Double
+    @State private var history = [Double](repeating: 0, count: Self.barCount)
+
+    var body: some View {
+        HStack(spacing: 5) {
+            ForEach(history.indices, id: \.self) { index in
+                Capsule(style: .continuous)
+                    .fill(Color.white.opacity(0.72))
+                    .frame(width: 3, height: barHeight(for: history[index]))
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: Self.maximumBarHeight)
+        .animation(.easeOut(duration: 0.12), value: history)
+        .onChange(of: level) { _, newLevel in
+            history.removeFirst()
+            history.append(min(1, max(0, newLevel)))
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Microphone audio level")
+        .accessibilityValue("\(Int(min(1, max(0, level)) * 100)) percent")
+    }
+
+    private func barHeight(for sample: Double) -> CGFloat {
+        Self.minimumBarHeight
+            + CGFloat(sample) * (Self.maximumBarHeight - Self.minimumBarHeight)
     }
 }
 

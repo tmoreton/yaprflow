@@ -261,10 +261,7 @@ final class MeetingSessionController: ObservableObject {
             try await ensureMicrophonePermission()
             try microphone.validateInputAvailable()
             phase = .preparing("Requesting Screen & System Audio access…")
-            guard MeetingSystemAudioCapture.requestAuthorizationIfNeeded() else {
-                MeetingSystemAudioCapture.openPrivacySettings()
-                throw MeetingSystemAudioError.permissionDenied
-            }
+            MeetingSystemAudioCapture.requestAuthorizationIfNeeded()
             phase = .preparing("Loading meeting transcription models…")
             let recognizer = try await TranscriptionController.shared
                 .speechRecognizerForMeeting()
