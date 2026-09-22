@@ -303,7 +303,7 @@ and build number for each release.
 The website, Stripe checkout, and private download service live together in
 [`checkout/`](checkout/README.md). The test purchase and private file delivery
 have been verified in Vercel Preview. Production is live at the confirmed US
-$7.99 one-time price and points to the verified Yaprflow 5.2.9 installer. The
+$7.99 one-time price and points to the verified Yaprflow 5.2.10 installer. The
 original site remains preserved in `docs/`.
 The release script verifies the bundled app,
 entitlements, notices, privacy manifest, and model hashes before it publishes
@@ -336,7 +336,7 @@ every release must therefore increment `CURRENT_PROJECT_VERSION` as well as the
 marketing version.
 
 The stable feed is `https://yaprflow.com/appcast.xml`. It currently offers
-Yaprflow 5.2.9 build 22; Yaprflow 5.2.8 was the first published updater release.
+Yaprflow 5.2.10 build 23; Yaprflow 5.2.8 was the first published updater release.
 Updater archives are stored in the isolated public Vercel Blob store
 `yaprflow-sparkle-updates`. Each immutable URL uses an opaque path and randomized
 filename and is referenced only by the signed feed; it is not linked from the
@@ -344,7 +344,7 @@ website, checkout, sitemap, or paid-download endpoint. The customer download
 remains in the separate private Blob store. To stage a later signed release, run:
 
 ```bash
-DIRECT_BUILD_NUMBER=23 \
+DIRECT_BUILD_NUMBER=24 \
   scripts/release.sh 5.3.0
 
 SPARKLE_DOWNLOAD_URL_PREFIX=https://<public-store>.public.blob.vercel-storage.com/updates/5.3.0/<opaque-id>/ \

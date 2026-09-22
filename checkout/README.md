@@ -2,19 +2,19 @@
 
 This directory contains the redesigned landing page, policies, support, Stripe checkout, and private Mac download flow in one Vercel project: `tmoretons-projects/yaprflow-checkout`.
 
-The redesigned website and enabled live Stripe checkout are published at `https://yaprflow.com/`, with the US $7.99 one-time price verified. The active release points to the signed and notarized Mac 5.2.9 installer. Google and Meta tracking are enabled by default when no saved choice exists, with changes available through **Cookie settings** and no automatic bottom bar. The direct-purchase terms include a 14-day refund policy. No real live purchase has been made during verification.
+The redesigned website and enabled live Stripe checkout are published at `https://yaprflow.com/`, with the US $7.99 one-time price verified. The active release points to the signed and notarized Mac 5.2.10 installer. Google and Meta tracking are enabled by default when no saved choice exists, with changes available through **Cookie settings** and no automatic bottom bar. The direct-purchase terms include a 14-day refund policy. No real live purchase has been made during verification.
 
-## Current setup — September 21, 2026
+## Current setup — September 22, 2026
 
-Production is READY and aliased to `yaprflow.com`. It publishes the channel-specific purchase and update disclosure: direct purchases receive the private Stripe download and Sparkle updates, while Mac App Store purchases and updates are handled by Apple. The checkout links to the published purchase and license terms, including the 14-day refund policy, without requiring a separate acceptance checkbox. The signed Sparkle feed offers Mac 5.2.9 build 22 from an isolated, unlisted public updater Blob, and the OpenAI Realtime microphone demo remains enabled.
+Production is READY and aliased to `yaprflow.com`. It publishes the channel-specific purchase and update disclosure: direct purchases receive the private Stripe download and Sparkle updates, while Mac App Store purchases and updates are handled by Apple. The checkout links to the published purchase and license terms, including the 14-day refund policy, without requiring a separate acceptance checkbox. The signed Sparkle feed offers Mac 5.2.10 build 23 from an isolated, unlisted public updater Blob, and the OpenAI Realtime microphone demo remains enabled.
 
-Live Production settings are `CHECKOUT_ENABLED=true`, `CHECKOUT_BASE_URL=https://yaprflow.com`, and `BLOB_PATHNAME=releases/yaprflow-5.2.9.dmg`. Public `/api/config` verifies `enabled: true`, `mode: "live"`, price `{amount: 799, currency: "usd", formatted: "$7.99"}`, `downloadReady: true`, and `voiceDemoAvailable: true`. The live product is `prod_VHf8LJ6S6B1Rk6`, and the live Price ID is `price_1UH5oDAlzJZxFihrxO8VSy8p`.
+Live Production settings are `CHECKOUT_ENABLED=true`, `CHECKOUT_BASE_URL=https://yaprflow.com`, and `BLOB_PATHNAME=releases/yaprflow-5.2.10.dmg`. Public `/api/config` verifies `enabled: true`, `mode: "live"`, price `{amount: 799, currency: "usd", formatted: "$7.99"}`, `downloadReady: true`, and `voiceDemoAvailable: true`. The live product is `prod_VHf8LJ6S6B1Rk6`, and the live Price ID is `price_1UH5oDAlzJZxFihrxO8VSy8p`.
 
-Production checks passed for enabled live price/configuration, version 5.2.9 metadata, the signed feed, the published purchase terms, the private confirmation and cookie flow, and unauthorized download denial. A same-origin checkout request returned HTTP 303 to `checkout.stripe.com`. No personal or card details were entered, and no payment was submitted. Paid live delivery and vendor analytics dashboard receipt remain unverified.
+Production checks passed for enabled live price/configuration, version 5.2.10 metadata, the signed feed, the published purchase terms, the private confirmation and cookie flow, and unauthorized download denial. A same-origin checkout request returned HTTP 303 to `checkout.stripe.com`. No personal or card details were entered, and no payment was submitted. Paid live delivery and vendor analytics dashboard receipt remain unverified.
 
-The local prebuilt Production build passed. It generated the expected Node.js 24 API functions with zero environment-override keys, the correct project and Production target, the intended canonical www redirect, and public output excluding credentials and paid-download installers. The latest full suite passed 100 website tests and 59 shared app tests. Universal optimized Release builds passed for both Mac schemes; bundle inspection confirmed that only the direct edition contains and links Sparkle. The iOS App Store export passed. The Mac App Store archive compiled, but its installer export is blocked until the missing Mac Installer Distribution private certificate is restored.
+The local prebuilt Production build passed. It generated the expected Node.js 24 API functions with zero environment-override keys, the correct project and Production target, the intended canonical www redirect, and public output excluding credentials and paid-download installers. The latest full suite passed 100 website tests and 63 shared app tests. The universal optimized direct Mac Release and iOS Release targets compiled successfully. Earlier bundle inspection confirmed that only the direct Mac edition contains and links Sparkle. The existing iOS App Store export remains verified. The Mac App Store archive compiled, but its installer export is blocked until the missing Mac Installer Distribution private certificate is restored.
 
-Yaprflow 5.2.9 (build 22) is signed, notarized, stapled, and accepted by Gatekeeper, with arm64 and x86_64 support. Its private and updater uploads both passed full-file size and checksum comparisons, and unauthenticated access to the private artifact returned 403. Production points to that artifact; paid live delivery remains unverified. The existing iOS 1.0.0 build 8 IPA and Mac App Store 5.2.8 build 21 archive were not rebuilt or uploaded for this direct-download maintenance release. The original 5.1.0 installer is preserved.
+Yaprflow 5.2.10 (build 23) is signed, notarized, stapled, and accepted by Gatekeeper, with arm64 and x86_64 support. Its private and updater uploads both passed full-file size and checksum comparisons, and unauthenticated access to the private artifact returned 403. Production points to that artifact; paid live delivery remains unverified. The existing iOS 1.0.0 build 8 IPA and Mac App Store 5.2.8 build 21 archive were not rebuilt or uploaded for this direct-download maintenance release. The original 5.1.0 installer is preserved.
 
 Namecheap DNS was saved and rechecked: apex A `216.150.1.1`, and `www` CNAME `49cac89f54e8a17a.vercel-dns-016.com`. Google DNS-over-HTTPS returns those records. TLS checks pass for both domains, and the current public smoke checks verify www redirects to the apex. The old GitHub Pages A records were removed; existing mail forwarding and SPF were preserved.
 
@@ -66,7 +66,7 @@ Asset directories reject hidden files, symlinks, and unexpected extensions. Sour
 
 `appcast.xml` is the public, signed Sparkle 2 update feed for the paid website
 edition. The Mac App Store edition excludes Sparkle and receives updates from
-Apple. Mac 5.2.9 build 22 is the current enclosure. Its DMG lives in the
+Apple. Mac 5.2.10 build 23 is the current enclosure. Its DMG lives in the
 separate `yaprflow-sparkle-updates` public Blob store under an opaque immutable
 path and randomized filename. It is absent from website navigation, checkout,
 the sitemap, and the private purchase-download API. Publish and checksum-verify
@@ -74,7 +74,7 @@ the updater archive before replacing this feed with the signed output from
 `../scripts/prepare-sparkle-update.sh`; otherwise installed apps could discover
 an update they cannot download.
 
-The old `/privacy.html` route redirects to `/policies/#privacy`. The landing page, purchase confirmation, policies, and support share the new branding. Files under `assets/brand/` include the matching website favicon and icon artwork applied to the signed and notarized Mac 5.2.9 build. Its private upload is verified and configured in the active checkout release. The original 5.1.0 installer remains preserved.
+The old `/privacy.html` route redirects to `/policies/#privacy`. The landing page, purchase confirmation, policies, and support share the new branding. Files under `assets/brand/` include the matching website favicon and icon artwork applied to the signed and notarized Mac 5.2.10 build. Its private upload is verified and configured in the active checkout release. The original 5.1.0 installer remains preserved.
 
 Public pages use `yaprflow.com` canonical URLs. `robots.txt` allows the website, excludes API routes, and links to a sitemap containing only the landing page, policies, and support. The private confirmation page retains its separate `noindex` metadata and response header and is absent from the sitemap.
 
@@ -113,7 +113,7 @@ cannot interrupt paid browser delivery.
 | `CHECKOUT_ENABLED` | Exactly `true` enables new checkout sessions when all other settings and the Stripe price are valid. Unset or `false` keeps checkout disabled. |
 | `STRIPE_ALLOWED_PRICE_IDS` | Optional comma-separated previous Price IDs whose paid purchasers should retain access. The current Price ID is always included. |
 | `CHECKOUT_BASE_URL` | Canonical HTTPS origin for checkout redirects. Required in Production; use the actual origin that serves these handlers. Local development permits HTTP on localhost. |
-| `BLOB_PATHNAME` | Fixed private installer path. Active Production uses the verified `releases/yaprflow-5.2.9.dmg`. |
+| `BLOB_PATHNAME` | Fixed private installer path. Active Production uses the verified `releases/yaprflow-5.2.10.dmg`. |
 | `BLOB_READ_WRITE_TOKEN` | Token for the private Blob store. Keep server-side and never commit it. |
 | `DOWNLOAD_LINK_SECRET` | Stable random secret of at least 32 characters used to sign cross-device purchase links. Rotating it invalidates links already emailed. |
 | `RESEND_API_KEY` | Server-only Resend credential used for transactional purchase delivery and opted-in newsletter contacts. |
@@ -166,15 +166,15 @@ Earlier browser checks confirmed all three settings buttons fit at 390 pixels wi
 
 ## Mac installer status
 
-The signed universal Mac app 5.2.9 (build 22) includes the full-bleed red icon at all ten required sizes. Apple accepted both the app and DMG for notarization; both are stapled and Gatekeeper accepted. The app passed deep, strict signature verification, stapler validation, and Gatekeeper assessment. It contains arm64 and x86_64 architectures.
+The signed universal Mac app 5.2.10 (build 23) includes the full-bleed red icon at all ten required sizes. Apple accepted both the app and DMG for notarization; both are stapled and Gatekeeper accepted. The app passed deep, strict signature verification, stapler validation, and Gatekeeper assessment. It contains arm64 and x86_64 architectures.
 
-- Local file: `../build/yaprflow-5.2.9.dmg`.
-- Private Blob pathname: `releases/yaprflow-5.2.9.dmg` in `yaprflow-private-downloads`.
+- Local file: `../build/yaprflow-5.2.10.dmg`.
+- Private Blob pathname: `releases/yaprflow-5.2.10.dmg` in `yaprflow-private-downloads`.
 - Updater copy: isolated `yaprflow-sparkle-updates` public store, opaque immutable path, randomized filename, and no website or sitemap link.
-- Size: 493,894,620 bytes.
-- SHA-256: `c1bdce33ed13e11911b6a90f3dd42e812cac9df3778250a5cc91cc51e33d35c5`.
+- Size: 493,898,860 bytes.
+- SHA-256: `65a716f33ea410f6de8ce641b53fa6f76604dfbfaeda9f1d90b4d55caedb7f51`.
 
-The full uploaded 5.2.9 file was downloaded back from both storage locations; each copy's size and SHA-256 match the local release. An unauthenticated private download returned 403. Active Production uses that private path. These checks establish the uploaded artifact's integrity; no paid live purchase or customer download was performed.
+The full uploaded 5.2.10 file was downloaded back from both storage locations; each copy's size and SHA-256 match the local release. An unauthenticated private download returned 403. Active Production uses that private path. These checks establish the uploaded artifact's integrity; no paid live purchase or customer download was performed.
 
 The private store is `yaprflow-private-downloads`. The preserved and previously verified Yaprflow 5.1.0 Mac release is:
 
@@ -207,10 +207,10 @@ For each release, complete the browser flow in a Preview deployment using Stripe
 
 Do not promote the sandbox deployment to Production: deployments retain their environment configuration. Create a fresh Production deployment with verified live credentials instead.
 
-Production is READY and publicly aliased. Direct buyers can proceed straight to Stripe Checkout; the published customer license and 14-day refund policy remain linked from the offer. The Mac 5.2.9 private artifact is fully checksum-verified and configured for browser delivery. The Resend sender domain is verified, the live Stripe webhook is active, all fulfillment credentials are configured, and paid buyers receive an idempotent private recovery email. Optional newsletter enrollment remains separate and applies only to explicit opt-ins. Actual GA/Meta dashboard event receipt remains unverified. The website's offer and metadata reflect US $7.99 plus applicable tax; update those alongside Stripe if the public price changes later. Do not expose the sandbox configuration as the live checkout.
+Production is READY and publicly aliased. Direct buyers can proceed straight to Stripe Checkout; the published customer license and 14-day refund policy remain linked from the offer. The Mac 5.2.10 private artifact is fully checksum-verified and configured for browser delivery. The Resend sender domain is verified, the live Stripe webhook is active, all fulfillment credentials are configured, and paid buyers receive an idempotent private recovery email. Optional newsletter enrollment remains separate and applies only to explicit opt-ins. Actual GA/Meta dashboard event receipt remains unverified. The website's offer and metadata reflect US $7.99 plus applicable tax; update those alongside Stripe if the public price changes later. Do not expose the sandbox configuration as the live checkout.
 
 ## Releasing an update
 
 Build, sign, and notarize a new DMG with the repository's `scripts/release.sh`. Upload it under a new versioned pathname in the private Blob store, verify unauthenticated access is denied, update `BLOB_PATHNAME`, and redeploy. Record the new checksum and repeat the paid-download verification.
 
-Existing paid sessions receive the configured current installer while their Price ID remains current or appears in `STRIPE_ALLOWED_PRICE_IDS`. Mac 5.2.9 has completed signing, notarization, artifact verification, both controlled uploads, and the production deployment. A real paid live delivery has not been exercised.
+Existing paid sessions receive the configured current installer while their Price ID remains current or appears in `STRIPE_ALLOWED_PRICE_IDS`. Mac 5.2.10 has completed signing, notarization, artifact verification, both controlled uploads, and the production deployment. A real paid live delivery has not been exercised.
