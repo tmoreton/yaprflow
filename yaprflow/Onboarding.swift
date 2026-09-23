@@ -78,7 +78,7 @@ struct OnboardingView: View {
                 .font(.system(size: 26, weight: .semibold))
                 .foregroundStyle(.white)
                 .padding(.top, 24)
-            Text("Quick Dictation needs your microphone. Meeting Notes also needs\nScreen & System Audio access. Audio never leaves your Mac.")
+            Text("Dictation needs your microphone. Meeting Notes also needs\nScreen & System Audio access. Audio never leaves your Mac.")
                 .font(.system(size: 13))
                 .foregroundStyle(Color.white.opacity(0.55))
                 .multilineTextAlignment(.center)
@@ -88,7 +88,7 @@ struct OnboardingView: View {
             VStack(spacing: 10) {
                 permissionRow(
                     title: "Microphone",
-                    detail: "Quick Dictation and your side of meetings",
+                    detail: "Dictation and your side of meetings",
                     isGranted: micStatus == .authorized
                 )
                 permissionRow(
@@ -143,7 +143,7 @@ struct OnboardingView: View {
 
     private var skipButtonTitle: String {
         micStatus == .authorized
-            ? "Continue with Quick Dictation only"
+            ? "Continue with Dictation only"
             : "Set up later"
     }
 

@@ -1,4 +1,3 @@
-import AppKit
 import Combine
 import Foundation
 
@@ -35,14 +34,9 @@ struct TranscriptHistoryItem: Identifiable, Hashable {
 @MainActor
 final class TranscriptHistoryModel: ObservableObject {
     @Published private(set) var items: [TranscriptHistoryItem] = []
-    @Published var selection: URL?
     @Published private(set) var errorMessage: String?
 
-    var selectedItem: TranscriptHistoryItem? {
-        items.first { $0.id == selection }
-    }
-
-    func refresh(selectLatest: Bool = false) {
+    func refresh() {
         do {
             let directory = try AppState.shared.transcriptsDirectory()
             let keys: Set<URLResourceKey> = [.isRegularFileKey]
@@ -69,38 +63,10 @@ final class TranscriptHistoryModel: ObservableObject {
             }
             .sorted { $0.recordedAt > $1.recordedAt }
 
-            if selectLatest || !items.contains(where: { $0.id == selection }) {
-                selection = items.first?.id
-            }
             errorMessage = nil
         } catch {
             items = []
-            selection = nil
             errorMessage = error.localizedDescription
-        }
-    }
-
-    func copySelected() {
-        guard let selectedItem, !selectedItem.transcript.isEmpty else { return }
-        copyToClipboard(selectedItem.transcript)
-    }
-
-    private func copyToClipboard(_ transcript: String) {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(transcript, forType: .string)
-    }
-
-    func openSelected() {
-        guard let selectedItem else { return }
-        NSWorkspace.shared.open(selectedItem.url)
-    }
-
-    func revealSelection() {
-        if let selectedItem {
-            NSWorkspace.shared.activateFileViewerSelecting([selectedItem.url])
-        } else if let directory = try? AppState.shared.transcriptsDirectory() {
-            NSWorkspace.shared.open(directory)
         }
     }
 
@@ -117,9 +83,6 @@ final class TranscriptHistoryModel: ObservableObject {
                 )
             }
             items.removeAll { $0.id == item.id }
-            if selection == item.id {
-                selection = items.first?.id
-            }
             errorMessage = nil
             return true
         } catch {
@@ -132,11 +95,4 @@ final class TranscriptHistoryModel: ObservableObject {
         errorMessage = nil
     }
 
-    func handleArchiveChange(_ notification: Notification) {
-        if let change = notification.object as? TranscriptArchiveChange,
-           selection == change.oldURL {
-            selection = change.newURL
-        }
-        refresh()
-    }
 }

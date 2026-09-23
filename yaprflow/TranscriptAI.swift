@@ -76,18 +76,6 @@ final class TranscriptAIModel: ObservableObject {
         }
     }
 
-    func resetPrompt() {
-        prompt = Self.defaultPrompt
-    }
-
-    func clearOutput() {
-        generationID = UUID()
-        result = ""
-        isRunning = false
-        processingMessage = nil
-        errorMessage = nil
-    }
-
     func run(transcript: String) {
         let trimmedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedTranscript = transcript.trimmingCharacters(in: .whitespacesAndNewlines)

@@ -29,17 +29,10 @@ final class MobileMeetingStore: ObservableObject {
 
     private let fileManager: FileManager
     private let rootOverride: URL?
-    private let encoder: JSONEncoder
-    private let decoder: JSONDecoder
 
     init(fileManager: FileManager = .default, rootOverride: URL? = nil) {
         self.fileManager = fileManager
         self.rootOverride = rootOverride
-        encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        encoder.dateEncodingStrategy = .iso8601
-        decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
         refresh()
     }
 
@@ -49,22 +42,12 @@ final class MobileMeetingStore: ObservableObject {
 
     func refresh() {
         do {
-            let directory = try meetingsDirectory()
-            meetings = try fileManager.contentsOfDirectory(
-                at: directory,
-                includingPropertiesForKeys: [.isRegularFileKey],
-                options: [.skipsHiddenFiles]
-            ).compactMap { url in
-                guard url.pathExtension == "json",
-                      let data = try? Data(contentsOf: url),
-                      let meeting = try? decoder.decode(MeetingRecord.self, from: data)
-                else { return nil }
-                return meeting
-            }.sorted { $0.startedAt > $1.startedAt }
-            errorMessage = nil
+            let result = try diskStore().load()
+            meetings = result.meetings
+            errorMessage = recoveryMessage(for: result.issues)
         } catch {
             meetings = []
-            errorMessage = error.localizedDescription
+            errorMessage = "The meeting library could not be loaded: \(error.localizedDescription)"
         }
     }
 
@@ -111,39 +94,37 @@ final class MobileMeetingStore: ObservableObject {
 
     @discardableResult
     func save(_ meeting: MeetingRecord) throws -> URL {
-        let directory = try meetingsDirectory()
-        let jsonURL = directory
-            .appendingPathComponent(meeting.id.uuidString)
-            .appendingPathExtension("json")
-        try encoder.encode(meeting).write(to: jsonURL, options: .atomic)
-
-        let markdownURL = directory
-            .appendingPathComponent(meeting.id.uuidString)
-            .appendingPathExtension("md")
-        try MeetingMarkdownRenderer.render(meeting).write(
-            to: markdownURL,
-            atomically: true,
-            encoding: .utf8
-        )
-
-        if let index = meetings.firstIndex(where: { $0.id == meeting.id }) {
-            meetings[index] = meeting
-        } else {
-            meetings.append(meeting)
+        do {
+            let saved = try diskStore().save(meeting)
+            if let index = meetings.firstIndex(where: { $0.id == saved.meeting.id }) {
+                meetings[index] = saved.meeting
+            } else {
+                meetings.append(saved.meeting)
+            }
+            meetings.sort { $0.startedAt > $1.startedAt }
+            errorMessage = nil
+            return saved.exportURL
+        } catch {
+            errorMessage = "The meeting could not be saved: \(error.localizedDescription)"
+            throw error
         }
-        meetings.sort { $0.startedAt > $1.startedAt }
-        errorMessage = nil
-        return markdownURL
+    }
+
+    @discardableResult
+    func saveReportingError(_ meeting: MeetingRecord) -> Bool {
+        do {
+            _ = try save(meeting)
+            return true
+        } catch {
+            return false
+        }
     }
 
     @discardableResult
     func delete(_ meeting: MeetingRecord) -> Bool {
         do {
-            let directory = try meetingsDirectory()
-            for pathExtension in ["json", "md"] {
-                let url = directory
-                    .appendingPathComponent(meeting.id.uuidString)
-                    .appendingPathExtension(pathExtension)
+            let urls = try diskStore().fileURLs(for: meeting.id)
+            for url in [urls.json, urls.markdown] {
                 if fileManager.fileExists(atPath: url.path) {
                     try fileManager.removeItem(at: url)
                 }
@@ -159,13 +140,22 @@ final class MobileMeetingStore: ObservableObject {
     }
 
     func exportURL(for meeting: MeetingRecord) throws -> URL {
-        let url = try meetingsDirectory()
-            .appendingPathComponent(meeting.id.uuidString)
-            .appendingPathExtension("md")
-        if !fileManager.fileExists(atPath: url.path) {
-            _ = try save(meeting)
+        do {
+            let url = try diskStore().exportURL(for: meeting)
+            errorMessage = nil
+            return url
+        } catch {
+            errorMessage = "The meeting export could not be created: \(error.localizedDescription)"
+            throw error
         }
-        return url
+    }
+
+    func exportURLReportingError(for meeting: MeetingRecord) -> URL? {
+        do {
+            return try exportURL(for: meeting)
+        } catch {
+            return nil
+        }
     }
 
     func resetDraft() {
@@ -206,6 +196,19 @@ final class MobileMeetingStore: ObservableObject {
             withIntermediateDirectories: true
         )
         return directory
+    }
+
+    private func diskStore() throws -> MeetingRecordDiskStore {
+        MeetingRecordDiskStore(
+            directory: try meetingsDirectory(),
+            fileManager: fileManager
+        )
+    }
+
+    private func recoveryMessage(for issues: [MeetingStorageIssue]) -> String? {
+        guard !issues.isEmpty else { return nil }
+        let noun = issues.count == 1 ? "file was" : "files were"
+        return "\(issues.count) unreadable meeting \(noun) moved to the \(MeetingRecordDiskStore.recoveryDirectoryName) folder. Your other meetings are still available."
     }
 
     static func runPersistenceSmokeTest() -> Bool {

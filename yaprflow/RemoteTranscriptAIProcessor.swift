@@ -16,7 +16,10 @@ enum RemoteTranscriptAIProcessor {
     }
 
     private static let synthesisResponseTokens = 1_800
+    private static let remoteSynthesisResponseTokens = 3_600
     private static let losslessResponseTokens = 2_400
+    private static let maximumTruncationSplits = 4
+    private static let minimumSplittableBytes = 512
 
     private static let instructions = """
     You transform speech transcripts according to the user's requested task.
@@ -35,6 +38,7 @@ enum RemoteTranscriptAIProcessor {
         prompt: String,
         transcript: String,
         configuration: AIChatConfiguration,
+        client: AIChatClient = AIChatClient(),
         progress: (String) -> Void
     ) async throws -> String {
         let strategy = compositionStrategy(for: prompt)
@@ -43,40 +47,47 @@ enum RemoteTranscriptAIProcessor {
             : synthesisResponseTokens
         let maximumBytes = maximumRequestBytes(for: configuration.provider)
         let directRequest = request(prompt: prompt, transcript: transcript, isPartial: false)
-        let client = AIChatClient()
-
         progress("Preparing transcript…")
         guard fits(request(prompt: prompt, transcript: "", isPartial: true), within: maximumBytes) else {
             throw ProcessingError.promptTooLong
         }
 
+        let chunks: [String]
         if fits(directRequest, within: maximumBytes) {
             progress("Working…")
-            return try await client.complete(
-                configuration: configuration,
-                instructions: instructions,
-                prompt: directRequest,
-                maximumResponseTokens: responseTokens
-            )
+            do {
+                return try await client.complete(
+                    configuration: configuration,
+                    instructions: instructions,
+                    prompt: directRequest,
+                    maximumResponseTokens: responseTokens
+                )
+            } catch let error as AIProviderError {
+                guard case .truncatedResponse = error else { throw error }
+                progress("Response was cut off; processing smaller parts…")
+                chunks = try await splitForTruncation(transcript)
+            }
+        } else {
+            chunks = try await TranscriptTextChunker.chunks(from: transcript) { candidate in
+                fits(request(prompt: prompt, transcript: candidate, isPartial: true), within: maximumBytes)
+            }
         }
 
-        let chunks = try await TranscriptTextChunker.chunks(from: transcript) { candidate in
-            fits(request(prompt: prompt, transcript: candidate, isPartial: true), within: maximumBytes)
-        }
         var partialResults: [String] = []
         partialResults.reserveCapacity(chunks.count)
 
         for (index, chunk) in chunks.enumerated() {
             try Task.checkCancellation()
             progress("Processing part \(index + 1) of \(chunks.count)…")
-            partialResults.append(
-                try await client.complete(
-                    configuration: configuration,
-                    instructions: instructions,
-                    prompt: request(prompt: prompt, transcript: chunk, isPartial: true),
-                    maximumResponseTokens: responseTokens
-                )
-            )
+            partialResults.append(contentsOf: try await processPart(
+                chunk,
+                prompt: prompt,
+                configuration: configuration,
+                client: client,
+                responseTokens: responseTokens,
+                splitCount: 0,
+                progress: progress
+            ))
         }
 
         guard partialResults.count > 1 else { return partialResults.first ?? "" }
@@ -92,6 +103,60 @@ enum RemoteTranscriptAIProcessor {
         )
     }
 
+    private static func processPart(
+        _ transcript: String,
+        prompt: String,
+        configuration: AIChatConfiguration,
+        client: AIChatClient,
+        responseTokens: Int,
+        splitCount: Int,
+        progress: (String) -> Void
+    ) async throws -> [String] {
+        try Task.checkCancellation()
+        do {
+            let result = try await client.complete(
+                configuration: configuration,
+                instructions: instructions,
+                prompt: request(prompt: prompt, transcript: transcript, isPartial: true),
+                maximumResponseTokens: responseTokens
+            )
+            return [result]
+        } catch let error as AIProviderError {
+            guard case .truncatedResponse = error,
+                  splitCount < maximumTruncationSplits else { throw error }
+            let smallerParts = try await splitForTruncation(transcript)
+            progress("Response was cut off; processing smaller parts…")
+            var results: [String] = []
+            for part in smallerParts {
+                results.append(contentsOf: try await processPart(
+                    part,
+                    prompt: prompt,
+                    configuration: configuration,
+                    client: client,
+                    responseTokens: responseTokens,
+                    splitCount: splitCount + 1,
+                    progress: progress
+                ))
+            }
+            return results
+        }
+    }
+
+    private static func splitForTruncation(_ transcript: String) async throws -> [String] {
+        guard transcript.utf8.count > minimumSplittableBytes else {
+            throw AIProviderError.truncatedResponse
+        }
+        let targetBytes = max(minimumSplittableBytes / 2, transcript.utf8.count / 2)
+        let chunks = try await TranscriptTextChunker.chunks(from: transcript) { candidate in
+            candidate.utf8.count <= targetBytes
+        }
+        guard chunks.count > 1,
+              chunks.allSatisfy({ $0.utf8.count < transcript.utf8.count }) else {
+            throw AIProviderError.truncatedResponse
+        }
+        return chunks
+    }
+
     private static func synthesize(
         _ initialResults: [String],
         prompt: String,
@@ -100,6 +165,9 @@ enum RemoteTranscriptAIProcessor {
         maximumBytes: Int
     ) async throws -> String {
         var results = initialResults
+        let responseTokens = configuration.provider == .ollama
+            ? synthesisResponseTokens
+            : remoteSynthesisResponseTokens
 
         while results.count > 1 {
             try Task.checkCancellation()
@@ -118,7 +186,7 @@ enum RemoteTranscriptAIProcessor {
                             configuration: configuration,
                             instructions: instructions,
                             prompt: synthesisRequest(prompt: prompt, partialResults: group),
-                            maximumResponseTokens: synthesisResponseTokens
+                            maximumResponseTokens: responseTokens
                         )
                     )
                 }

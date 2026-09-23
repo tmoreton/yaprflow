@@ -25,16 +25,11 @@ SCHEME="yaprflow-iOS"
 PROJECT="yaprflow.xcodeproj"
 CONFIGURATION="Release"
 MODEL_CHECKSUMS="$ROOT/scripts/model-checksums.sha256"
-NATIVE_ASR_CHECKSUMS="$ROOT/scripts/native-asr-checksums.sha256"
 ACKNOWLEDGEMENTS_SOURCE="$ROOT/yaprflow/Acknowledgements.txt"
 MODEL_NOTICE_SOURCE="$ROOT/scripts/model-NOTICE.txt"
 MODEL_ORIGIN_NOTICE_SOURCE="$ROOT/NOTICE.txt"
-MODEL_LICENSE_SOURCE="$ROOT/LICENSES/OpenMDW-1.1.txt"
 PRIVACY_MANIFEST_SOURCE="$ROOT/yaprflow-iOS/PrivacyInfo.xcprivacy"
 SOURCE_INFO_PLIST="$ROOT/yaprflow-iOS/Info.plist"
-ONNXRUNTIME_NOTICES_SOURCE="$ROOT/LICENSES/ONNXRuntime-ThirdPartyNotices-v1.28.2.txt"
-SHERPA_NOTICES_SOURCE="$ROOT/LICENSES/SherpaOnnx-ThirdParty-v1.13.8"
-SHERPA_ARTIFACTS_ROOT="$ROOT/Vendor/SherpaOnnxASR/Artifacts"
 
 EXPECTED_BUNDLE_ID="com.tmoreton.yaprflow.ios"
 EXPECTED_TEAM_ID="GVXC5FQ2RP"
@@ -201,76 +196,6 @@ validate_source_plists() {
     require_absent_plist_key "$PRIVACY_MANIFEST_SOURCE" NSPrivacyCollectedDataTypes:0
 }
 
-validate_native_ios_artifacts() {
-    local sherpa_xcframework onnx_xcframework unexpected_slice
-    sherpa_xcframework="$SHERPA_ARTIFACTS_ROOT/SherpaOnnxIOS.xcframework"
-    onnx_xcframework="$SHERPA_ARTIFACTS_ROOT/OnnxRuntimeIOS.xcframework"
-
-    yaprflow_verify_native_asr_artifacts "$ROOT" "$NATIVE_ASR_CHECKSUMS" \
-        || fail "native ASR provenance validation failed; run scripts/build-sherpa-onnx-asr.sh"
-
-    for xcframework_path in "$sherpa_xcframework" "$onnx_xcframework"; do
-        [[ -d "$xcframework_path/ios-arm64" ]] \
-            || fail "$xcframework_path is missing its ios-arm64 device slice"
-        [[ -d "$xcframework_path/ios-arm64_x86_64-simulator" ]] \
-            || fail "$xcframework_path is missing its simulator slice"
-        unexpected_slice="$(
-            find "$xcframework_path" -mindepth 1 -maxdepth 1 -type d \
-                ! -name ios-arm64 ! -name ios-arm64_x86_64-simulator -print
-        )"
-        [[ -z "$unexpected_slice" ]] \
-            || fail "$xcframework_path contains an unexpected platform slice: $unexpected_slice"
-    done
-
-    require_exact_arm64 \
-        "$sherpa_xcframework/ios-arm64/SherpaOnnxC.framework/SherpaOnnxC"
-    require_exact_arm64 \
-        "$onnx_xcframework/ios-arm64/onnxruntime.framework/onnxruntime"
-    require_exact_simulator_architectures \
-        "$sherpa_xcframework/ios-arm64_x86_64-simulator/SherpaOnnxC.framework/SherpaOnnxC"
-    require_exact_simulator_architectures \
-        "$onnx_xcframework/ios-arm64_x86_64-simulator/onnxruntime.framework/onnxruntime"
-}
-
-verify_framework_payload() {
-    local app_path="$1"
-    local frameworks_path="$app_path/Frameworks"
-    local actual_frameworks expected_frameworks framework_path
-
-    [[ -d "$frameworks_path" ]] || fail "the app is missing its Frameworks directory"
-    actual_frameworks="$(
-        find "$frameworks_path" -mindepth 1 -maxdepth 1 -type d -name '*.framework' \
-            -exec basename {} \; | LC_ALL=C sort
-    )"
-    expected_frameworks="$(printf '%s\n' SherpaOnnxC.framework onnxruntime.framework | LC_ALL=C sort)"
-    [[ "$actual_frameworks" == "$expected_frameworks" ]] \
-        || fail "the app must embed exactly SherpaOnnxC.framework and onnxruntime.framework"
-    [[ -z "$(find "$frameworks_path" -mindepth 1 -maxdepth 1 -type f -name '*.dylib' -print)" ]] \
-        || fail "the app contains an unexpected embedded dynamic library"
-
-    for framework_path in \
-        "$frameworks_path/SherpaOnnxC.framework" \
-        "$frameworks_path/onnxruntime.framework"; do
-        require_plist_value "$framework_path/Info.plist" CFBundlePackageType FMWK
-    done
-    require_plist_value \
-        "$frameworks_path/SherpaOnnxC.framework/Info.plist" \
-        CFBundleIdentifier com.k2-fsa.sherpa-onnx
-    require_plist_value \
-        "$frameworks_path/SherpaOnnxC.framework/Info.plist" \
-        CFBundleShortVersionString 1.13.8
-    require_plist_value \
-        "$frameworks_path/onnxruntime.framework/Info.plist" \
-        CFBundleIdentifier com.microsoft.onnxruntime
-    require_plist_value \
-        "$frameworks_path/onnxruntime.framework/Info.plist" \
-        CFBundleShortVersionString 1.28.2
-    require_exact_arm64 "$frameworks_path/SherpaOnnxC.framework/SherpaOnnxC"
-    require_ios_device_macho "$frameworks_path/SherpaOnnxC.framework/SherpaOnnxC"
-    require_exact_arm64 "$frameworks_path/onnxruntime.framework/onnxruntime"
-    require_ios_device_macho "$frameworks_path/onnxruntime.framework/onnxruntime"
-}
-
 verify_app_payload() {
     local app_path="$1"
     local info_plist executable_name executable_path bundled_link
@@ -319,19 +244,6 @@ verify_app_payload() {
         || fail "the retained model-origin notice is missing or empty"
     cmp -s "$MODEL_ORIGIN_NOTICE_SOURCE" "$app_path/NOTICE.txt" \
         || fail "bundled NOTICE.txt does not match the retained model-origin notice"
-    [[ -s "$MODEL_LICENSE_SOURCE" ]] || fail "the source OpenMDW-1.1 license is missing"
-    cmp -s "$MODEL_LICENSE_SOURCE" "$app_path/OpenMDW-1.1.txt" \
-        || fail "bundled OpenMDW-1.1 license does not match the reviewed source"
-    [[ -s "$ONNXRUNTIME_NOTICES_SOURCE" ]] \
-        || fail "the source ONNX Runtime notices are missing"
-    cmp -s \
-        "$ONNXRUNTIME_NOTICES_SOURCE" \
-        "$app_path/ONNXRuntime-ThirdPartyNotices-v1.28.2.txt" \
-        || fail "bundled ONNX Runtime notices do not match the reviewed source"
-    [[ -d "$SHERPA_NOTICES_SOURCE" ]] || fail "the source sherpa-onnx notices are missing"
-    diff -qr "$SHERPA_NOTICES_SOURCE" "$app_path/SherpaOnnx-ThirdParty-v1.13.8" >/dev/null \
-        || fail "bundled sherpa-onnx notices do not match the reviewed source"
-
     [[ -f "$app_path/PrivacyInfo.xcprivacy" ]] \
         || fail "the app is missing PrivacyInfo.xcprivacy"
     plutil -lint "$app_path/PrivacyInfo.xcprivacy" >/dev/null \
@@ -342,27 +254,16 @@ verify_app_payload() {
         || fail "bundled PrivacyInfo.xcprivacy does not match the reviewed source"
 
     yaprflow_verify_model_inventory \
-        "$app_path" "$MODEL_CHECKSUMS" "$YAPRFLOW_IOS_ASR_MODEL_DIR" \
+        "$app_path" "$MODEL_CHECKSUMS" "$YAPRFLOW_ASR_MODEL_DIR" \
         || fail "the bundled model inventory failed verification"
-    if find "$app_path" -type f \
-        \( -iname '*parakeet*' -o -iname '*zipformer*' -o -iname '*moonshine*' \) \
-        -print -quit | grep -q .; then
-        fail "the app contains a superseded speech-model asset"
-    fi
-
     executable_name="$(plist_value "$info_plist" CFBundleExecutable || true)"
     [[ -n "$executable_name" ]] || fail "CFBundleExecutable is missing"
     executable_path="$app_path/$executable_name"
     require_exact_arm64 "$executable_path"
     require_ios_device_macho "$executable_path"
-    verify_framework_payload "$app_path"
     if nm -gU "$executable_path" 2>/dev/null \
         | grep -Ei '(^|_)espeak(_|$)|espeak-ng|piper[_-]?phonemize' >/dev/null; then
         fail "the app executable contains excluded optional TTS symbols"
-    fi
-    if nm -gU "$executable_path" 2>/dev/null \
-        | grep -F '$s10FluidAudio' >/dev/null; then
-        fail "the app executable links the full FluidAudio package"
     fi
 }
 
@@ -553,7 +454,6 @@ verify_ipa() {
 }
 
 validate_source_plists
-validate_native_ios_artifacts
 yaprflow_validate_model_checksum_manifest "$MODEL_CHECKSUMS" \
     || fail "the model checksum manifest is invalid"
 

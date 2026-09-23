@@ -1,328 +1,82 @@
 # Yaprflow bundle profile
 
-> Historical App Store and bundle planning record. Current Mac distribution is
-> a direct download from yaprflow.com; see the README for the active release
-> process. The pricing and App Store checklists below are no longer current.
-
-Last reviewed: September 16, 2026
+Last reviewed: September 23, 2026
 
 ## Product
 
-**Product name:** Yaprflow
+Yaprflow is a local-first dictation and meeting-notes app for Mac, iPhone, and
+iPad. It does not require a Yaprflow account or retain raw audio.
 
-**Description:** Private, local-first voice dictation that turns speech into
-clean text and can summarize, rewrite, and organize local transcripts using
-Apple Intelligence, a user-supplied OpenAI or OpenRouter key, or Ollama on Mac.
+## Supported platforms
 
-Yaprflow is the voice and AI productivity application in the planned
-Productivity Bundle. It remains independently useful and purchasable. It does
-not require a bundle launcher, a shared account, or any other bundle
-application.
+- macOS 14 or later for dictation and meeting capture.
+- macOS 26 or later on an eligible Mac for optional Apple Intelligence tools.
+- iOS 17 or later on iPhone and iPad for dictation and microphone-only meeting
+  capture.
 
-## Supported Apple platforms
+The current identifiers are `com.tmoreton.yaprflow` on macOS and
+`com.tmoreton.yaprflow.ios` on iOS. Keep both stable to preserve each app's
+local container and store identity.
 
-- **macOS 14 Sonoma or later:** primary desktop application.
-- **macOS 26 or later on an eligible Mac:** required only for the optional
-  Apple Intelligence summary, transformation, and transcript-metadata features.
-- **iOS 17 or later on iPhone and iPad:** local dictation and a small
-  recent-transcript history. A fail-closed local archive/export verifier is in
-  place; its App Store Connect record and signed-device/TestFlight validation
-  are not yet documented as complete.
+## Shared speech stack
 
-## Versions and identifiers
+Both platforms bundle NVIDIA Parakeet TDT 0.6B v3 Core ML and use the pinned
+FluidAudio package. Parakeet automatically detects 25 supported European
+languages. The bundled Silero Core ML model provides voice-activity detection.
+There is no manual language selector.
 
-| Target | Bundle identifier | Intended version | Intended build |
-| --- | --- | --- | --- |
-| macOS | `com.tmoreton.yaprflow` | 5.0.1 | 5 |
-| iOS | `com.tmoreton.yaprflow.ios` | 1.0.0 | 2 |
+Model files are pinned in `scripts/model-checksums.sha256`, validated by
+`scripts/lib/model-release.sh`, copied by `scripts/copy-models.sh`, and loaded
+according to `Shared/TranscriptionCore.swift`.
 
-These identifiers must remain stable. In particular, the macOS identifier owns
-the existing sandbox container used for transcript history, vocabulary, and
-preferences.
+## Platform behavior
 
-## Primary use cases
+Mac Dictation provides a global shortcut, live preview, clipboard copy,
+and local Markdown history. Mac Meeting Notes can capture microphone and system
+audio and optionally create generated notes through Apple Intelligence,
+OpenAI, OpenRouter, or Ollama.
 
-- Dictate clean text into any Mac application with a global keyboard shortcut.
-- Capture spoken thoughts and copy the result for use in email, notes, and
-  other productivity tools.
-- Keep and browse a private local transcript archive.
-- Capture bot-free Mac meetings with separate microphone and system-audio
-  transcripts, human notes, calendar context, and evidence-linked results.
-- Search and ask questions across locally saved meetings.
-- Correct names, acronyms, product terms, and preferred spellings with a local
-  vocabulary.
-- Summarize, rewrite, extract action items from, and otherwise transform
-  transcripts on supported Macs.
-- Dictate on iPhone or iPad and quickly re-copy recent transcripts.
+iOS Dictation captures from the device microphone, copies final text,
+and retains up to 50 local results. In-person Meeting uses the microphone only,
+supports typed notes and templates, and stores local JSON and Markdown records.
 
-Yaprflow does not retain raw recordings. Meeting Notes captures system audio
-only during an explicitly started meeting session, shows a persistent recording
-indicator, and stores the resulting transcript and notes locally. Calendar and
-Screen & System Audio Recording permissions must be separately reviewed during
-privacy and App Store release checks.
+Meeting records use the same schema on both platforms but do not sync. The
+canonical feature matrix is [`../PLATFORM_CAPABILITIES.md`](../PLATFORM_CAPABILITIES.md).
 
-## Core features
+## Privacy boundary
 
-- On-device multilingual streaming speech recognition in 32 production-ready
-  locales, using the 1120 ms chunk-size INT8 export of NVIDIA Nemotron 3.5 ASR
-  Streaming 0.6B through an ASR-only sherpa-onnx build and ONNX Runtime.
-  English (United States) is the saved default; every production-ready locale
-  is selectable and Automatic detection remains available on both platforms.
-- On-device Silero voice activity detection.
-- Live transcription preview and automatic clipboard copy.
-- Local Markdown transcript history and vocabulary replacement on macOS.
-- Up to 50 device-local Quick Dictation results on iOS.
-- Microphone-only in-person meetings on iPhone and iPad, with typed notes,
-  shared templates, local meeting history, and Markdown sharing.
-- Optional on-device summaries, rewrites, custom transformations, titles,
-  topics, and descriptions through Apple's Foundation Models framework on
-  supported Macs.
-- Optional OpenAI, OpenRouter, and Ollama providers for Mac meeting summaries
-  and transcript tools. Cloud
-  keys are stored in the Mac Keychain. Automatic titles with these providers
-  require a separate opt-in.
-- No Yaprflow account, subscription, advertising, analytics, or tracking.
+Speech recognition and voice-activity detection run on-device. Raw audio is
+discarded after transcription. Transcripts, settings, vocabulary, and meeting
+records stay in each app's sandbox unless the user explicitly copies, shares,
+or sends text to an optional Mac AI provider. Yaprflow has no first-party
+account, inference, or storage backend.
 
-## Local and private architecture
+## Distribution
 
-Microphone audio is processed by models bundled with the official application.
-Raw audio is not retained after transcription. On macOS, transcripts,
-vocabulary, preferences, and custom AI prompts remain in the application's
-sandbox container. On iOS, recent Quick Dictation results, preferences, and
-in-person meeting JSON/Markdown records remain in the local app container.
-Apple Intelligence processing uses the on-device Foundation
-Models framework. Selecting OpenAI or OpenRouter sends the selected transcript
-and prompt to that provider when an AI tool is run; automatic titles with a
-selected external provider require a separate opt-in. Ollama requests go to
-localhost, although an Ollama cloud model may use its own cloud service.
+The `yaprflow` scheme produces the signed and notarized direct-download Mac
+edition. `yaprflow-AppStore` produces the Mac App Store edition without
+Sparkle. `yaprflow-iOS` produces the iPhone and iPad app. Release scripts verify
+model hashes, resources, entitlements, privacy manifests, signing, and package
+contents before artifacts are distributed.
 
-The application does not send audio, transcripts, or generated results to a
-developer-operated server. The macOS target has an outbound-network sandbox
-entitlement for optional AI providers. Neither target contains a first-party
-backend client.
+## Licensing
 
-Legacy 2.x/3.x installations, and 4.x installations that used the model
-fallback, can leave a roughly 400–450 MB model-only cache under
-`Application Support/FluidAudio/Models` in the sandbox. Version 5 does not use
-or automatically delete that cache. It is an existing-user storage migration
-risk, not a runtime service dependency; validate its exact contents before any
-future cleanup.
+- FluidAudio 0.13.6: Apache License 2.0.
+- NVIDIA Parakeet TDT 0.6B v3 Core ML: CC BY 4.0.
+- Silero VAD Core ML: MIT License.
+- Sparkle 2.10.0: MIT and its bundled permissive third-party terms; used only
+  by the direct-download Mac edition.
 
-Pinned model and native-source dependencies are retrieved only while preparing
-a source build. The required runtime model assets and native frameworks are
-then bundled into the application; the source dependencies and in-tree Swift
-package are not. Those build-time downloads are separate from application
-runtime behavior.
+See [`../THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md) and the in-app
+Acknowledgements view for the complete current inventory.
 
-## First-party backend and hosted-service boundary
+## Release checklist
 
-**First-party application backend:** None.
-
-An installed official build does not depend on a Yaprflow-hosted API, cloud
-inference service, authentication service, or hosted user-data store. There is
-therefore no hosted feature that needs a StoreKit-to-service entitlement
-exchange. The App Store purchase itself is sufficient for official app
-distribution and updates.
-
-The following external services are outside the application runtime boundary:
-
-- GitHub Pages hosts the public product, privacy, and support pages.
-- GitHub and Hugging Face host source-build dependencies and model artifacts.
-- Apple provides App Store distribution, payment processing, updates,
-  notarization, and the operating-system frameworks used by the app.
-- Email sent to `tim@yaprflow.com` is voluntary support communication.
-
-Public source builds do not receive access to any paid first-party
-infrastructure because no such infrastructure exists for Yaprflow.
-
-## Product URLs
-
-- **Marketing URL:** <https://yaprflow.com/>
-- **Privacy-policy URL:** <https://yaprflow.com/privacy.html>
-- **Support URL:** <https://yaprflow.com/support.html>
-- **Source URL:** <https://github.com/tmoreton/yaprflow>
-- **Mac App Store URL:** <https://apps.apple.com/app/id6810892725>
-- **Mac App Store Apple ID:** `6810892725`
-
-On September 11, 2026, the marketing URL returned HTTP 200 but still advertised
-the legacy free/open-source download; the privacy URL returned HTTP 200 but did
-not yet match the updated local policy; and the support URL and Mac App Store
-URL returned HTTP 404. Deploy the updated `docs/` site, then activate and verify
-customer-facing App Store links after the listing is available.
-
-## Licensing and third-party components
-
-Yaprflow-owned code in releases through 4.0.14 and repository revisions through
-commit `0af74ab27f24933d16c004336cf63eac95c0a6b0` remains under Apache License
-2.0. Revisions after that boundary through commit
-`0153bbd696421d07cca72822c8840a028e064ebb` remain available under PolyForm
-Shield 1.0.0. Later revisions are source available under PolyForm
-Noncommercial 1.0.0 beginning September 19, 2026. Commercial source use
-requires a separate written license. See [`../LICENSE`](../LICENSE) for the
-complete transition notice and current terms, and
-[`../COMMERCIAL-LICENSING.md`](../COMMERCIAL-LICENSING.md) for commercial
-inquiries. Product names, icons, logos, domains, and associated branding are
-addressed separately in [`../TRADEMARKS.md`](../TRADEMARKS.md).
-
-The repository owner confirmed on September 11, 2026 that the git author
-identities Tim Moreton, Homelab, and Tim Moreton Jr are under the same ownership
-and that all Yaprflow-owned code and assets are owned by the licensor. The
-first-party PolyForm transition therefore has no outstanding contributor-rights
-condition. This confirmation does not apply to third-party components.
-
-Third-party components retain their original licenses. The complete notices
-are in [`../THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md) and the app's
-Acknowledgements view.
-
-| Component | License | Purpose |
-| --- | --- | --- |
-| FluidAudio 0.13.6 (adapted VAD portions only) | Apache License 2.0 | Core ML VAD invocation and streaming endpoint logic; the package itself is not linked |
-| sherpa-onnx 1.13.8 | Apache License 2.0 | Local streaming ASR runtime, built without TTS |
-| ONNX Runtime 1.28.2 | MIT License | Local neural-network inference |
-| Eigen 5.0.1 | MPL 2.0 and retained upstream notices | Header dependency in the sherpa-onnx native build |
-| NVIDIA Nemotron 3.5 ASR Streaming 0.6B | OpenMDW-1.1 | Bundled multilingual speech recognition |
-| Silero VAD Core ML model | MIT License | Bundled voice activity detection |
-| Apple frameworks and system symbols | Applicable Apple agreements | Native UI, audio, Core ML, and on-device AI |
-
-The CC BY Parakeet model, its interim Zipformer replacement, and the later
-English-only Nemotron model have been removed. The current build uses the
-pinned June 11, 2026, 1120 ms chunk-size INT8 sherpa-onnx export of NVIDIA
-Nemotron 3.5 ASR Streaming 0.6B. The source model covers 40 locales across 35
-languages. Nineteen transcription-ready and 13 broad-coverage locales work out
-of the box. Both apps expose those 32 production-ready locales as explicit
-choices, default to English (United States), and also offer Automatic detection.
-The remaining 8 adaptation-ready locales require fine-tuning and are not
-advertised as supported. OpenMDW-1.1 permits dealing in
-the model materials subject to its conditions and requires the license plus
-applicable copyright and origin notices to be retained when redistributing.
-Both apps bundle the agreement and the exact retained-origin `NOTICE.txt`. The
-repository owner's September 12, 2026 selection is a recorded release decision,
-not a claim that separate written opinions were received from counsel or every
-upstream rightsholder. The sherpa-onnx runtime remains Apache-2.0 and ONNX
-Runtime is MIT-licensed. Yaprflow uses a pinned native sherpa build with
-`SHERPA_ONNX_ENABLE_TTS=OFF` and
-`SHERPA_ONNX_ENABLE_SPEAKER_DIARIZATION=OFF`, so the unused diarization surface
-and optional GPL eSpeak-NG/Piper TTS stack are not distributed. Release
-validation checks the final executable for the excluded TTS symbols. Its
-vendored upstream Swift wrapper has one local bridge to the existing per-stream
-option setter so Yaprflow can provide a selected language code or
-`language=auto`; the reviewed wrapper and native output hashes are pinned by
-the release scripts.
-
-## Commercial distribution
-
-Official version 5 builds are intended for paid App Store distribution as a
-US $29.00 one-time purchase. The United States is the base region, with Apple's
-comparable prices configured across all 175 available regions. There is no
-Yaprflow login, subscription, or in-app purchase. Apple handles ordinary
-purchase entitlement and automatic updates.
-
-Public source remains available for inspection and developer builds under the
-license that applies to that version. GitHub application releases after the
-commercial cutoff are source-only and do not attach signed production DMGs.
-Historical DMGs may remain available when clearly identified as legacy free
-releases from the Apache-licensed generation. Model-only release assets remain
-available for reproducible source builds.
-
-Yaprflow may be included in an Apple App Store multi-app bundle, but it remains
-independently purchasable and has no technical dependency on the other apps.
-Bundle membership and pricing are configured in App Store Connect rather than
-in this repository.
-
-## Ongoing infrastructure and commercial costs
-
-The installed application requires no first-party runtime infrastructure, so
-there is no hosted inference, account, database, file-storage, or API bill per
-user.
-
-Ongoing operational costs and external dependencies are limited to:
-
-- Apple Developer Program participation and applicable App Store commission.
-- Domain registration and support email for `yaprflow.com`.
-- Public website hosting through GitHub Pages.
-- Source and build-artifact hosting through GitHub and Hugging Face.
-- Support time and ordinary release operations.
-
-GitHub Pages, GitHub Releases, and Hugging Face are availability dependencies
-for the website or source-build workflow, but not for an installed official
-build.
-
-## Source-build release follow-up
-
-The immutable `models-nemotron-3.5-streaming-1120ms-v1` GitHub mirror may not
-exist until
-`scripts/publish-models.sh` is run from a trusted, verified checkout. Fresh
-source builds safely fall back to the checksum-pinned official sherpa-onnx
-export; the VAD fetch remains pinned to an exact Hugging Face revision. Every
-file is hash-verified. This is a source-build availability task, not an
-installed-app runtime dependency or App Store blocker. Older model release
-assets remain for compatibility with historical builds.
-
-## Paid App Store blocker checklist
-
-- [x] **Replace the incompatible model path.** The current build uses the
-  OpenMDW-1.1-licensed multilingual Nemotron 3.5 1120 ms chunk-size export and
-  a pinned ASR-only sherpa-onnx build; the previous Parakeet, Zipformer, and
-  English-only Nemotron weights, unused speaker diarization implementation, and
-  optional GPL TTS stack are excluded from release packaging.
-- [x] **Record the Nemotron redistribution terms.** The exact model hashes,
-  complete OpenMDW-1.1 agreement, retained origin notice, reviewed
-  source/model-card revision, exact export revision, and the repository owner's
-  September 12, 2026 implementation decision are recorded. This does not
-  represent a separate counsel or rightsholder opinion.
-- [ ] **Complete paid-app commercial setup.** Confirm that the Account Holder
-  has accepted the current Paid Apps Agreement and completed required banking
-  and tax information in App Store Connect.
-- [ ] **Complete Digital Services Act status.** Declare trader or non-trader
-  status in App Store Connect. For EU distribution of this commercial app,
-  complete Apple's verification of the public trader address, phone number,
-  and email address.
-- [x] **Applied the approved paid price.** On September 11, 2026, App Store
-  Connect was updated to a US $29.00 one-time price with the United States as
-  the base region and Apple's comparable prices across all 175 available
-  regions. Apple currently groups 171 regions under Current Price and four
-  regions under a price ending on September 14 because of its scheduled
-  foreign-exchange or tax adjustment. The documented 4.0.14 submission was
-  configured as free with automatic release, so decide whether to withdraw or
-  manage that submission as the final legacy release before making 5.0.0 the
-  paid generation. Anyone who acquires the free record remains entitled to
-  free updates and redownloads; later repricing does not convert that existing
-  customer into a paid sale.
-- [ ] **Verify the live macOS listing.** The known Apple ID is `6810892725`, but
-  its public App Store URL was not live at the last review. Confirm public
-  availability and the support, privacy, and marketing URLs before enabling
-  customer-facing purchase links.
-- [ ] **Finish iOS App Store metadata.** Product-page copy, review notes, draft
-  privacy answers, and clean iPhone/iPad screenshots are prepared in
-  `APP_STORE_SUBMISSION.md` and `AppStore/Screenshots/iOS/`. Confirm or create
-  the iOS App Store Connect record and Apple ID, then enter the age rating,
-  pricing, territories, and final answers. Universal purchase requires one
-  bundle ID across platforms; the current macOS and iOS IDs differ. Existing
-  separate records cannot be merged, so otherwise keep separate paid records.
-- [x] **Recheck target configuration values.** Release values are macOS 5.2.0
-  build 12 and iOS 1.0.0 build 3, shared across Debug and Release.
-- [ ] **Run a signed upgrade test.** Install the publicly released 4.0.14
-  Developer ID build, create transcript history, vocabulary entries, and
-  preferences, then install the signed Mac App Store 5.0.0 build. Verify the
-  existing sandbox container remains accessible and all local data survives.
-  Also verify a normal update from a prior Mac App Store build when one is
-  available.
-- [x] **Verify both signed Release archives.** The macOS 5.2.0 (12) and iOS
-  1.0.0 (3) signed archives passed local payload, model, privacy, notice,
-  entitlement, architecture, and profile checks on September 20, 2026.
-- [ ] **Restore App Store export credentials.** Install a `Mac Installer
-  Distribution` certificate for team `GVXC5FQ2RP`. Sign in to that developer
-  account in Xcode and regenerate the iOS App Store profile so it includes the
-  current Apple Distribution certificate. Then rerun both release scripts and
-  inspect the exported `.pkg` and `.ipa`; neither script uploads.
-- [ ] **Publish and verify support/privacy pages.** Confirm the committed pages
-  are live over HTTPS and update the corresponding App Store Connect URLs.
-- [ ] **Configure the Productivity Bundle in App Store Connect.** Do this only
-  after each member app is independently purchasable, eligible, and associated
-  with the correct developer account. Set the bundle price below the sum of the
-  member prices but not below the highest-priced member. Bundle availability is
-  the intersection of the members' territories; there is no separate bundle
-  territory setting. No code-level integration is required.
-
-No application account, central authentication service, subscription,
-analytics system, or new backend is required to clear these blockers.
+- Run `swift test` and the platform smoke tests.
+- Build all three Xcode schemes with model validation enabled.
+- Run `scripts/app-store-release.sh` and
+  `scripts/ios-app-store-release.sh` for signed store candidates.
+- Reconfirm App Store privacy, age-rating, content-rights, price, and review
+  metadata whenever capabilities or third-party inputs change.
+- Validate microphone, background-audio, system-audio, clipboard, meeting
+  persistence, export, and existing-user migration on release hardware.

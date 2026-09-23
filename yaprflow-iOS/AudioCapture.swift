@@ -1,8 +1,5 @@
 #if os(iOS)
 @preconcurrency import AVFoundation
-import OSLog
-
-private let log = Logger(subsystem: "com.tmoreton.yaprflow.ios", category: "AudioCapture")
 
 enum AudioCaptureEvent: Sendable {
     case interruptionBegan

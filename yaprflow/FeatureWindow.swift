@@ -61,6 +61,7 @@ final class FeatureWindowController: NSObject, NSWindowDelegate {
     private let title: String
     private let contentSize: NSSize
     private let minimumSize: NSSize
+    private let usesTransparentTitlebar: Bool
     private let makeContent: () -> AnyView
     private var window: NSWindow?
 
@@ -68,11 +69,13 @@ final class FeatureWindowController: NSObject, NSWindowDelegate {
         title: String,
         contentSize: NSSize,
         minimumSize: NSSize,
+        usesTransparentTitlebar: Bool = true,
         @ViewBuilder content: @escaping () -> Content
     ) {
         self.title = title
         self.contentSize = contentSize
         self.minimumSize = minimumSize
+        self.usesTransparentTitlebar = usesTransparentTitlebar
         self.makeContent = { AnyView(content()) }
         super.init()
     }
@@ -89,9 +92,9 @@ final class FeatureWindowController: NSObject, NSWindowDelegate {
         newWindow.minSize = minimumSize
         newWindow.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
         newWindow.title = title
-        newWindow.titleVisibility = .hidden
-        newWindow.titlebarAppearsTransparent = true
-        newWindow.isMovableByWindowBackground = true
+        newWindow.titleVisibility = usesTransparentTitlebar ? .hidden : .visible
+        newWindow.titlebarAppearsTransparent = usesTransparentTitlebar
+        newWindow.isMovableByWindowBackground = usesTransparentTitlebar
         newWindow.isReleasedWhenClosed = false
         newWindow.delegate = self
         newWindow.center()

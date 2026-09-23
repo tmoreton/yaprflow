@@ -108,7 +108,7 @@ final class HotkeyRecorderButton: NSButton {
         guard newConfig != .meetingNotesHotkey else {
             NSSound.beep()
             title = "⌘M is in use"
-            toolTip = "Command-M opens Meeting Notes. Choose another shortcut for Quick Dictation."
+            toolTip = "Command-M opens Meeting Notes. Choose another shortcut for Dictation."
             return true
         }
         AppState.shared.hotkey = newConfig

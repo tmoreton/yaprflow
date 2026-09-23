@@ -1,7 +1,7 @@
 import Foundation
 import Combine
 
-/// FIFO of recent Quick Dictation results for re-copy inside the iOS app.
+/// FIFO of recent Dictation results for re-copy inside the iOS app.
 @MainActor
 final class HistoryStore: ObservableObject {
     static let shared = HistoryStore()

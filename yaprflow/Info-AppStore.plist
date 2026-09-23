@@ -39,8 +39,6 @@
 	<string>Yaprflow needs the microphone to transcribe your voice into text.</string>
 	<key>NSScreenCaptureUsageDescription</key>
 	<string>Yaprflow captures Mac audio for meeting transcripts. Your screen is never saved.</string>
-	<key>NSCalendarsFullAccessUsageDescription</key>
-	<string>Yaprflow uses your calendar to show upcoming meetings and prepare local meeting notes.</string>
 	<key>NSSupportsAutomaticTermination</key>
 	<true/>
 	<key>YaprflowDistribution</key>

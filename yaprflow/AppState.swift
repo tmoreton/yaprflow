@@ -111,7 +111,6 @@ final class AppState: ObservableObject {
 
     private static let lastTranscriptKey = "yaprflow.lastTranscript"
     private static let dictationModeKey = "yaprflow.dictationMode"
-    private static let speechLanguageKey = "yaprflow.speechLanguage"
     private static let desktopPreviewEnabledKey = "yaprflow.desktopPreviewEnabled"
     private static let transcriptsFolderName = "Transcripts"
     private static let vocabularyFileName = "Vocabulary.md"
@@ -132,12 +131,6 @@ final class AppState: ObservableObject {
             UserDefaults.standard.set(dictationMode.rawValue, forKey: Self.dictationModeKey)
         }
     }
-    @Published var speechLanguage: SpeechLanguage {
-        didSet {
-            UserDefaults.standard.set(speechLanguage.rawValue, forKey: Self.speechLanguageKey)
-        }
-    }
-
     /// Most recent finalized transcript. Persisted so it survives restarts and
     /// remains available in History.
     @Published var lastTranscript: String {
@@ -153,9 +146,6 @@ final class AppState: ObservableObject {
         ) as? Bool ?? true
         self.dictationMode = UserDefaults.standard.string(forKey: Self.dictationModeKey)
             .flatMap(DictationMode.init(rawValue:)) ?? .polished
-        self.speechLanguage = SpeechLanguage.selection(
-            fromPersistedValue: UserDefaults.standard.string(forKey: Self.speechLanguageKey)
-        )
     }
 
     /// Exercise preference-driven UI without changing the user's saved value.
@@ -197,10 +187,6 @@ final class AppState: ObservableObject {
         )
     }
 
-    func processTranscript(_ raw: String) -> TranscriptProcessingResult {
-        makeTranscriptProcessor().process(raw)
-    }
-
     func makeTranscriptProcessor(mode overrideMode: DictationMode? = nil) -> TranscriptProcessor {
         TranscriptProcessor(
             mode: overrideMode ?? dictationMode,
@@ -214,10 +200,6 @@ final class AppState: ObservableObject {
 
     func vocabularyFileURL() throws -> URL {
         try Self.ensureVocabularyFile()
-    }
-
-    func vocabularyEntryCount() -> Int {
-        (try? Self.loadVocabularyReplacements().count) ?? 0
     }
 
     private static func writeTranscriptMarkdown(

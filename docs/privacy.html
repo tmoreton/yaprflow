@@ -42,15 +42,15 @@
 
     <section class="legal-section">
       <h2>Data stored on your device</h2>
-      <p>On macOS, completed dictation text is copied to the system clipboard and stored as Markdown files in Yaprflow's sandboxed app container. Meeting Notes stores JSON and Markdown records containing the meeting title, timestamps, typed notes, transcript, generated notes, evidence identifiers, and any selected calendar event context such as attendee names. Yaprflow also stores your local vocabulary, keyboard shortcut, settings, most recent transcript, and custom AI prompt on your Mac.</p>
-      <p>On iOS, Quick Dictation copies completed transcript text to the system clipboard and stores up to 50 recent results in the app's local preferences. In-person Meeting stores the meeting title, timestamps, typed notes, template choice, and transcript as local JSON and Markdown files. The iOS app uses only the device microphone and does not capture audio from other apps. Mac and iOS records do not sync in this release.</p>
+      <p>On macOS, completed dictation text is copied to the system clipboard and stored as Markdown files in Yaprflow's sandboxed app container. Meeting Notes stores JSON and Markdown records containing the meeting title, timestamps, typed notes, transcript, generated notes, and evidence identifiers. Yaprflow also stores your local vocabulary, keyboard shortcut, settings, most recent transcript, and custom AI prompt on your Mac.</p>
+      <p>On iOS, Dictation copies completed transcript text to the system clipboard and stores up to 50 recent results in the app's local preferences. Meeting stores the meeting title, timestamps, typed notes, notes format, and transcript as local JSON and Markdown files. The iOS app uses only the device microphone and does not capture audio from other apps. Mac and iOS records do not sync in this release.</p>
       <p>This local data remains under your control and is not transmitted to the developer.</p>
     </section>
 
     <section class="legal-section">
       <h2>Optional AI providers on Mac</h2>
       <p>Apple Intelligence remains the default for optional meeting summaries, transcript tools, and transcript metadata on supported Macs. It uses Apple's on-device Foundation Models framework. You may instead select OpenAI, OpenRouter, or Ollama in Settings.</p>
-      <p>When you run transcript tools or cross-meeting questions with OpenAI or OpenRouter, Yaprflow sends the selected transcript or relevant meeting excerpts, your prompt, and task instructions directly from your Mac to that provider. When you choose Generate in Meeting Notes, Yaprflow sends that meeting transcript and typed notes to the selected provider to create structured notes. The provider processes the request under its own terms and privacy policy and may charge your account. Your API key is saved in the Mac Keychain, not in Yaprflow preferences or on a Yaprflow server.</p>
+      <p>When you run transcript tools or ask a question about a selected meeting with OpenAI or OpenRouter, Yaprflow sends that selected transcript or meeting excerpts, your prompt, and task instructions directly from your Mac to that provider. When you choose Generate in Meeting Notes, Yaprflow sends that meeting transcript and typed notes to the selected provider to create structured notes. The provider processes the request under its own terms and privacy policy and may charge your account. Your API key is saved in the Mac Keychain, not in Yaprflow preferences or on a Yaprflow server.</p>
       <p>Automatic archive titles using a selected OpenAI, OpenRouter, or Ollama model are off by default. If you enable them, each new Mac transcript is sent to that model for its title, topic, and description. Existing saved transcripts are not automatically uploaded to a cloud provider for backfill.</p>
       <p>Ollama requests go to the Ollama service at localhost:11434. A local Ollama model processes them on your Mac; an Ollama cloud model may send them to Ollama's service. Yaprflow does not send your AI requests or API keys to a developer-operated server.</p>
     </section>
@@ -64,7 +64,7 @@
 
     <section class="legal-section">
       <h2>Permissions and deletion</h2>
-      <p>On macOS, you can revoke microphone, calendar, and Screen &amp; System Audio Recording access in System Settings &gt; Privacy &amp; Security. The Folder and Reveal actions expose local transcript and meeting files so you can review or delete them. To remove all macOS data, quit and uninstall Yaprflow, then delete its sandbox container.</p>
+      <p>On macOS, you can revoke microphone and Screen &amp; System Audio Recording access in System Settings &gt; Privacy &amp; Security. The Folder and Reveal actions expose local transcript and meeting files so you can review or delete them. To remove all macOS data, quit and uninstall Yaprflow, then delete its sandbox container.</p>
       <p>On iOS, you can revoke microphone access in Settings &gt; Privacy &amp; Security &gt; Microphone. Choosing Delete App, rather than Offload App, removes the app and its locally stored data.</p>
     </section>
 

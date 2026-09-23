@@ -228,7 +228,10 @@ struct AIChatClient {
 
         // One bounded retry recovers when a provider's reasoning tokens consume
         // the first budget without creating an unbounded or unexpectedly costly loop.
-        let retryLimit = min(max(requested * 2, requested + 512), 4_096)
+        // Keep local Ollama conservative: raising num_predict can also raise
+        // memory pressure on Macs with smaller model contexts.
+        let maximumRetry = provider == .ollama ? 4_096 : 8_192
+        let retryLimit = min(max(requested * 2, requested + 512), maximumRetry)
         return retryLimit > requested ? [requested, retryLimit] : [requested]
     }
 }

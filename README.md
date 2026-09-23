@@ -20,7 +20,7 @@ audio without a meeting bot, transcribes both locally as Me and Them, combines
 the live transcript with the user's typed notes, and saves evidence-linked
 meeting notes on the Mac. Raw meeting audio is never retained.
 
-On iPhone and iPad, Quick Dictation copies short-form speech to the clipboard,
+On iPhone and iPad, Dictation copies short-form speech to the clipboard,
 while In-person Meeting mode captures the device microphone alongside typed
 notes and saves a local meeting record and Markdown export. Mobile does not
 claim to capture audio from other apps.
@@ -41,9 +41,9 @@ licensed noncommercial builds.
 - **One hotkey workflow on Mac**: start and stop dictation with Command-T, or
   change the shortcut from the menu-bar item.
 - **Private Meeting Notes**: capture microphone and Mac audio, type guiding
-  notes, use calendar context and meeting templates, and generate decisions,
+  notes, choose meeting templates, and generate decisions,
   action items, follow-up email text, and transcript-linked evidence.
-- **Two mobile capture modes**: use Quick Dictation for clipboard text or an
+- **Two mobile capture modes**: use Dictation for clipboard text or an
   explicitly microphone-only In-person Meeting workflow on iPhone and iPad.
 - **Meeting memory**: search saved meetings locally and generate answers from a
   selected meeting with citations back to the underlying transcript.
@@ -55,9 +55,10 @@ licensed noncommercial builds.
   with key points, decisions, action items, personal notes, evidence links, and
   a collapsed transcript. Use Apple Intelligence on a supported Mac, your own
   OpenAI or OpenRouter key, or local Ollama.
-- **Unified workspace**: search meetings and dictations together, ask across
-  all meetings with linked sources, or select one item to create a structured
-  brief, action plan, detailed notes, follow-up email, or custom result.
+- **Unified workspace**: search meetings and dictations together, ask questions
+  about a selected meeting with linked sources, or select one item to create a
+  structured brief, action plan, detailed notes, follow-up email, or custom
+  result.
 - **Smart Markdown archive**: each completed Mac transcript is saved locally;
   Apple Intelligence can add a title, topic, and description on supported Macs.
   Automatic titles with another provider require a separate opt-in.
@@ -87,6 +88,10 @@ The Mac app requires macOS 14 Sonoma or later. The repository also contains an
 iPhone/iPad source target requiring iOS 17 or later; it is separate from the
 Mac direct download.
 
+Platform-specific model, language, capture, and distribution claims are kept in
+[`PLATFORM_CAPABILITIES.md`](PLATFORM_CAPABILITIES.md). Treat that matrix as the
+source of truth when updating product, store, privacy, or release copy.
+
 All speech-recognition models ship inside official apps. The Mac app starts
 preparing its recognizer in the background at launch. Recording before that
 preparation finishes—or after the recognizer has been released while idle—can
@@ -96,18 +101,17 @@ take a little longer while the on-device runtimes initialize.
 
 Yaprflow runs as a menu-bar app. Click the waveform icon to open the menu.
 
-- **Quick Dictation** starts or stops short-form speech-to-text and copies the
+- **Dictation** starts or stops short-form speech-to-text and copies the
   result to the clipboard.
 - **Change shortcut**: open Settings, click the keyboard shortcut button, then
   press the new key combination. Escape cancels shortcut capture.
-- **Choose speech language**: Settings defaults to English (United States) for
-  more consistent English dictation. Choose any other supported locale, or
-  Automatic when a recording may use different languages.
-- **Yaprflow workspace** keeps live capture, saved meetings, and Quick Dictation
+- **Automatic multilingual recognition**: the bundled Parakeet model detects
+  supported languages while you speak, with no language setting to manage.
+- **Yaprflow workspace** keeps live capture, saved meetings, and Dictation
   history in one searchable sidebar. Meetings and dictations share the same AI
   presets and Generate workflow without switching pages.
-- **Meeting Notes** supports one-click join and record, typed notes, live
-  Me/Them transcription, seven templates, automatic titles and summaries,
+- **Meeting Notes** supports bot-free recording, typed notes, live Me/Them
+  transcription, nine templates, automatic titles and summaries,
   editable generated output, and evidence jumps. Settings stays one click away
   without competing with the primary workflow.
 - **Send Feedback** is available in Settings for reporting a problem, making a
@@ -121,8 +125,8 @@ top of the screen. It displays live partial text while listening and changes to
 
 ## Vocabulary
 
-The vocabulary file is plain Markdown. Open it from the menu-bar item with
-`Vocabulary`, then add one replacement per line:
+The vocabulary file is plain Markdown. Open Settings and choose
+`Vocabulary` → `Open File`, then add one replacement per line:
 
 ```text
 spoken phrase => preferred spelling
@@ -159,14 +163,12 @@ Application Support directory:
 
 Use the `Folder` action in Transcripts to reveal saved transcripts. Raw microphone
 and system audio are held only for processing and are not retained after
-transcription. Calendar access is optional and is used to show upcoming
-meetings, attendees, join links, and reminders; selected event context is saved
-with the local meeting record.
+transcription.
 
-On iOS, up to 50 recent Quick Dictation results, speech-language and mode
-preferences, and in-person meetings are stored in the app's separate local
-container. Meeting JSON and Markdown files use the same schema as Mac, but
-there is currently no Mac/iOS sync.
+On iOS, up to 50 recent Dictation results, mode preferences, and
+in-person meetings are stored in the app's separate local container. Meeting
+JSON and Markdown files use the same schema as Mac, but there is currently no
+Mac/iOS sync.
 
 The iPhone and iPad app also has a feedback button in its top bar. Feedback is
 sent only when you choose to send the email draft. For a recommendation on
@@ -175,16 +177,17 @@ measuring app usage without changing this privacy behavior, see
 
 ## How it works
 
-The macOS app is built with AppKit, SwiftUI, AVFoundation, Core ML, and the
-pinned [FluidAudio](https://github.com/FluidInference/FluidAudio) package for
-Parakeet inference. The iOS target retains sherpa-onnx and ONNX Runtime.
+Both apps use AVFoundation, Core ML, and the pinned
+[FluidAudio](https://github.com/FluidInference/FluidAudio) package for
+Parakeet inference. The Mac UI uses AppKit and SwiftUI; the iPhone and iPad UI
+uses SwiftUI and UIKit.
 
 1. The global hotkey toggles `TranscriptionController`.
 2. `AudioCapture` records microphone buffers with `AVAudioEngine`.
 3. A reusable `AVAudioConverter` resamples the stream and the bundled Silero
    Core ML VAD finds speech endpoints.
 4. Speech segments are decoded offline by the bundled Parakeet TDT 0.6B v3
-   Core ML model. Quick Dictation caps segments at 30 seconds; each meeting
+   Core ML model. Dictation caps segments at 30 seconds; each meeting
    source caps them at 25 seconds so memory does not grow with meeting length.
 5. Yaprflow applies local cleanup and vocabulary replacements.
 6. Final text is copied to the clipboard and saved as Markdown.
@@ -193,7 +196,7 @@ Parakeet inference. The iOS target retains sherpa-onnx and ONNX Runtime.
    Intelligence is on-device; cloud providers receive text only when used, and
    automatic cloud archive titles require opt-in.
 
-The complete Parakeet ASR and Silero VAD models are bundled in the Mac app. On
+The complete Parakeet ASR and Silero VAD models are bundled in both apps. On
 Mac, background preparation begins at launch, the speech recognizer stays warm
 between nearby dictations and meetings, and its Core ML allocation is released
 after five idle minutes or memory pressure. A later cold start initializes it
@@ -201,11 +204,10 @@ again. Source builds may fetch checksum-pinned model files when absent.
 At runtime, network access is used for optional cloud AI requests and enabled
 usage telemetry.
 
-Parakeet automatically detects Bulgarian, Croatian, Czech, Danish, Dutch,
+On both platforms, Parakeet automatically detects Bulgarian, Croatian, Czech, Danish, Dutch,
 English, Estonian, Finnish, French, German, Greek, Hungarian, Italian, Latvian,
 Lithuanian, Maltese, Polish, Portuguese, Romanian, Russian, Slovak, Slovenian,
-Spanish, Swedish, and Ukrainian. The iOS target continues to use the bundled
-Nemotron streaming model and its explicit language setting.
+Spanish, Swedish, and Ukrainian. Language selection is automatic.
 
 ## Repository layout
 
@@ -217,8 +219,6 @@ docs/                           current GitHub Pages website and bundle brief
 checkout/                       redesigned website, Stripe checkout, private downloads
 scripts/fetch-models.sh         fetches and verifies pinned build-time models
 scripts/copy-models.sh          verifies and stages the exact Xcode model payload
-scripts/build-sherpa-onnx-asr.sh builds pinned Apple native ASR-only frameworks
-scripts/publish-models.sh       maintains the public source-build model mirror
 scripts/app-store-release.sh    creates and verifies Mac App Store packages
 scripts/ios-app-store-release.sh creates and verifies iOS App Store archives
 scripts/testflight-release.sh   gates every TestFlight candidate on both platforms
@@ -237,16 +237,13 @@ Requirements:
 - macOS 14 or later
 - Xcode 26 or later with command-line tools (the Mac target imports Apple's
   Foundation Models framework while remaining deployable to macOS 14)
-- CMake 3.24 or later for the initial native ASR runtime build
 - Network access for the initial, checksum-verified dependency and model fetch
 - Hugging Face CLI (`brew install huggingface-cli`) for the bundled Parakeet and
-  Silero VAD models; the iOS Nemotron fallback comes from the pinned official
-  sherpa-onnx release.
+  Silero VAD models.
 
 ```bash
 git clone https://github.com/tmoreton/yaprflow.git
 cd yaprflow
-scripts/build-sherpa-onnx-asr.sh
 scripts/fetch-models.sh
 open yaprflow.xcodeproj
 ```
@@ -285,8 +282,6 @@ The shared schemes are:
 
 The fetch script pins exact Hugging Face revisions and validates every bundled
 model file with `scripts/model-checksums.sha256`.
-Reviewed native sherpa-onnx and ONNX Runtime artifacts are independently pinned
-by `scripts/native-asr-checksums.sha256`.
 
 ## Distribution and releases
 
@@ -427,9 +422,8 @@ Yaprflow currently accepts outside code only under a prior written contributor
 agreement; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Third-party libraries and models retain their own licenses. Parakeet TDT 0.6B
-v3 is available under CC BY 4.0; Nemotron 3.5 ASR model materials are available
-under OpenMDW-1.1; FluidAudio and sherpa-onnx are Apache-2.0; and ONNX Runtime
-and Silero VAD use MIT terms. See
+v3 is available under CC BY 4.0; FluidAudio is Apache-2.0; and Silero VAD uses
+MIT terms. See
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and the in-app
 Acknowledgements.
 

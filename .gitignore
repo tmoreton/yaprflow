@@ -14,11 +14,8 @@ xcuserdata/
 # macOS
 .DS_Store
 
-# Model weights — hosted in GitHub Releases, fetched via scripts/fetch-models.sh
+# Model weights — fetched from checksum-pinned Hugging Face revisions
 Models/
-
-# Reproducible ASR-only native frameworks; built by scripts/build-sherpa-onnx-asr.sh
-Vendor/SherpaOnnxASR/Artifacts/
 
 .env
 .claude

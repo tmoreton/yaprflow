@@ -57,32 +57,26 @@ enum MeetingAIService {
 
     static func answer(
         question: String,
-        meetings: [MeetingRecord],
-        includeAllSegments: Bool = false,
+        meeting: MeetingRecord,
         progress: @escaping (String) -> Void
     ) async throws -> String {
-        let context = includeAllSegments
-            ? fullContext(for: meetings)
-            : MeetingSearchIndex.context(for: question, in: meetings)
+        let context = fullContext(for: meeting)
         guard !context.isEmpty else {
-            return "I couldn’t find relevant evidence in your saved meetings."
+            return "I couldn’t find relevant evidence in this meeting."
         }
         let prompt = "Answer the user's question using only the supplied meeting excerpts. Cite claims inline using the exact bracketed meeting and segment references. If the evidence is insufficient, say so.\n\nQuestion: \(question)"
         return try await generate(prompt: prompt, source: context, progress: progress)
     }
 
-    private static func fullContext(for meetings: [MeetingRecord]) -> String {
-        meetings.flatMap { meeting -> [String] in
-            var entries: [String] = []
-            if !meeting.rawNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                entries.append("[meeting:\(meeting.id.uuidString)] \(meeting.title) — Notes: \(meeting.rawNotes)")
-            }
-            entries.append(contentsOf: meeting.transcript.map { segment in
-                "[meeting:\(meeting.id.uuidString) segment:\(segment.id.uuidString)] \(meeting.title) — \(segment.displaySpeaker): \(segment.text)"
-            })
-            return entries
+    private static func fullContext(for meeting: MeetingRecord) -> String {
+        var entries: [String] = []
+        if !meeting.rawNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            entries.append("[meeting:\(meeting.id.uuidString)] \(meeting.title) — Notes: \(meeting.rawNotes)")
         }
-        .joined(separator: "\n")
+        entries.append(contentsOf: meeting.transcript.map { segment in
+            "[meeting:\(meeting.id.uuidString) segment:\(segment.id.uuidString)] \(meeting.title) — \(segment.displaySpeaker): \(segment.text)"
+        })
+        return entries.joined(separator: "\n")
     }
 
     private static func generate(

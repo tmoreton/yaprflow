@@ -4,6 +4,13 @@ import MessageUI
 import SwiftUI
 import UIKit
 
+private enum MobileLibrarySection: String, CaseIterable, Identifiable {
+    case dictations = "Dictations"
+    case meetings = "Meetings"
+
+    var id: Self { self }
+}
+
 struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -11,8 +18,8 @@ struct ContentView: View {
     @StateObject private var history = HistoryStore.shared
     @StateObject private var meetings = MobileMeetingStore.shared
     @AppStorage("yaprflow.captureMode") private var selectedModeRaw = MobileCaptureMode.quick.rawValue
-    @State private var showHistory = false
-    @State private var showMeetingLibrary = false
+    @State private var showLibrary = false
+    @State private var initialLibrarySection = MobileLibrarySection.dictations
     @State private var showAcknowledgements = false
     @State private var showFeedback = false
 
@@ -37,6 +44,9 @@ struct ContentView: View {
                 }
             }
         }
+        .safeAreaInset(edge: .bottom) {
+            captureControl
+        }
         .preferredColorScheme(.dark)
         .onAppear {
             engine.preload()
@@ -52,14 +62,12 @@ struct ContentView: View {
         )) { _ in
             engine.applicationDidReceiveMemoryWarning()
         }
-        .sheet(isPresented: $showHistory) {
-            HistorySheet(history: history)
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-                .presentationBackground(Color.black)
-        }
-        .sheet(isPresented: $showMeetingLibrary) {
-            MeetingLibrarySheet(store: meetings)
+        .sheet(isPresented: $showLibrary) {
+            LibrarySheet(
+                history: history,
+                store: meetings,
+                initialSection: initialLibrarySection
+            )
                 .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showAcknowledgements) {
@@ -79,72 +87,44 @@ struct ContentView: View {
     // MARK: - Top bar
 
     private var topBar: some View {
-        HStack {
-            Button {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                showAcknowledgements = true
-            } label: {
-                Image(systemName: "info.circle")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.7))
-                    .frame(width: 36, height: 36)
-                    .background(
-                        Circle().fill(Color.white.opacity(0.08))
-                    )
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("About and acknowledgements")
+        HStack(spacing: 10) {
+            Text("Yaprflow")
+                .font(.system(size: 21, weight: .semibold, design: .rounded))
 
             Spacer()
 
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                showFeedback = true
+                initialLibrarySection = selectedMode == .quick ? .dictations : .meetings
+                showLibrary = true
             } label: {
-                Image(systemName: "bubble.left")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.7))
-                    .frame(width: 36, height: 36)
-                    .background(Circle().fill(Color.white.opacity(0.08)))
+                Label("Library", systemImage: "books.vertical")
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .padding(.horizontal, 12)
+                    .frame(height: 36)
+                    .background(Color.white.opacity(0.08), in: Capsule())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Send feedback")
 
             Menu {
-                Picker("Speech language", selection: $engine.speechLanguage) {
-                    ForEach(SpeechLanguage.allCases) { language in
-                        Text(language.displayName).tag(language)
-                    }
+                Button {
+                    showFeedback = true
+                } label: {
+                    Label("Send Feedback", systemImage: "bubble.left")
+                }
+                Button {
+                    showAcknowledgements = true
+                } label: {
+                    Label("About Yaprflow", systemImage: "info.circle")
                 }
             } label: {
-                Image(systemName: "globe")
+                Image(systemName: "ellipsis")
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(.secondary)
                     .frame(width: 36, height: 36)
                     .background(Circle().fill(Color.white.opacity(0.08)))
             }
-            .disabled(engine.isBusy)
-            .opacity(engine.isBusy ? 0.4 : 1)
-            .accessibilityLabel("Speech language, \(engine.speechLanguage.displayName)")
-
-            Button {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                if selectedMode == .quick {
-                    showHistory = true
-                } else {
-                    showMeetingLibrary = true
-                }
-            } label: {
-                Image(systemName: selectedMode == .quick ? "clock" : "books.vertical")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.7))
-                    .frame(width: 36, height: 36)
-                    .background(
-                        Circle().fill(Color.white.opacity(0.08))
-                    )
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(selectedMode == .quick ? "Recent transcripts" : "Saved meetings")
+            .accessibilityLabel("More options")
         }
     }
 
@@ -159,9 +139,9 @@ struct ContentView: View {
             .disabled(engine.isBusy)
             .accessibilityHint("Choose clipboard dictation or an in-person meeting")
 
-            Label(modeSubtitle, systemImage: selectedMode == .quick ? "doc.on.clipboard" : "person.2")
+            Label(modeSubtitle, systemImage: selectedMode == .quick ? "doc.on.clipboard" : "lock.fill")
                 .font(.system(size: 12, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(.secondary)
                 .lineLimit(1)
         }
         .frame(maxWidth: 390)
@@ -175,11 +155,7 @@ struct ContentView: View {
                 .frame(height: 96)
                 .padding(.horizontal, 24)
 
-            statusText
-                .padding(.top, 16)
-                .frame(height: 38)
-
-            Spacer(minLength: 12)
+            Spacer(minLength: 24)
 
             if !engine.liveTranscript.isEmpty {
                 transcript
@@ -187,138 +163,137 @@ struct ContentView: View {
                     .padding(.bottom, 24)
             }
 
-            micButton
-                .padding(.bottom, 56)
+            Spacer(minLength: 12)
         }
     }
 
     private var meetingContent: some View {
         ScrollView {
-            VStack(spacing: 16) {
-                meetingPrivacyCard
-
-                VStack(spacing: 12) {
-                    TextField("Meeting title (optional)", text: $meetings.draftTitle)
-                        .textInputAutocapitalization(.sentences)
-                        .font(.system(size: 17, weight: .semibold, design: .rounded))
-                        .padding(12)
-                        .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
-                        .accessibilityLabel("Meeting title")
-
-                    HStack {
-                        Label("Output", systemImage: "rectangle.3.group")
-                            .foregroundStyle(.white.opacity(0.65))
-                        Spacer()
-                        Menu {
-                            ForEach(MeetingTemplateCatalog.builtIns) { template in
-                                Button {
-                                    meetings.draftTemplateID = template.id
-                                } label: {
-                                    Label(
-                                        template.name,
-                                        systemImage: template.id == selectedMeetingTemplate.id
-                                            ? "checkmark"
-                                            : template.systemImage
-                                    )
-                                }
-                            }
-                        } label: {
-                            HStack(spacing: 6) {
-                                Text(selectedMeetingTemplate.name)
-                                    .lineLimit(1)
-                                Image(systemName: "chevron.up.chevron.down")
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: 10, height: 13)
-                            }
-                            .font(.system(size: 14, weight: .medium, design: .rounded))
-                        }
-                        .tint(.white)
-                        .accessibilityLabel("Meeting template, \(selectedMeetingTemplate.name)")
+            Group {
+                if horizontalSizeClass == .regular {
+                    HStack(alignment: .top, spacing: 24) {
+                        meetingSetup
+                            .frame(maxWidth: .infinity, alignment: .top)
+                        meetingLivePanel
+                            .frame(maxWidth: .infinity, alignment: .top)
                     }
-                    .font(.system(size: 14, weight: .medium, design: .rounded))
-                    .padding(.horizontal, 12)
-
-                    ZStack(alignment: .topLeading) {
-                        if meetings.draftNotes.isEmpty {
-                            Text("Type notes while you talk…")
-                                .font(.system(size: 15, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.32))
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 15)
-                                .allowsHitTesting(false)
-                        }
-                        TextEditor(text: $meetings.draftNotes)
-                            .font(.system(size: 15, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.88))
-                            .scrollContentBackground(.hidden)
-                            .padding(8)
-                            .frame(minHeight: 96)
-                            .accessibilityLabel("My meeting notes")
-                    }
-                    .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
-                }
-
-                Waveform(levels: engine.levels, isActive: engine.isRecording)
-                    .frame(height: 64)
-
-                HStack(spacing: 8) {
-                    statusText
-                    if engine.isRecording, let startedAt = engine.recordingStartedAt {
-                        TimelineView(.periodic(from: .now, by: 1)) { context in
-                            Text(Self.durationString(context.date.timeIntervalSince(startedAt)))
-                                .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                                .foregroundStyle(.red.opacity(0.9))
-                                .accessibilityLabel("Meeting duration")
-                        }
+                } else {
+                    VStack(spacing: 18) {
+                        meetingSetup
+                        meetingLivePanel
                     }
                 }
-                .frame(minHeight: 22)
-
-                if !engine.liveTranscript.isEmpty {
-                    Text(engine.liveTranscript)
-                        .font(.system(size: 15, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.78))
-                        .multilineTextAlignment(.leading)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(14)
-                        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
-                        .accessibilityLabel("Live meeting transcript")
-                }
-
-                micButton
-                    .padding(.top, 2)
-                    .padding(.bottom, 28)
             }
             .padding(.horizontal, horizontalSizeClass == .regular ? 56 : 20)
             .padding(.top, 14)
+            .padding(.bottom, 24)
         }
         .scrollDismissesKeyboard(.interactively)
     }
 
-    private var meetingPrivacyCard: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "person.2.wave.2")
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(.blue)
-                .frame(width: 28)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("In-person meeting")
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white)
-                Text("Uses this device’s microphone. Audio is never saved; transcript and notes stay local.")
-                    .font(.system(size: 12, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.55))
-                    .fixedSize(horizontal: false, vertical: true)
+    private var meetingSetup: some View {
+        VStack(spacing: 12) {
+            TextField("Meeting title (optional)", text: $meetings.draftTitle)
+                .textInputAutocapitalization(.sentences)
+                .font(.system(size: 17, weight: .semibold, design: .rounded))
+                .padding(12)
+                .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
+                .accessibilityLabel("Meeting title")
+
+            HStack {
+                Label("Notes format", systemImage: "rectangle.3.group")
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Menu {
+                    ForEach(MeetingTemplateCatalog.builtIns) { template in
+                        Button {
+                            meetings.draftTemplateID = template.id
+                        } label: {
+                            Label(
+                                template.name,
+                                systemImage: template.id == selectedMeetingTemplate.id
+                                    ? "checkmark"
+                                    : template.systemImage
+                            )
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Text(selectedMeetingTemplate.name)
+                            .lineLimit(1)
+                        Image(systemName: "chevron.up.chevron.down")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 10, height: 13)
+                    }
+                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                }
+                .tint(.white)
+                .accessibilityLabel("Notes format, \(selectedMeetingTemplate.name)")
             }
-            Spacer(minLength: 0)
+            .font(.system(size: 14, weight: .medium, design: .rounded))
+            .padding(.horizontal, 12)
+
+            ZStack(alignment: .topLeading) {
+                if meetings.draftNotes.isEmpty {
+                    Text("Add notes while you talk…")
+                        .font(.system(size: 15, design: .rounded))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 15)
+                        .allowsHitTesting(false)
+                }
+                TextEditor(text: $meetings.draftNotes)
+                    .font(.system(size: 15, design: .rounded))
+                    .foregroundStyle(.primary)
+                    .scrollContentBackground(.hidden)
+                    .padding(8)
+                    .frame(minHeight: horizontalSizeClass == .regular ? 180 : 96)
+                    .accessibilityLabel("Your meeting notes")
+            }
+            .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
         }
-        .padding(14)
-        .background(Color.blue.opacity(0.12), in: RoundedRectangle(cornerRadius: 14))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color.blue.opacity(0.25), lineWidth: 1)
-        )
+    }
+
+    private var meetingLivePanel: some View {
+        VStack(spacing: 14) {
+            HStack {
+                Text("Live transcript")
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                Spacer()
+                if engine.isRecording, let startedAt = engine.recordingStartedAt {
+                    TimelineView(.periodic(from: .now, by: 1)) { context in
+                        Text(Self.durationString(context.date.timeIntervalSince(startedAt)))
+                            .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(.red)
+                            .accessibilityLabel("Meeting duration")
+                    }
+                }
+            }
+
+            Waveform(levels: engine.levels, isActive: engine.isRecording)
+                .frame(height: horizontalSizeClass == .regular ? 72 : 56)
+
+            Group {
+                if engine.liveTranscript.isEmpty {
+                    ContentUnavailableView(
+                        "Transcript appears here",
+                        systemImage: "waveform",
+                        description: Text("Finalized speech appears after each pause.")
+                    )
+                } else {
+                    Text(engine.liveTranscript)
+                        .font(.system(size: 15, design: .rounded))
+                        .foregroundStyle(.primary)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityLabel("Live meeting transcript")
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: horizontalSizeClass == .regular ? 180 : 92, alignment: .topLeading)
+            .padding(14)
+            .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+        }
     }
 
     private var transcript: some View {
@@ -330,62 +305,88 @@ struct ContentView: View {
             .animation(.easeInOut(duration: 0.15), value: engine.liveTranscript)
     }
 
-    private var statusText: some View {
-        Text(statusLabel)
-            .font(.system(size: 13, weight: .medium, design: .rounded))
-            .tracking(0.3)
-            .foregroundStyle(statusColor)
-            .animation(.easeInOut(duration: 0.2), value: statusLabel)
-            .multilineTextAlignment(.center)
+    private var captureControl: some View {
+        VStack(spacing: 8) {
+            if let captureFeedback {
+                Text(captureFeedback)
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundStyle(captureFeedbackColor)
+                    .multilineTextAlignment(.center)
+                    .transition(.opacity)
+            }
+
+            Button {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                if selectedMode == .meeting, !engine.isBusy {
+                    meetings.prepareNewCapture()
+                }
+                engine.toggle(mode: selectedMode)
+            } label: {
+                HStack(spacing: 10) {
+                    if captureControlDisabled {
+                        ProgressView()
+                            .controlSize(.small)
+                            .tint(.black)
+                    } else {
+                        Image(systemName: captureButtonSymbol)
+                            .font(.system(size: 16, weight: .semibold))
+                    }
+                    Text(captureButtonTitle)
+                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                }
+                .foregroundStyle(showsStopControl ? Color.white : Color.black)
+                .frame(maxWidth: 360)
+                .frame(height: 54)
+                .background(showsStopControl ? Color.red : Color.white, in: Capsule())
+                .shadow(
+                    color: showsStopControl ? Color.red.opacity(0.3) : .clear,
+                    radius: showsStopControl ? 16 : 0
+                )
+                .animation(.easeInOut(duration: 0.18), value: showsStopControl)
+            }
+            .buttonStyle(.plain)
+            .disabled(captureControlDisabled)
+            .accessibilityLabel(captureButtonTitle)
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 10)
+        .padding(.bottom, 8)
+        .frame(maxWidth: .infinity)
+        .background(Color.black.opacity(0.96))
     }
 
-    private var statusLabel: String {
+    private var captureButtonTitle: String {
+        if engine.isRecordingPending { return "Cancel" }
+        if engine.isRecording {
+            return selectedMode == .quick ? "Stop dictation" : "Stop meeting"
+        }
+        if captureControlDisabled { return "Finishing…" }
+        return selectedMode == .quick ? "Start dictation" : "Start meeting"
+    }
+
+    private var captureButtonSymbol: String {
+        if engine.isRecordingPending { return "xmark" }
+        return engine.isRecording ? "stop.fill" : "mic.fill"
+    }
+
+    private var captureControlDisabled: Bool {
+        engine.isBusy && !engine.isRecording && !engine.isRecordingPending
+    }
+
+    private var captureFeedback: String? {
         switch engine.status {
-        case .idle:
-            return selectedMode == .quick ? "Tap to dictate" : "Tap to start meeting"
-        case .preparing(let msg): return msg
-        case .listening: return selectedMode == .quick ? "Listening" : "Recording"
-        case .finishing: return "Finishing"
-        case .copied: return "Copied"
-        case .saved: return "Meeting saved locally"
-        case .error(let msg): return msg
+        case .idle, .listening: nil
+        case .preparing(let message): message
+        case .finishing: "Finishing…"
+        case .copied: "Copied to clipboard"
+        case .saved: "Meeting saved locally"
+        case .error(let message): message
         }
     }
 
-    private var statusColor: Color {
+    private var captureFeedbackColor: Color {
         if case .error = engine.status { return .orange }
-        if engine.isRecording { return .red.opacity(0.9) }
-        return .white.opacity(0.45)
-    }
-
-    private var micButton: some View {
-        Button {
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            if selectedMode == .meeting, !engine.isBusy {
-                meetings.prepareNewCapture()
-            }
-            engine.toggle(mode: selectedMode)
-        } label: {
-            ZStack {
-                Circle()
-                    .fill(showsStopControl ? Color.red : Color.white)
-                    .frame(width: 76, height: 76)
-                    .shadow(color: showsStopControl ? Color.red.opacity(0.45) : .clear,
-                            radius: showsStopControl ? 22 : 0)
-
-                Image(systemName: showsStopControl ? "stop.fill" : "mic.fill")
-                    .font(.system(size: 28, weight: .semibold))
-                    .foregroundStyle(showsStopControl ? .white : .black)
-            }
-            .scaleEffect(showsStopControl ? 1.04 : 1.0)
-            .animation(.spring(response: 0.32, dampingFraction: 0.7), value: showsStopControl)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(
-            showsStopControl
-                ? "Stop \(selectedMode == .quick ? "dictation" : "meeting")"
-                : "Start \(selectedMode == .quick ? "dictation" : "meeting")"
-        )
+        return .secondary
     }
 
     private var showsStopControl: Bool {
@@ -409,8 +410,8 @@ struct ContentView: View {
 
     private var modeSubtitle: String {
         switch selectedMode {
-        case .quick: "Voice to text • Copies to clipboard"
-        case .meeting: "In-person • Microphone only • Saved locally"
+        case .quick: "Copies finished text to the clipboard"
+        case .meeting: "Microphone only • Audio isn’t saved • Stored locally"
         }
     }
 
@@ -426,7 +427,9 @@ struct ContentView: View {
     private func configureDebugSmokeRoute() {
         #if DEBUG
         let arguments = ProcessInfo.processInfo.arguments
-        if arguments.contains("--smoke-test-meeting") {
+        if arguments.contains("--smoke-test-dictation") {
+            selectedModeRaw = MobileCaptureMode.quick.rawValue
+        } else if arguments.contains("--smoke-test-meeting") {
             selectedModeRaw = MobileCaptureMode.meeting.rawValue
             meetings.draftTitle = "Production readiness"
             meetings.draftNotes = "Typed notes stay local and remain available with the transcript."
@@ -437,47 +440,56 @@ struct ContentView: View {
                 showFeedback = true
             } else if arguments.contains("--smoke-test-meeting-library") {
                 selectedModeRaw = MobileCaptureMode.meeting.rawValue
-                showMeetingLibrary = true
+                initialLibrarySection = .meetings
+                showLibrary = true
             } else if arguments.contains("--smoke-test-history") {
-                showHistory = true
+                initialLibrarySection = .dictations
+                showLibrary = true
             }
         }
         #endif
     }
 }
 
-// MARK: - Meeting library
+// MARK: - Library
 
-private struct MeetingLibrarySheet: View {
+private struct LibrarySheet: View {
+    @ObservedObject var history: HistoryStore
     @ObservedObject var store: MobileMeetingStore
     @Environment(\.dismiss) private var dismiss
-    @State private var meetingPendingDeletion: MeetingRecord?
+    @State private var selectedSection: MobileLibrarySection
+
+    init(
+        history: HistoryStore,
+        store: MobileMeetingStore,
+        initialSection: MobileLibrarySection
+    ) {
+        _history = ObservedObject(wrappedValue: history)
+        _store = ObservedObject(wrappedValue: store)
+        _selectedSection = State(initialValue: initialSection)
+    }
 
     var body: some View {
         NavigationStack {
-            Group {
-                if store.meetings.isEmpty {
-                    ContentUnavailableView(
-                        "No meetings yet",
-                        systemImage: "person.2.wave.2",
-                        description: Text("Use Meeting mode to capture an in-person conversation.")
-                    )
-                } else {
-                    List {
-                        ForEach(store.meetings) { meeting in
-                            NavigationLink(value: meeting) {
-                                MeetingLibraryRow(meeting: meeting)
-                            }
-                        }
-                        .onDelete { offsets in
-                            guard let offset = offsets.first,
-                                  store.meetings.indices.contains(offset) else { return }
-                            meetingPendingDeletion = store.meetings[offset]
-                        }
+            VStack(spacing: 0) {
+                Picker("Library section", selection: $selectedSection) {
+                    ForEach(MobileLibrarySection.allCases) { section in
+                        Text(section.rawValue).tag(section)
                     }
                 }
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+
+                switch selectedSection {
+                case .dictations:
+                    HistorySheet(history: history)
+                case .meetings:
+                    MeetingLibraryContent(store: store)
+                }
             }
-            .navigationTitle("Meetings")
+            .navigationTitle("Library")
+            .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: MeetingRecord.self) { meeting in
                 MobileMeetingDetailView(meeting: meeting, store: store)
             }
@@ -488,6 +500,40 @@ private struct MeetingLibrarySheet: View {
             }
         }
         .preferredColorScheme(.dark)
+        .presentationDetents([.medium, .large])
+        .presentationBackground(Color.black)
+    }
+}
+
+// MARK: - Meeting library
+
+private struct MeetingLibraryContent: View {
+    @ObservedObject var store: MobileMeetingStore
+    @State private var meetingPendingDeletion: MeetingRecord?
+
+    var body: some View {
+        Group {
+            if store.meetings.isEmpty {
+                ContentUnavailableView(
+                    "No meetings yet",
+                    systemImage: "person.2.wave.2",
+                    description: Text("Use Meeting mode to capture an in-person conversation.")
+                )
+            } else {
+                List {
+                    ForEach(store.meetings) { meeting in
+                        NavigationLink(value: meeting) {
+                            MeetingLibraryRow(meeting: meeting)
+                        }
+                    }
+                    .onDelete { offsets in
+                        guard let offset = offsets.first,
+                              store.meetings.indices.contains(offset) else { return }
+                        meetingPendingDeletion = store.meetings[offset]
+                    }
+                }
+            }
+        }
         .onAppear { store.refresh() }
         .alert(
             "Couldn’t update meetings",
@@ -562,15 +608,20 @@ private struct MobileMeetingDetailView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(meeting.startedAt.formatted(date: .long, time: .shortened))
                         .foregroundStyle(.secondary)
-                    Label(
-                        MeetingTemplateCatalog.template(id: meeting.templateID).name,
-                        systemImage: "rectangle.3.group"
-                    )
+                    HStack {
+                        Text("Notes format")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Label(
+                            MeetingTemplateCatalog.template(id: meeting.templateID).name,
+                            systemImage: "rectangle.3.group"
+                        )
+                    }
                     .font(.callout.weight(.medium))
                 }
 
                 if !meeting.rawNotes.isEmpty {
-                    meetingSection(title: "My notes", text: meeting.rawNotes)
+                    meetingSection(title: "Your notes", text: meeting.rawNotes)
                 }
 
                 meetingSection(
@@ -615,7 +666,7 @@ private struct MobileMeetingDetailView: View {
             }
         }
         .onAppear {
-            exportURL = try? store.exportURL(for: meeting)
+            exportURL = store.exportURLReportingError(for: meeting)
         }
         .confirmationDialog(
             "Delete this meeting?",
@@ -840,7 +891,6 @@ private enum HistoryDeletionTarget {
 
 private struct HistorySheet: View {
     @ObservedObject var history: HistoryStore
-    @Environment(\.dismiss) private var dismiss
     @State private var copiedItem: String?
     @State private var deletionTarget: HistoryDeletionTarget?
 
@@ -850,9 +900,9 @@ private struct HistorySheet: View {
 
             VStack(alignment: .leading, spacing: 0) {
                 HStack {
-                    Text("Recent")
+                    Text("Recent dictations")
                         .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(.secondary)
                         .tracking(0.6)
                         .textCase(.uppercase)
                     Spacer()
@@ -872,7 +922,7 @@ private struct HistorySheet: View {
                         ContentUnavailableView(
                             "No recent dictations",
                             systemImage: "mic",
-                            description: Text("Quick Dictation results will appear here after they’re copied.")
+                            description: Text("Finished dictations will appear here after they’re copied.")
                         )
                         .frame(maxWidth: .infinity)
                         .padding(.horizontal, 24)
@@ -915,7 +965,6 @@ private struct HistorySheet: View {
                     Button("Clear History", role: .destructive) {
                         history.clear()
                         self.deletionTarget = nil
-                        dismiss()
                     }
                 }
             }
@@ -1010,13 +1059,13 @@ private struct HistoryRow: View {
                 HStack(alignment: .top, spacing: 10) {
                     Text(text)
                         .font(.system(size: 14, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.8))
+                        .foregroundStyle(.primary)
                         .multilineTextAlignment(.leading)
                         .lineLimit(3)
                     Spacer(minLength: 0)
                     Image(systemName: isCopied ? "checkmark" : "doc.on.doc")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(isCopied ? Color.green : .white.opacity(0.4))
+                        .foregroundStyle(isCopied ? Color.green : Color.secondary)
                         .frame(width: 18)
                 }
                 .contentShape(Rectangle())

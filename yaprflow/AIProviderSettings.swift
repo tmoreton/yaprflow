@@ -64,8 +64,10 @@ final class AIProviderSettings: ObservableObject {
         ollamaModel = defaults.string(forKey: DefaultsKey.ollamaModel) ?? ""
         automaticDictationOutput = defaults.object(forKey: DefaultsKey.automaticDictationOutput) as? Bool
             ?? (selectedProvider == .appleIntelligence && Self.supportsAutomaticAppleDictation)
-        hasOpenAIKey = (try? AIKeychain.read(account: AIProviderKind.openAI.rawValue)) != nil
-        hasOpenRouterKey = (try? AIKeychain.read(account: AIProviderKind.openRouter.rawValue)) != nil
+        // Checking whether a key exists should never decrypt it or trigger a
+        // Keychain authorization prompt while a window is opening.
+        hasOpenAIKey = AIKeychain.contains(account: AIProviderKind.openAI.rawValue)
+        hasOpenRouterKey = AIKeychain.contains(account: AIProviderKind.openRouter.rawValue)
     }
 
     var selectedModel: String {
@@ -161,6 +163,12 @@ private enum AIKeychain {
             throw KeychainError(errSecDecode)
         }
         return key
+    }
+
+    static func contains(account: String) -> Bool {
+        var query = baseQuery(account: account)
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+        return SecItemCopyMatching(query as CFDictionary, nil) == errSecSuccess
     }
 
     static func save(_ key: String, account: String) throws {

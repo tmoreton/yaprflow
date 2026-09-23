@@ -414,7 +414,7 @@ verify_bundled_app() {
     fi
 
     yaprflow_verify_model_inventory \
-        "$resources_path" "$MODEL_CHECKSUMS" "$YAPRFLOW_MAC_ASR_MODEL_DIR" || return 1
+        "$resources_path" "$MODEL_CHECKSUMS" "$YAPRFLOW_ASR_MODEL_DIR" || return 1
 
     executable_name="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$info_plist")"
     executable_path="$app_path/Contents/MacOS/$executable_name"

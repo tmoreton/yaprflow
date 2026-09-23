@@ -167,27 +167,6 @@ struct MeetingCoreTests {
         #expect(MeetingTranscriptTimestamp.string(for: 3_661) == "1:01:01")
     }
 
-    @Test("Search favors titles and returns exact evidence segments")
-    func search() {
-        let evidence = MeetingTranscriptSegment(
-            speaker: .them,
-            startTime: 10,
-            endTime: 18,
-            text: "The launch date is October fifth."
-        )
-        let launch = MeetingRecord(title: "Launch planning", transcript: [evidence])
-        let unrelated = MeetingRecord(
-            title: "Weekly sync",
-            rawNotes: "Talk about lunch plans instead."
-        )
-
-        let hits = MeetingSearchIndex.search("launch date", in: [unrelated, launch])
-
-        #expect(hits.first?.meetingID == launch.id)
-        #expect(hits.contains { $0.segmentID == evidence.id })
-        #expect(MeetingSearchIndex.context(for: "launch date", in: [launch]).contains(evidence.id.uuidString))
-    }
-
     @Test("Generated notes discard invented citation identifiers")
     func generatedNotesParsing() throws {
         let validID = UUID()
@@ -490,14 +469,13 @@ struct MeetingCoreTests {
 
     @Test("Library presets provide structured, trustworthy workflows")
     func libraryPromptPresets() {
-        let presets = LibraryPromptCatalog.itemPresets + LibraryPromptCatalog.allMeetingPresets
+        let presets = LibraryPromptCatalog.itemPresets
 
-        #expect(presets.count == 13)
+        #expect(presets.count == 9)
         #expect(Set(presets.map(\.id)).count == presets.count)
         #expect(presets.allSatisfy { $0.prompt.split(separator: "\n").count >= 8 })
         #expect(presets.allSatisfy { $0.prompt.localizedCaseInsensitiveContains("invent") })
         #expect(LibraryPromptCatalog.itemPresets.contains { $0.id == "follow-up-email" })
-        #expect(LibraryPromptCatalog.allMeetingPresets.contains { $0.id == "follow-up-queue" })
         #expect(LibraryPromptCatalog.dictationPresets.first?.id == LibraryPromptCatalog.polishedDictation.id)
         #expect(!LibraryPromptCatalog.itemPresets.contains { $0.id == LibraryPromptCatalog.polishedDictation.id })
         #expect(LibraryPromptCatalog.polishedDictation.prompt.localizedCaseInsensitiveContains("do not invent"))
@@ -558,4 +536,65 @@ struct MeetingCoreTests {
         #expect(abs(restored.startedAt.timeIntervalSince(meeting.startedAt)) < 1)
         #expect(restored.attendees.first?.email == "ari@example.com")
     }
+
+    @Test("Shared meeting storage writes and reloads both representations")
+    func meetingDiskStoreRoundTrip() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("yaprflow-meeting-store-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let store = MeetingRecordDiskStore(directory: directory)
+        let meeting = MeetingRecord(
+            title: "Storage test",
+            transcript: [MeetingTranscriptSegment(
+                speaker: .me,
+                startTime: 0,
+                endTime: 1,
+                text: "Persist this sentence."
+            )]
+        )
+
+        let saved = try store.save(meeting)
+        let loaded = try store.load()
+        let urls = store.fileURLs(for: meeting.id)
+
+        #expect(saved.meeting == meeting)
+        #expect(loaded.meetings.first?.id == meeting.id)
+        #expect(loaded.meetings.first?.title == meeting.title)
+        #expect(loaded.meetings.first?.transcript == meeting.transcript)
+        #expect(loaded.issues.isEmpty)
+        #expect(FileManager.default.fileExists(atPath: urls.json.path))
+        #expect(FileManager.default.fileExists(atPath: urls.markdown.path))
+    }
+
+    @Test("Unreadable meeting records are quarantined without hiding valid meetings")
+    func corruptMeetingRecovery() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("yaprflow-meeting-recovery-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let store = MeetingRecordDiskStore(directory: directory)
+        let validMeeting = MeetingRecord(title: "Valid meeting")
+        _ = try store.save(validMeeting)
+        let corruptURL = directory.appendingPathComponent("damaged.json")
+        try Data("not valid JSON".utf8).write(to: corruptURL)
+
+        let loaded = try store.load()
+        let recoveryDirectory = directory.appendingPathComponent(
+            MeetingRecordDiskStore.recoveryDirectoryName,
+            isDirectory: true
+        )
+        let recoveredFiles = try FileManager.default.contentsOfDirectory(
+            at: recoveryDirectory,
+            includingPropertiesForKeys: nil
+        )
+
+        #expect(loaded.meetings.first?.id == validMeeting.id)
+        #expect(loaded.meetings.first?.title == validMeeting.title)
+        #expect(loaded.issues.count == 1)
+        #expect(loaded.issues.first?.fileName == "damaged.json")
+        #expect(!FileManager.default.fileExists(atPath: corruptURL.path))
+        #expect(recoveredFiles.contains { $0.pathExtension == "json" })
+    }
+
 }

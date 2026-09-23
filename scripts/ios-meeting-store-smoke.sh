@@ -16,6 +16,7 @@ xcrun swiftc \
     -parse-as-library \
     "$ROOT/Shared/TranscriptionCore.swift" \
     "$ROOT/Shared/MeetingCore.swift" \
+    "$ROOT/Shared/MeetingPersistence.swift" \
     "$ROOT/yaprflow-iOS/MobileMeetingStore.swift" \
     "$ROOT/Tools/MobileMeetingStoreSmoke.swift" \
     -o "$TEMP_ROOT/mobile-meeting-store-smoke"

@@ -9,6 +9,9 @@ commercial generation. It also preserves the state of the historical free
 4.0.14 submission so that the transition is not mistaken for a retroactive
 change.
 
+Use [`PLATFORM_CAPABILITIES.md`](PLATFORM_CAPABILITIES.md) as the source of
+truth for model, language, capture, and generated-text claims by platform.
+
 Last reviewed: September 20, 2026
 
 ## Intended release records
@@ -52,7 +55,7 @@ the DMG under submission `c36097ec-8965-4b0f-8ae2-e485d3d32b5d`. Gatekeeper
 accepted `build/yaprflow-5.2.0.dmg`; its SHA-256 is
 `d07a46538f1d55462d7bf7d574c9d1df3099a3030b862e2cacec3220196a3a0f`.
 The signed app uses the final edge-to-edge flat-red icon and also passed the
-Meeting Notes persistence and Quick Dictation capture-engine runtime smoke
+Meeting Notes persistence and Dictation capture-engine runtime smoke
 tests. Nothing was uploaded to a customer-facing download location.
 
 The macOS 5.2.0 (13) TestFlight package at
@@ -84,13 +87,13 @@ Neither TestFlight artifact was uploaded.
 
 ### Draft What's New in Version 5.2.0
 
-Yaprflow now separates Quick Dictation from Meeting Notes. Quick Dictation
+Yaprflow now separates Dictation from Meeting Notes. Dictation
 turns speech into clipboard text from a global shortcut. Command-M opens a
 cleaner, more focused Meeting Notes workspace for capturing
 microphone and Mac audio without a meeting bot, combines the local transcript
-with typed notes and calendar context, and creates editable structured notes
+with typed notes and meeting templates, and creates editable structured notes
 with evidence links. This release also adds meeting templates, local meeting
-search, cross-meeting questions, a simpler Ask experience, a cleaner mode-first
+search, selected-meeting questions, a simpler Ask experience, a cleaner mode-first
 menu, and a unified flat-red app icon across Mac, iPhone, and iPad.
 
 Use this text when 5.2.0 is submitted as an update to a version that reached
@@ -103,8 +106,8 @@ Yaprflow is private voice dictation and optional AI productivity for your Mac.
 Press Command-T, speak naturally, press Command-T again, and paste clean text
 into any app.
 
-Speech recognition runs locally through sherpa-onnx and ONNX Runtime, with
-Core ML used for voice activity detection. The complete speech model is
+Speech recognition runs locally through FluidAudio and the bundled Parakeet
+Core ML model, with Core ML also used for voice activity detection. The complete speech model is
 included with Yaprflow, so audio and transcripts do not need to leave the Mac.
 There is no Yaprflow account, subscription, advertising, or cross-app tracking.
 Limited usage and fixed-category error telemetry is enabled by default and can
@@ -119,8 +122,8 @@ Features:
 - Automatically copy finished text to the clipboard.
 - Keep a browsable local Markdown history.
 - Correct names, acronyms, and preferred spellings with a local vocabulary.
-- Choose among 32 production-ready dictation locales, with English (United
-  States) as the default and Automatic detection available.
+- Automatically detect 25 supported European languages with the bundled
+  Parakeet speech model.
 - Summarize, restructure, or rewrite transcripts with Apple Intelligence on
   supported Macs, your own OpenAI or OpenRouter API key, or Ollama on your Mac.
 - Generate local titles, topics, and descriptions for transcript history on
@@ -154,7 +157,7 @@ the device microphone and cannot capture audio from another app.
 Turn speech into useful text without sending your voice to a transcription
 service. Yaprflow includes two focused modes for iPhone and iPad.
 
-Quick Dictation is the fast path from voice to clipboard. Speak, stop, and your
+Dictation is the fast path from voice to clipboard. Speak, stop, and your
 finished text is ready to paste into any app. Yaprflow keeps up to 50 recent
 results locally so you can recover something you dictated earlier.
 
@@ -169,7 +172,7 @@ Features:
 - Quick voice-to-text capture with automatic clipboard copy.
 - Microphone-only in-person meeting capture with typed notes and templates.
 - Local meeting library with readable Markdown export.
-- 32 production-ready speech locales plus Automatic detection.
+- Automatic detection across 25 supported European languages.
 - No account, subscription, advertising, or cross-app tracking.
 
 Audio is used only while you record and is not retained. In-person Meeting
@@ -181,8 +184,8 @@ the Mac app. Yaprflow requires iOS 17 or later.
 Yaprflow has no account or login. The bundled speech model can make the first
 capture slower while the local recognizer initializes.
 
-To test Quick Dictation, select Quick, tap the microphone, speak, and tap Stop.
-The transcript is copied to the clipboard and appears under the clock button.
+To test Dictation, select Dictation, tap Start dictation, speak, and tap Stop dictation.
+The transcript is copied to the clipboard and appears under Library.
 
 To test In-person Meeting, select Meeting, optionally enter a title and notes,
 tap Start in-person meeting, speak, and tap Stop meeting. The transcript and
@@ -253,49 +256,20 @@ does not alter the licenses of the third-party components below.
 Answer **Yes** when asked whether the app contains or accesses third-party
 content. Current bundled components are:
 
-- A narrow VAD adapter derived from FluidAudio 0.13.6: Apache License 2.0.
-  The FluidAudio package itself, VBx, fastcluster, diarization, clustering,
-  downloader, and TTS implementations are not linked or distributed.
-- Silero VAD: MIT License.
-- sherpa-onnx: Apache License 2.0.
-- NVIDIA Nemotron 3.5 ASR Streaming 0.6B: OpenMDW License Agreement, version
-  1.1. Its permission grant covers dealing in the model materials, including
-  commercial redistribution, subject to the agreement's conditions.
-- ONNX Runtime: MIT License; its complete upstream third-party notice inventory
-  is also bundled.
-- sherpa-onnx native build dependencies: Apache, BSD 3-Clause, MIT, and Eigen's
-  MPL 2.0 terms; exact upstream license files are bundled.
+- Both platforms: FluidAudio 0.13.6 under Apache License 2.0, NVIDIA Parakeet
+  TDT 0.6B v3 Core ML model materials under CC BY 4.0, the bundled Silero VAD
+  model under MIT, and adapted VAD logic
+  derived from FluidAudio under Apache License 2.0.
 
 Attributions, license links, and the applicable reproduced Apache, BSD, and MIT
 texts are included in the Mac Settings > Acknowledgements view and bundled as
-`Acknowledgements.txt` in both targets. Both targets also bundle the complete
-OpenMDW-1.1 agreement, the detailed model notice, and an exact `NOTICE.txt`
-resource retaining the model's origin and pinned source/export revisions.
+`Acknowledgements.txt`. Each release target must retain the notices and license
+texts applicable to the model and runtime it packages.
 
-The previous CC BY 4.0 Parakeet model and its interim Zipformer replacement have
-been removed from the current model manifest and release packaging path. The
-selected model is the pinned 1120 ms chunk-size INT8 sherpa-onnx export dated
-June 11, 2026 of NVIDIA Nemotron 3.5 ASR Streaming 0.6B. The upstream source
-model/model-card revision reviewed is
-`ea30d66debe3740a08b573244286791d423d6b3e`; the exact export mirror revision is
-`cba1c96ca5ef0e8393b50584ae153a79145dc492`. The export does not identify the
-precise NVIDIA commit used for conversion, so the official archive digest and
-per-file hashes are the authoritative binary pins. The model covers 40 locales
-across 35 languages: 32 transcribe out of the box and are exposed as explicit
-language choices plus Automatic detection, while 8 adaptation-ready locales
-require fine-tuning and are not a Yaprflow product claim. OpenMDW-1.1 permits
-dealing in the model materials subject to its conditions and requires
-redistributed copies to retain the agreement plus applicable copyright and
-origin notices. Both are bundled.
-This records the owner's release decision; it does not represent that counsel
-or every upstream rightsholder supplied a separate written chain-of-title
-opinion.
-
-The sherpa-onnx Apple frameworks are built with TTS and speaker diarization
-disabled so the optional GPL eSpeak-NG/Piper path is not distributed; release
-verification rejects those symbols if they reappear. ONNX Runtime is pinned as
-a checksum-verified local artifact, with the upstream macOS framework links
-normalized before Xcode packaging.
+Both releases package the same pinned Parakeet Core ML model and CC BY 4.0
+attribution. The exact conversion revision and per-file hashes are the
+authoritative binary pins. FluidAudio's optional diarization and TTS features
+are not linked by Yaprflow.
 
 ## macOS review notes
 
@@ -306,12 +280,11 @@ restore flow is required; Apple handles the ordinary paid-app entitlement.
 To test the main flow:
 
 1. Launch Yaprflow and grant microphone access during onboarding.
-2. Open Settings and confirm Speech language defaults to English (United
-   States). Choose Automatic only when testing language detection.
+2. Open Settings and choose the Exact or Polished dictation style.
 3. Click the waveform icon in the menu bar, or press Command-T.
 4. Speak a sentence, then press Command-T again.
-5. The finished text is copied to the clipboard and saved in local History.
-6. Open the menu-bar item and choose History to view the saved transcript.
+5. The finished text is copied to the clipboard and saved locally.
+6. Open Meeting Notes and select the saved dictation in the sidebar.
 
 The complete speech model is bundled with the app; no runtime model download is
 required. Yaprflow begins preparing the recognizer in the background at launch.
@@ -351,15 +324,8 @@ HTTP 200 but did not yet match the updated local policy; and the new support URL
 and App Store URL returned HTTP 404. The updated local `docs/` pages have not
 been deployed by this repository change.
 
-- [x] Replace the CC BY Parakeet, interim Zipformer, and English-only Nemotron
-  models with the pinned June 11, 2026 multilingual Nemotron 3.5 1120 ms
-  chunk-size INT8 export, while retaining the ASR-only sherpa-onnx build with
-  optional TTS and diarization disabled.
-- [x] Record Nemotron 3.5's OpenMDW-1.1 agreement, retained origin notice,
-  reviewed source/model-card revision, exact export revision and hashes, and
-  September 12, 2026 owner decision to implement the commercially usable
-  model. No separate counsel or rightsholder opinion is represented by this
-  checkbox.
+- [x] Pin one Parakeet Core ML and FluidAudio speech stack for both platforms,
+  with optional TTS and diarization unused.
 - [ ] Decide whether the pending free 4.0.14 submission should be released as
   the final legacy version, withdrawn, or otherwise managed before 5.0.0.
   Anyone who acquires that free version becomes an existing customer: App Store
@@ -379,17 +345,17 @@ been deployed by this repository change.
   `/support.html` over HTTPS.
 - [ ] Verify the public App Store URL and replace or defer customer-facing links
   if Apple ID `6810892725` is not yet live.
-- [ ] Recapture `AppStore/Assets/settings-window.png` with the speech-language
-  selector, then regenerate and review the four 2560 × 1600 Mac screenshots.
+- [ ] Regenerate and review the four 2560 × 1600 Mac screenshots when the UI
+  changes.
 - [ ] Reconfirm App Privacy, age rating, third-party-content, encryption, and
   microphone-usage answers in App Store Connect.
-- [x] Re-ran `scripts/app-store-release.sh` for 5.0.0 (4) on September 12, 2026,
-  after the Nemotron implementation. The script passed all 21 tests and its
+- [x] Re-ran `scripts/app-store-release.sh` for 5.0.0 (4) on September 12, 2026.
+  The script passed all 21 tests and its
   model, archive, installer, signature, entitlement, and profile checks. The
   verified package SHA-256 is
   `e7ec2910e7d9678bc0b77fc4067f78ad11f229f0f0cbb3e5c811625e782e9bd2`.
-- [x] Re-ran Xcode automatic distribution signing archive/export preflight for
-  the Nemotron build and verified the installer plus nested
+- [x] Re-ran Xcode automatic distribution signing archive/export preflight and
+  verified the installer plus nested
   application/framework signatures. The current Mac Team Store profile expires
   December 19, 2026.
 - [ ] If build 4 is rejected or another binary is uploaded for version 5.0.0,
@@ -398,10 +364,8 @@ been deployed by this repository change.
 - [x] Uploaded build 5.0.0 (4) to App Store Connect on September 12, 2026.
   Delivery `f00c618c-7303-4a96-b05c-d47d10ed1a3b` completed processing with
   binary state Validated and was added to the Internal TestFlight group.
-- [ ] Upload an incremented build containing the persisted speech-language
-  selector; build 4 remains the earlier Automatic-only implementation.
-- [ ] Install the incremented selector build through TestFlight and perform the
-  release smoke test before App Review submission.
+- [ ] Install the next candidate through TestFlight and perform the release
+  smoke test before App Review submission.
 - [x] Run the paired release gate for macOS 5.2.0 (13) and iOS/iPadOS 1.0.0
   (4). Both signed archives and exported artifacts passed their platform
   verifiers on September 20, 2026; neither artifact was uploaded.
@@ -416,7 +380,7 @@ Info.plist derives version/build from Xcode settings, includes iPad
 orientations, and declares its microphone purpose. Its app icon is opaque, and
 the target now bundles a privacy manifest plus third-party acknowledgements.
 
-The iOS release exposes two explicit modes. Quick Dictation copies local
+The iOS release exposes two explicit modes. Dictation copies local
 speech-to-text results to the clipboard and retains up to 50 recent results.
 In-person Meeting uses only the device microphone, accepts typed notes and a
 shared template, and saves local JSON plus Markdown using the same

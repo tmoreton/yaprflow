@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate scripts and project metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n scripts/*.sh scripts/lib/*.sh
+          plutil -lint yaprflow.xcodeproj/project.pbxproj
+          plutil -lint yaprflow/Info.plist yaprflow-iOS/Info.plist
+          source scripts/lib/model-release.sh
+          yaprflow_validate_model_checksum_manifest scripts/model-checksums.sha256
+
+      - name: Test shared Swift code
+        run: swift test
+
+      - name: Exercise iOS meeting persistence
+        run: scripts/ios-meeting-store-smoke.sh
+
+      - name: Verify checkout service
+        working-directory: checkout
+        run: |
+          npm ci
+          npm test
+          npm run build
+
+      - name: Check whitespace
+        run: git diff --check

@@ -2,9 +2,9 @@
 @preconcurrency import AVFoundation
 import Combine
 import CoreML
+import FluidAudio
 import Foundation
 import OSLog
-import SherpaOnnx
 import UIKit
 
 nonisolated private let log = Logger(
@@ -32,7 +32,7 @@ enum MobileCaptureMode: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .quick: "Quick"
+        case .quick: "Dictation"
         case .meeting: "Meeting"
         }
     }
@@ -214,123 +214,19 @@ nonisolated final class AudioBufferFIFO: @unchecked Sendable {
     }
 }
 
-/// Owns sherpa-onnx's stateful Nemotron decoder away from the main actor. The
-/// ONNX export has a 1120 ms chunk size; 320 ms app-side feeds keep UI updates
-/// responsive while sherpa buffers complete model chunks.
-private actor StreamingNemotronRecognizer {
-    static let sampleRate = 16_000
-    static let chunkSampleCount = 5_120
-    static let finalizationTailSampleCount = 20_800
-
-    private let recognizer: SherpaOnnxRecognizer
-    private var pendingSamples: [Float] = []
-    private var isAcceptingInput = false
-
-    init(modelDirectory: URL) {
-        let transducerConfig = sherpaOnnxOnlineTransducerModelConfig(
-            encoder: modelDirectory
-                .appendingPathComponent("encoder.int8.onnx")
-                .path,
-            decoder: modelDirectory
-                .appendingPathComponent("decoder.int8.onnx")
-                .path,
-            joiner: modelDirectory
-                .appendingPathComponent("joiner.int8.onnx")
-                .path
-        )
-        let modelConfig = sherpaOnnxOnlineModelConfig(
-            tokens: modelDirectory.appendingPathComponent("tokens.txt").path,
-            transducer: transducerConfig,
-            numThreads: 2,
-            provider: "cpu"
-        )
-        let featureConfig = sherpaOnnxFeatureConfig(
-            sampleRate: Self.sampleRate,
-            featureDim: 80
-        )
-        var config = sherpaOnnxOnlineRecognizerConfig(
-            featConfig: featureConfig,
-            modelConfig: modelConfig,
-            enableEndpoint: false,
-            decodingMethod: "greedy_search",
-            maxActivePaths: 1,
-            hotwordsFile: "",
-            hotwordsBuf: "",
-            hotwordsBufSize: 0
-        )
-        self.recognizer = SherpaOnnxRecognizer(config: &config)
-        self.recognizer.setOption(key: "language", value: "auto")
-    }
-
-    func beginSegment(language: SpeechLanguage) {
-        recognizer.reset()
-        recognizer.setOption(key: "language", value: language.rawValue)
-        pendingSamples.removeAll(keepingCapacity: true)
-        isAcceptingInput = true
-    }
-
-    /// Accept samples and return the latest unstable hypothesis. App-side
-    /// chunks are deliberately smaller than the export's model chunk size.
-    func accept(_ samples: [Float]) -> String {
-        guard isAcceptingInput, !samples.isEmpty else {
-            return isAcceptingInput ? recognizer.getResult().text : ""
-        }
-
-        pendingSamples.append(contentsOf: samples)
-        while pendingSamples.count >= Self.chunkSampleCount {
-            let chunk = Array(pendingSamples.prefix(Self.chunkSampleCount))
-            pendingSamples.removeFirst(Self.chunkSampleCount)
-            recognizer.acceptWaveform(samples: chunk, sampleRate: Self.sampleRate)
-            decodeAvailableFrames()
-        }
-        return recognizer.getResult().text
-    }
-
-    /// Explicitly close and drain the current online stream. Benchmarking found
-    /// that a 1.3-second tail is required to preserve final words at 1120 ms.
-    func finishSegment() -> String {
-        guard isAcceptingInput else { return "" }
-
-        if !pendingSamples.isEmpty {
-            recognizer.acceptWaveform(samples: pendingSamples, sampleRate: Self.sampleRate)
-            pendingSamples.removeAll(keepingCapacity: true)
-        }
-        recognizer.acceptWaveform(
-            samples: [Float](repeating: 0, count: Self.finalizationTailSampleCount),
-            sampleRate: Self.sampleRate
-        )
-        recognizer.inputFinished()
-        decodeAvailableFrames()
-
-        isAcceptingInput = false
-        return recognizer.getResult().text
-    }
-
-    private func decodeAvailableFrames() {
-        while recognizer.isReady() {
-            recognizer.decode()
-        }
-    }
-}
-
 @MainActor
 final class TranscriptionEngine: ObservableObject {
     static let shared = TranscriptionEngine()
 
     private struct RecognizerLoad {
         let id: UInt
-        let task: Task<StreamingNemotronRecognizer, Never>
+        let task: Task<AsrManager, Error>
         var installAllowed: Bool
     }
 
     @Published var status: TranscriptionStatus = .idle
     @Published var liveTranscript: String = ""
     @Published private(set) var activeMode: MobileCaptureMode?
-    @Published var speechLanguage: SpeechLanguage {
-        didSet {
-            UserDefaults.standard.set(speechLanguage.rawValue, forKey: Self.speechLanguageKey)
-        }
-    }
 
     /// Rolling history of recent normalized audio levels (0...1). Updated at
     /// roughly the audio buffer rate while recording, decays toward zero when
@@ -344,7 +240,7 @@ final class TranscriptionEngine: ObservableObject {
     private let audioFIFO: AudioBufferFIFO
     private let audioConverter = StreamingAudioConverter()
 
-    private var speechRecognizer: StreamingNemotronRecognizer?
+    private var speechRecognizer: AsrManager?
     private var vadManager: VoiceActivityDetector?
     private var recognizerLoad: RecognizerLoad?
     private var vadLoadingTask: Task<VoiceActivityDetector?, Never>?
@@ -366,7 +262,7 @@ final class TranscriptionEngine: ObservableObject {
     private var sessionGeneration: UInt = 0
     private var requestedMode: MobileCaptureMode = .quick
     private var sessionStartedAt: Date?
-    private var sessionLanguage: SpeechLanguage = .defaultSelection
+    private var recognitionFailure: Error?
 
     private var lifecycle: RecordingLifecyclePhase = .idle
     private var startRequested = false
@@ -375,8 +271,7 @@ final class TranscriptionEngine: ObservableObject {
     private var usesVoiceDetectorForCurrentSession = true
     private var releaseModelAfterSession = false
 
-    private static let sampleRate = StreamingNemotronRecognizer.sampleRate
-    private static let speechLanguageKey = "yaprflow.speechLanguage"
+    private static let sampleRate = 16_000
     private static let hardSegmentSamples = 30 * sampleRate
     private static let shortRecordingFallbackSamples = hardSegmentSamples
     private static let forcedSegmentOverlapSamples = 3 * sampleRate / 2
@@ -390,9 +285,6 @@ final class TranscriptionEngine: ObservableObject {
     private var decayTimer: Timer?
 
     private init() {
-        speechLanguage = SpeechLanguage.selection(
-            fromPersistedValue: UserDefaults.standard.string(forKey: Self.speechLanguageKey)
-        )
         let fifo = AudioBufferFIFO(capacity: 128)
         self.audioFIFO = fifo
 
@@ -537,9 +429,9 @@ final class TranscriptionEngine: ObservableObject {
         activeSegmentID = nil
         activeSegmentHasLeadingOverlap = false
         lastFinalizedAudioEnd = 0
+        recognitionFailure = nil
         liveTranscript = ""
         audioConverter.reset()
-        sessionLanguage = speechLanguage
 
         do {
             try await ensureMicPermission()
@@ -662,6 +554,9 @@ final class TranscriptionEngine: ObservableObject {
         let finalText = TranscriptSegments.capitalizingFirstLetter(
             in: confirmedText.trimmingCharacters(in: .whitespacesAndNewlines)
         )
+        let completionReason = reason ?? recognitionFailure.map {
+            "Speech recognition failed: \($0.localizedDescription)"
+        }
 
         // The recognizer has finished consuming this session. Release raw
         // microphone samples immediately; only the resulting text persists.
@@ -670,7 +565,7 @@ final class TranscriptionEngine: ObservableObject {
         let endedAt = Date()
         let startedAt = sessionStartedAt
             ?? endedAt.addingTimeInterval(-capturedSeconds)
-        log.info("Finalized \(capturedSeconds, format: .fixed(precision: 2), privacy: .public) seconds of streaming audio")
+        log.info("Finalized \(capturedSeconds, format: .fixed(precision: 2), privacy: .public) seconds of captured audio")
 
         sessionAudio.reset(keepingCapacity: false)
         vadPending.removeAll(keepingCapacity: false)
@@ -692,7 +587,7 @@ final class TranscriptionEngine: ObservableObject {
             if !finalText.isEmpty {
                 UIPasteboard.general.string = finalText
                 history.add(finalText)
-                if let reason {
+                if let reason = completionReason {
                     status = .error("Partial text copied — \(reason)")
                     scheduleAutoHide(after: 2.5)
                 } else {
@@ -700,7 +595,7 @@ final class TranscriptionEngine: ObservableObject {
                     scheduleAutoHide(after: 1.5)
                 }
             } else {
-                if let reason {
+                if let reason = completionReason {
                     status = .error(reason)
                     scheduleAutoHide(after: 2.5)
                 } else {
@@ -718,7 +613,7 @@ final class TranscriptionEngine: ObservableObject {
                         endedAt: endedAt,
                         duration: capturedSeconds
                     )
-                    if let reason {
+                    if let reason = completionReason {
                         status = .error("Partial meeting saved — \(reason)")
                         scheduleAutoHide(after: 3.0)
                     } else {
@@ -729,7 +624,7 @@ final class TranscriptionEngine: ObservableObject {
                     status = .error("Meeting could not be saved — \(error.localizedDescription)")
                     scheduleAutoHide(after: 3.0)
                 }
-            } else if let reason {
+            } else if let reason = completionReason {
                 status = .error(reason)
                 scheduleAutoHide(after: 2.5)
             } else {
@@ -980,18 +875,10 @@ final class TranscriptionEngine: ObservableObject {
         activeSegmentID = segmentID
         activeSegmentHasLeadingOverlap = hasLeadingOverlap
 
-        // VAD reports a padded absolute start index, so backfill the short
-        // interval already captured while speech onset was being confirmed.
-        let initialSamples = sessionAudio.samples(from: start, to: initialEnd)
-        guard let recognizer = speechRecognizer else { return }
-        await recognizer.beginSegment(language: sessionLanguage)
-        let rawText: String
-        if initialSamples.isEmpty {
-            rawText = ""
-        } else {
-            rawText = await recognizer.accept(initialSamples)
-        }
-        applyPartial(rawText, for: segmentID)
+        // Parakeet transcribes the complete bounded segment when it closes.
+        // Keep only the indexes here so the raw samples can remain in the
+        // rolling buffer until finalization.
+        applyPartial("", for: segmentID)
     }
 
     private func feedCurrentSpeech(upTo requestedEnd: Int) async {
@@ -1008,12 +895,8 @@ final class TranscriptionEngine: ObservableObject {
             let feedEnd = min(targetEnd, hardEnd)
 
             if feedEnd > fedThrough {
-                let samples = sessionAudio.samples(from: fedThrough, to: feedEnd)
                 currentSpeechFedThrough = feedEnd
-                if !samples.isEmpty, let recognizer = speechRecognizer {
-                    let rawText = await recognizer.accept(samples)
-                    applyPartial(rawText, for: segmentID)
-                }
+                applyPartial("", for: segmentID)
             }
 
             guard feedEnd >= hardEnd else { break }
@@ -1030,7 +913,7 @@ final class TranscriptionEngine: ObservableObject {
                 initiallyThrough: hardEnd,
                 hasLeadingOverlap: true
             )
-            log.info("Forced a streaming ASR segment boundary at 30 seconds")
+            log.info("Forced a Parakeet segment boundary at 30 seconds")
         }
     }
 
@@ -1042,14 +925,27 @@ final class TranscriptionEngine: ObservableObject {
         }
 
         let hasLeadingOverlap = activeSegmentHasLeadingOverlap
+        let start = currentSpeechStart ?? sessionAudio.startIndex
         let finalizedThrough = currentSpeechFedThrough ?? currentSpeechStart ?? 0
         if let recognizer = speechRecognizer {
-            let rawText = await recognizer.finishSegment()
-            commitFinal(
-                rawText,
-                for: segmentID,
-                deduplicatingLeadingOverlap: hasLeadingOverlap
-            )
+            let samples = sessionAudio.samples(from: start, to: finalizedThrough)
+            if !samples.isEmpty {
+                do {
+                    let prepared = OfflineRecognitionAudio.paddedToMinimumDuration(samples)
+                    let result = try await transcribeWithOneRetry(
+                        recognizer: recognizer,
+                        samples: prepared
+                    )
+                    commitFinal(
+                        result.text,
+                        for: segmentID,
+                        deduplicatingLeadingOverlap: hasLeadingOverlap
+                    )
+                } catch {
+                    recognitionFailure = error
+                    log.error("Parakeet transcription failed: \(error.localizedDescription)")
+                }
+            }
         }
 
         lastFinalizedAudioEnd = max(lastFinalizedAudioEnd, finalizedThrough)
@@ -1057,6 +953,19 @@ final class TranscriptionEngine: ObservableObject {
         currentSpeechFedThrough = nil
         activeSegmentID = nil
         activeSegmentHasLeadingOverlap = false
+    }
+
+    private func transcribeWithOneRetry(
+        recognizer: AsrManager,
+        samples: [Float]
+    ) async throws -> ASRResult {
+        do {
+            return try await recognizer.transcribe(samples, source: .microphone)
+        } catch {
+            log.error("Parakeet segment failed; retrying once: \(error.localizedDescription)")
+            try? await recognizer.resetDecoderState(for: .microphone)
+            return try await recognizer.transcribe(samples, source: .microphone)
+        }
     }
 
     private func continueWithoutVoiceDetector(from requestedStart: Int) async {
@@ -1069,11 +978,9 @@ final class TranscriptionEngine: ObservableObject {
 
     private func trimRetainedSessionAudio() {
         let retainFrom: Int
-        if let fedThrough = currentSpeechFedThrough {
-            retainFrom = max(
-                sessionAudio.startIndex,
-                fedThrough - Self.forcedSegmentOverlapSamples
-            )
+        if let segmentStart = currentSpeechStart {
+            // Offline Parakeet recognition needs the entire active segment.
+            retainFrom = max(sessionAudio.startIndex, segmentStart)
         } else {
             retainFrom = max(
                 sessionAudio.startIndex,
@@ -1141,7 +1048,7 @@ final class TranscriptionEngine: ObservableObject {
         }
     }
 
-    private func ensureSpeechRecognizer(showStatus: Bool) async throws -> StreamingNemotronRecognizer {
+    private func ensureSpeechRecognizer(showStatus: Bool) async throws -> AsrManager {
         if let speechRecognizer { return speechRecognizer }
         if showStatus {
             status = .preparing("Loading speech model…")
@@ -1150,7 +1057,7 @@ final class TranscriptionEngine: ObservableObject {
         let load: RecognizerLoad
         if var existing = recognizerLoad {
             // A foreground request may adopt a still-running native load that
-            // was invalidated in the background. Never start a second ~680 MB
+            // was invalidated in the background. Never start a second large
             // decoder while the first task is still unwinding.
             existing.installAllowed = true
             recognizerLoad = existing
@@ -1162,17 +1069,25 @@ final class TranscriptionEngine: ObservableObject {
 
             nextRecognizerLoadID &+= 1
             let id = nextRecognizerLoadID
-            log.info("Loading ASR from \(modelDirectory.path, privacy: .public)")
-            let task = Task.detached(priority: .userInitiated) {
-                let recognizer = StreamingNemotronRecognizer(modelDirectory: modelDirectory)
-                await Self.warmUp(recognizer: recognizer)
+            log.info("Loading Parakeet ASR from \(modelDirectory.path, privacy: .public)")
+            let task = Task(priority: .userInitiated) {
+                let configuration = MLModelConfiguration()
+                configuration.computeUnits = .cpuAndGPU
+                let models = try await AsrModels.load(
+                    from: modelDirectory,
+                    configuration: configuration,
+                    version: .v3
+                )
+                let recognizer = AsrManager(config: .default)
+                try await recognizer.loadModels(models)
+                try await Self.warmUp(recognizer: recognizer)
                 return recognizer
             }
             load = RecognizerLoad(id: id, task: task, installAllowed: true)
             recognizerLoad = load
         }
 
-        let loaded = await load.task.value
+        let loaded = try await load.task.value
         if let speechRecognizer {
             // Another waiter on the same preload already installed it.
             return speechRecognizer
@@ -1242,11 +1157,11 @@ final class TranscriptionEngine: ObservableObject {
     private static func bundledASRDir() -> URL? {
         guard let resources = Bundle.main.resourceURL else { return nil }
         let dir = resources.appendingPathComponent(
-            BundledModelInventory.speechDirectory,
+            BundledModelInventory.parakeetSpeechDirectory,
             isDirectory: true
         )
         let fm = FileManager.default
-        for file in BundledModelInventory.speechFiles {
+        for file in BundledModelInventory.parakeetSpeechFiles {
             let url = dir.appendingPathComponent(file.name)
             guard
                 fm.fileExists(atPath: url.path),
@@ -1273,10 +1188,11 @@ final class TranscriptionEngine: ObservableObject {
         return modelPath
     }
 
-    private static func warmUp(recognizer: StreamingNemotronRecognizer) async {
-        await recognizer.beginSegment(language: .englishUS)
-        _ = await recognizer.accept([Float](repeating: 0, count: 16_000))
-        _ = await recognizer.finishSegment()
+    private static func warmUp(recognizer: AsrManager) async throws {
+        let silence = OfflineRecognitionAudio.paddedToMinimumDuration(
+            [Float](repeating: 0, count: 16_000)
+        )
+        _ = try await recognizer.transcribe(silence, source: .microphone)
     }
 
     private static func warmUp(vad: VoiceActivityDetector) async {
@@ -1326,7 +1242,7 @@ final class TranscriptionEngine: ObservableObject {
         load.installAllowed = false
         recognizerLoad = load
         load.task.cancel()
-        log.info("Discarded pending Nemotron load after \(reason, privacy: .public)")
+        log.info("Discarded pending Parakeet load after \(reason, privacy: .public)")
     }
 
     private func authorizeRecognizerLoad() {
@@ -1344,7 +1260,7 @@ final class TranscriptionEngine: ObservableObject {
         let releasedLoadedModel = speechRecognizer != nil
         speechRecognizer = nil
         if releasedLoadedModel {
-            log.info("Released the Nemotron model after \(reason, privacy: .public)")
+            log.info("Released the Parakeet model after \(reason, privacy: .public)")
         }
     }
 }

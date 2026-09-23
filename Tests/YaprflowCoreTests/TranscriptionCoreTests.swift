@@ -1,42 +1,6 @@
 import Testing
 @testable import YaprflowCore
 
-@Suite("Speech language selection")
-struct SpeechLanguageTests {
-    @Test("English US is the safe persisted default")
-    func defaultsToEnglishUS() {
-        #expect(SpeechLanguage.defaultSelection == .englishUS)
-        #expect(SpeechLanguage.selection(fromPersistedValue: nil) == .englishUS)
-        #expect(SpeechLanguage.selection(fromPersistedValue: "not-a-language") == .englishUS)
-    }
-
-    @Test("Automatic detection remains an explicit choice")
-    func preservesAutomaticSelection() {
-        #expect(SpeechLanguage.automatic.rawValue == "auto")
-        #expect(SpeechLanguage.selection(fromPersistedValue: "auto") == .automatic)
-    }
-
-    @Test("Picker exposes exactly the production-ready model prompts")
-    func exposesProductionReadyPrompts() {
-        let expectedForcedPrompts: Set<String> = [
-            "en-US", "en-GB", "es-US", "es-ES", "fr-FR", "fr-CA",
-            "it-IT", "pt-BR", "pt-PT", "nl-NL", "de-DE", "tr-TR",
-            "ru-RU", "ar-AR", "hi-IN", "ja-JP", "ko-KR", "vi-VN",
-            "uk-UA", "pl-PL", "sv-SE", "cs-CZ", "nb-NO", "da-DK",
-            "bg-BG", "fi-FI", "hr-HR", "sk-SK", "zh-CN", "hu-HU",
-            "ro-RO", "et-EE",
-        ]
-        let prompts = SpeechLanguage.allCases.map(\.rawValue)
-
-        #expect(prompts.count == 33)
-        #expect(Set(prompts).count == prompts.count)
-        #expect(Set(prompts).subtracting([SpeechLanguage.automatic.rawValue]) == expectedForcedPrompts)
-        #expect(SpeechLanguage.chineseSimplified.displayName.contains("Mandarin"))
-        #expect(!prompts.contains("el-GR"))
-        #expect(!prompts.contains("th-TH"))
-    }
-}
-
 @Suite("Bundled model inventory")
 struct BundledModelInventoryTests {
     @Test("Parakeet inventory covers every required Core ML component")
@@ -49,19 +13,6 @@ struct BundledModelInventoryTests {
         #expect(names.contains("JointDecision.mlmodelc/weights/weight.bin"))
         #expect(names.contains("parakeet_vocab.json"))
         #expect(BundledModelInventory.parakeetSpeechFiles.allSatisfy { $0.byteCount > 0 })
-    }
-
-    @Test("Speech inventory remains complete and uniquely named")
-    func speechInventoryIsComplete() {
-        let names = BundledModelInventory.speechFiles.map(\.name)
-        #expect(Set(names).count == 4)
-        #expect(Set(names) == [
-            "encoder.int8.onnx",
-            "decoder.int8.onnx",
-            "joiner.int8.onnx",
-            "tokens.txt",
-        ])
-        #expect(BundledModelInventory.speechFiles.allSatisfy { $0.byteCount > 0 })
     }
 }
 

@@ -36,7 +36,7 @@ future product.
 
 ## Direct-purchase refunds
 
-You may request a refund for a direct website purchase within 14 calendar days
+You may request a refund for a direct website purchase within 14 days
 after purchase by emailing tim@yaprflow.com from the address used at checkout.
 Approved refunds are returned through Stripe to the original payment method.
 After a full refund, this license ends and you must stop using and delete the

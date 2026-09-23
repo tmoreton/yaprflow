@@ -14,17 +14,10 @@ final class MeetingStore: ObservableObject {
 
     private let fileManager: FileManager
     private let rootOverride: URL?
-    private let encoder: JSONEncoder
-    private let decoder: JSONDecoder
 
     init(fileManager: FileManager = .default, rootOverride: URL? = nil) {
         self.fileManager = fileManager
         self.rootOverride = rootOverride ?? Self.audioSmokeTestRoot()
-        encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        encoder.dateEncodingStrategy = .iso8601
-        decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
         refresh()
     }
 
@@ -44,32 +37,12 @@ final class MeetingStore: ObservableObject {
 
     func refresh() {
         do {
-            let directory = try meetingsDirectory()
-            let urls = try fileManager.contentsOfDirectory(
-                at: directory,
-                includingPropertiesForKeys: [.isRegularFileKey],
-                options: [.skipsHiddenFiles]
-            )
-            meetings = urls.compactMap { url in
-                guard url.pathExtension == "json",
-                      let data = try? Data(contentsOf: url),
-                      var meeting = try? decoder.decode(MeetingRecord.self, from: data) else {
-                    return nil
-                }
-                meeting.transcript = MeetingTranscriptReconciler.reconcile(meeting.transcript)
-                if let notes = meeting.generatedNotes {
-                    let repaired = MeetingGeneratedNotesParser.repairingEmbeddedPayload(
-                        in: notes,
-                        validSegmentIDs: Set(meeting.transcript.map(\.id))
-                    )
-                    meeting.generatedNotes = MeetingGeneratedNotesGrounder.grounded(repaired, in: meeting)
-                }
-                return meeting
-            }.sorted { $0.startedAt > $1.startedAt }
-            errorMessage = nil
+            let result = try diskStore().load()
+            meetings = result.meetings
+            errorMessage = recoveryMessage(for: result.issues)
         } catch {
             meetings = []
-            errorMessage = error.localizedDescription
+            errorMessage = "The meeting library could not be loaded: \(error.localizedDescription)"
         }
     }
 
@@ -79,46 +52,50 @@ final class MeetingStore: ObservableObject {
 
     @discardableResult
     func save(_ meeting: MeetingRecord) throws -> URL {
-        var meeting = meeting
-        meeting.transcript = MeetingTranscriptReconciler.reconcile(meeting.transcript)
-        if let notes = meeting.generatedNotes {
-            let repaired = MeetingGeneratedNotesParser.repairingEmbeddedPayload(
-                in: notes,
-                validSegmentIDs: Set(meeting.transcript.map(\.id))
-            )
-            meeting.generatedNotes = MeetingGeneratedNotesGrounder.grounded(repaired, in: meeting)
+        do {
+            let saved = try diskStore().save(meeting)
+            if let index = meetings.firstIndex(where: { $0.id == saved.meeting.id }) {
+                meetings[index] = saved.meeting
+            } else {
+                meetings.append(saved.meeting)
+            }
+            meetings.sort { $0.startedAt > $1.startedAt }
+            errorMessage = nil
+            NotificationCenter.default.post(name: .yaprflowMeetingsChanged, object: saved.meeting.id)
+            return saved.exportURL
+        } catch {
+            errorMessage = "The meeting could not be saved: \(error.localizedDescription)"
+            throw error
         }
-        let directory = try meetingsDirectory()
-        let jsonURL = directory.appendingPathComponent(meeting.id.uuidString).appendingPathExtension("json")
-        let data = try encoder.encode(meeting)
-        try data.write(to: jsonURL, options: .atomic)
+    }
 
-        let exportURL = directory.appendingPathComponent(meeting.id.uuidString).appendingPathExtension("md")
-        try MeetingMarkdownRenderer.render(meeting).write(
-            to: exportURL,
-            atomically: true,
-            encoding: .utf8
-        )
-
-        if let index = meetings.firstIndex(where: { $0.id == meeting.id }) {
-            meetings[index] = meeting
-        } else {
-            meetings.append(meeting)
+    @discardableResult
+    func saveReportingError(_ meeting: MeetingRecord) -> Bool {
+        do {
+            _ = try save(meeting)
+            return true
+        } catch {
+            return false
         }
-        meetings.sort { $0.startedAt > $1.startedAt }
-        errorMessage = nil
-        NotificationCenter.default.post(name: .yaprflowMeetingsChanged, object: meeting.id)
-        return exportURL
     }
 
     func exportURL(for meeting: MeetingRecord) throws -> URL {
-        let url = try meetingsDirectory()
-            .appendingPathComponent(meeting.id.uuidString)
-            .appendingPathExtension("md")
-        if !fileManager.fileExists(atPath: url.path) {
-            _ = try save(meeting)
+        do {
+            let url = try diskStore().exportURL(for: meeting)
+            errorMessage = nil
+            return url
+        } catch {
+            errorMessage = "The meeting export could not be created: \(error.localizedDescription)"
+            throw error
         }
-        return url
+    }
+
+    func exportURLReportingError(for meeting: MeetingRecord) -> URL? {
+        do {
+            return try exportURL(for: meeting)
+        } catch {
+            return nil
+        }
     }
 
     /// Removes both durable representations of a meeting. Production files are
@@ -126,18 +103,12 @@ final class MeetingStore: ObservableObject {
     @discardableResult
     func delete(_ meeting: MeetingRecord) -> Bool {
         do {
-            let directory = try meetingsDirectory()
-            let markdownURL = directory
-                .appendingPathComponent(meeting.id.uuidString)
-                .appendingPathExtension("md")
-            let jsonURL = directory
-                .appendingPathComponent(meeting.id.uuidString)
-                .appendingPathExtension("json")
+            let urls = try diskStore().fileURLs(for: meeting.id)
 
             // Delete the indexable JSON last. If moving the Markdown export
             // fails, the meeting remains visible and can be retried safely.
-            try discardFileIfPresent(at: markdownURL)
-            try discardFileIfPresent(at: jsonURL)
+            try discardFileIfPresent(at: urls.markdown)
+            try discardFileIfPresent(at: urls.json)
             meetings.removeAll { $0.id == meeting.id }
             errorMessage = nil
             NotificationCenter.default.post(name: .yaprflowMeetingsChanged, object: meeting.id)
@@ -159,12 +130,31 @@ final class MeetingStore: ObservableObject {
         if let rootOverride {
             root = rootOverride
         } else {
-            root = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            guard let applicationSupport = fileManager.urls(
+                for: .applicationSupportDirectory,
+                in: .userDomainMask
+            ).first else {
+                throw CocoaError(.fileNoSuchFile)
+            }
+            root = applicationSupport
                 .appendingPathComponent("Yaprflow", isDirectory: true)
                 .appendingPathComponent("Meetings", isDirectory: true)
         }
         try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
         return root
+    }
+
+    private func diskStore() throws -> MeetingRecordDiskStore {
+        MeetingRecordDiskStore(
+            directory: try meetingsDirectory(),
+            fileManager: fileManager
+        )
+    }
+
+    private func recoveryMessage(for issues: [MeetingStorageIssue]) -> String? {
+        guard !issues.isEmpty else { return nil }
+        let noun = issues.count == 1 ? "file was" : "files were"
+        return "\(issues.count) unreadable meeting \(noun) moved to the \(MeetingRecordDiskStore.recoveryDirectoryName) folder. Your other meetings are still available."
     }
 
     static func runPersistenceSmokeTest() -> Bool {

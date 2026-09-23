@@ -26,7 +26,7 @@ final class GlobalHotkey {
             modifiers: modifiers
         ) else { return false }
         quickDictationHotKeyRef = ref
-        log.info("Registered Quick Dictation hotkey keyCode=\(keyCode, privacy: .public) modifiers=\(modifiers, privacy: .public)")
+        log.info("Registered dictation hotkey keyCode=\(keyCode, privacy: .public) modifiers=\(modifiers, privacy: .public)")
         return true
     }
 

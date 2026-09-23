@@ -47,7 +47,7 @@ private final class MeetingMemoryModel: ObservableObject {
         }
     }
 
-    func ask(question: String, meetings: [MeetingRecord], includeAllSegments: Bool = false) {
+    func ask(question: String, meeting: MeetingRecord) {
         let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !isRunning else { return }
         let requestID = UUID()
@@ -55,7 +55,7 @@ private final class MeetingMemoryModel: ObservableObject {
         isRunning = true
         answer = ""
         errorMessage = nil
-        evidenceHits = MeetingSearchIndex.search(trimmed, in: meetings, limit: 10)
+        evidenceHits = []
         Task { [weak self] in
             guard let self else { return }
             defer {
@@ -67,8 +67,7 @@ private final class MeetingMemoryModel: ObservableObject {
             do {
                 let generatedAnswer = try await MeetingAIService.answer(
                     question: trimmed,
-                    meetings: meetings,
-                    includeAllSegments: includeAllSegments,
+                    meeting: meeting,
                     progress: { message in
                         guard self.generationID == requestID else { return }
                         self.progressMessage = message
@@ -76,9 +75,7 @@ private final class MeetingMemoryModel: ObservableObject {
                 )
                 guard self.generationID == requestID else { return }
                 answer = generatedAnswer
-                if includeAllSegments {
-                    evidenceHits = Self.citedEvidence(in: generatedAnswer, meetings: meetings)
-                }
+                evidenceHits = Self.citedEvidence(in: generatedAnswer, meeting: meeting)
             } catch {
                 guard self.generationID == requestID else { return }
                 errorMessage = error.localizedDescription
@@ -88,72 +85,26 @@ private final class MeetingMemoryModel: ObservableObject {
 
     private static func citedEvidence(
         in answer: String,
-        meetings: [MeetingRecord]
+        meeting: MeetingRecord
     ) -> [MeetingSearchHit] {
         var hits: [MeetingSearchHit] = []
-        for meeting in meetings {
-            for segment in meeting.transcript where answer.contains(segment.id.uuidString) {
-                hits.append(MeetingSearchHit(
-                    meetingID: meeting.id,
-                    segmentID: segment.id,
-                    title: meeting.title,
-                    excerpt: "\(segment.displaySpeaker): \(segment.text)",
-                    score: 0
-                ))
-            }
-            if answer.contains("[meeting:\(meeting.id.uuidString)]") {
-                hits.append(MeetingSearchHit(
-                    meetingID: meeting.id,
-                    segmentID: nil,
-                    title: meeting.title,
-                    excerpt: meeting.rawNotes,
-                    score: 0
-                ))
-            }
+        for segment in meeting.transcript where answer.contains(segment.id.uuidString) {
+            hits.append(MeetingSearchHit(
+                meetingID: meeting.id,
+                segmentID: segment.id,
+                title: meeting.title,
+                excerpt: "\(segment.displaySpeaker): \(segment.text)"
+            ))
+        }
+        if answer.contains("[meeting:\(meeting.id.uuidString)]") {
+            hits.append(MeetingSearchHit(
+                meetingID: meeting.id,
+                segmentID: nil,
+                title: meeting.title,
+                excerpt: meeting.rawNotes
+            ))
         }
         return Array(hits.prefix(12))
-    }
-}
-
-private enum AIWorkspaceSource {
-    case allMeetings([MeetingRecord])
-    case dictation(TranscriptHistoryItem)
-}
-
-struct AllMeetingsWorkspace: View {
-    @StateObject private var ai = TranscriptAIModel()
-    @StateObject private var memory = MeetingMemoryModel()
-    @State private var prompt = LibraryPromptCatalog.allMeetingsDefaultPrompt
-
-    let meetings: [MeetingRecord]
-    let onOpenEvidence: (UUID, UUID?) -> Void
-    let onOpenSettings: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Ask all meetings")
-                    .font(.title3.weight(.semibold))
-                Text(meetings.isEmpty
-                    ? "Your saved meetings will become searchable here."
-                    : "Search decisions, action items, and context across \(meetings.count) meeting\(meetings.count == 1 ? "" : "s").")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            AIWorkspaceContent(
-                source: .allMeetings(meetings),
-                prompt: $prompt,
-                ai: ai,
-                memory: memory,
-                showsEmptyResult: true,
-                compact: false,
-                onOpenEvidence: onOpenEvidence,
-                onOpenSettings: onOpenSettings
-            )
-        }
-        .padding(18)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
 
@@ -194,10 +145,10 @@ struct MeetingAskPanel: View {
                 HStack(spacing: 9) {
                     Image(systemName: "sparkles")
                         .foregroundStyle(.purple)
-                    Text("Ask this meeting")
+                    Text("Meeting tools")
                         .font(.callout.weight(.medium))
                     Spacer()
-                    Image(systemName: isExpanded ? "chevron.down" : "chevron.up")
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
                 }
@@ -213,7 +164,7 @@ struct MeetingAskPanel: View {
                     FeatureCard {
                         VStack(alignment: .leading, spacing: 12) {
                             HStack(spacing: 10) {
-                                Text("Output")
+                                Text("Notes format")
                                     .font(.callout.weight(.medium))
                                 Spacer()
                                 Menu {
@@ -373,13 +324,12 @@ struct MeetingAskPanel: View {
 
     private func askQuestion() {
         guard !askIsDisabled else { return }
-        memory.ask(question: question, meetings: [meeting], includeAllSegments: true)
+        memory.ask(question: question, meeting: meeting)
     }
 }
 
 struct DictationWorkspace: View {
     @StateObject private var ai = TranscriptAIModel()
-    @StateObject private var memory = MeetingMemoryModel()
     @State private var isAskExpanded = false
     @State private var didCopy = false
 
@@ -495,7 +445,7 @@ struct DictationWorkspace: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Spacer()
-                        Image(systemName: isAskExpanded ? "chevron.down" : "chevron.up")
+                        Image(systemName: isAskExpanded ? "chevron.down" : "chevron.right")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
                     }
@@ -507,14 +457,10 @@ struct DictationWorkspace: View {
 
                 if isAskExpanded {
                     Divider()
-                    AIWorkspaceContent(
-                        source: .dictation(item),
+                    DictationAIWorkspace(
+                        item: item,
                         prompt: $ai.prompt,
                         ai: ai,
-                        memory: memory,
-                        showsEmptyResult: false,
-                        compact: true,
-                        onOpenEvidence: { _, _ in },
                         onOpenSettings: onOpenSettings
                     )
                     .padding(12)
@@ -542,15 +488,11 @@ struct DictationWorkspace: View {
     }
 }
 
-private struct AIWorkspaceContent: View {
-    let source: AIWorkspaceSource
+private struct DictationAIWorkspace: View {
+    let item: TranscriptHistoryItem
     @Binding var prompt: String
     @ObservedObject var ai: TranscriptAIModel
-    @ObservedObject var memory: MeetingMemoryModel
     @AppStorage("yaprflow.ai.output-preset") private var selectedItemPresetID = LibraryPromptCatalog.structuredBrief.id
-    let showsEmptyResult: Bool
-    let compact: Bool
-    let onOpenEvidence: (UUID, UUID?) -> Void
     let onOpenSettings: () -> Void
 
     var body: some View {
@@ -559,21 +501,21 @@ private struct AIWorkspaceContent: View {
                 promptSection
             }
 
-            if let errorMessage = currentError {
+            if let errorMessage = ai.errorMessage {
                 Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
                     .foregroundStyle(.red)
                     .textSelection(.enabled)
             }
 
-            if showsEmptyResult || !currentResult.isEmpty {
+            if !ai.result.isEmpty {
                 FeatureCard {
                     resultSection
                 }
-                .frame(maxHeight: compact ? 220 : .infinity)
+                .frame(maxHeight: 220)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: compact ? nil : .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
         .onAppear {
             refreshSelectedItemPrompt()
             ai.refreshAvailability()
@@ -588,67 +530,29 @@ private struct AIWorkspaceContent: View {
 
     private var promptSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if source.isAllMeetings {
-                HStack {
-                    Text("Ask")
-                        .font(.callout.weight(.medium))
-
-                    Spacer()
-
-                    Menu("Use preset") {
-                        ForEach(currentPresets) { preset in
-                            Button {
-                                prompt = preset.prompt
-                            } label: {
-                                Label(preset.title, systemImage: preset.systemImage)
-                            }
-                        }
-
-                        Divider()
-
-                        Button("Reset") {
-                            prompt = LibraryPromptCatalog.allMeetingsDefaultPrompt
+            HStack(spacing: 12) {
+                Text("Output")
+                    .font(.callout.weight(.medium))
+                Spacer()
+                Menu {
+                    ForEach(LibraryPromptCatalog.dictationPresets) { preset in
+                        Button {
+                            selectItemPreset(preset)
+                        } label: {
+                            Label(preset.title, systemImage: preset.systemImage)
                         }
                     }
-                    .menuStyle(.borderlessButton)
-                    .fixedSize()
+                } label: {
+                    Label(selectedItemPreset.title, systemImage: selectedItemPreset.systemImage)
                 }
-
-                TextEditor(text: $prompt)
-                    .font(.body)
-                    .scrollContentBackground(.hidden)
-                    .padding(7)
-                    .frame(minHeight: compact ? 60 : 72, maxHeight: compact ? 76 : 92)
-                    .background(.background, in: RoundedRectangle(cornerRadius: 7))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 7)
-                            .stroke(.separator, lineWidth: 1)
-                    }
-            } else {
-                HStack(spacing: 12) {
-                    Text("Output")
-                        .font(.callout.weight(.medium))
-                    Spacer()
-                    Menu {
-                        ForEach(LibraryPromptCatalog.dictationPresets) { preset in
-                            Button {
-                                selectItemPreset(preset)
-                            } label: {
-                                Label(preset.title, systemImage: preset.systemImage)
-                            }
-                        }
-                    } label: {
-                        Label(selectedItemPreset.title, systemImage: selectedItemPreset.systemImage)
-                    }
-                    .menuStyle(.borderlessButton)
-                    .fixedSize()
-                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
             }
 
             HStack(spacing: 7) {
                 Image(systemName: ai.isModelAvailable ? "checkmark.circle.fill" : "info.circle")
                     .foregroundStyle(ai.isModelAvailable ? .green : .secondary)
-                Text(currentProgress ?? ai.availabilityMessage)
+                Text(ai.processingMessage ?? ai.availabilityMessage)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -664,13 +568,13 @@ private struct AIWorkspaceContent: View {
 
                 Spacer()
 
-                if isRunning {
+                if ai.isRunning {
                     ProgressView()
                         .controlSize(.small)
                 }
 
-                Button(isRunning ? "Working…" : runButtonTitle) {
-                    run()
+                Button(ai.isRunning ? "Working…" : "Generate") {
+                    ai.run(transcript: item.transcript)
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(runIsDisabled)
@@ -684,7 +588,6 @@ private struct AIWorkspaceContent: View {
         }
     }
 
-    @ViewBuilder
     private var resultSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
@@ -696,75 +599,27 @@ private struct AIWorkspaceContent: View {
                 Button("Copy", systemImage: "doc.on.clipboard") {
                     let pasteboard = NSPasteboard.general
                     pasteboard.clearContents()
-                    pasteboard.setString(currentResult, forType: .string)
+                    pasteboard.setString(ai.result, forType: .string)
                 }
                 .buttonStyle(.plain)
-                .disabled(currentResult.isEmpty)
+                .disabled(ai.result.isEmpty)
             }
 
-            if currentResult.isEmpty {
-                ContentUnavailableView(
-                    "Ask your meetings",
-                    systemImage: "text.bubble",
-                    description: Text(emptyResultDescription)
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                TextEditor(text: resultBinding)
-                    .font(.body)
-                    .scrollContentBackground(.hidden)
-                    .padding(7)
-                    .frame(minHeight: 110, maxHeight: .infinity)
-                    .background(.background, in: RoundedRectangle(cornerRadius: 7))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 7)
-                            .stroke(.separator, lineWidth: 1)
-                    }
-
-                if source.usesMeetingMemory && !memory.evidenceHits.isEmpty {
-                    Divider()
-                    Text("Sources")
-                        .font(.headline)
-
-                    ForEach(memory.evidenceHits) { hit in
-                        Button {
-                            onOpenEvidence(hit.meetingID, hit.segmentID)
-                        } label: {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(hit.title)
-                                    .font(.callout.weight(.medium))
-                                Text(hit.excerpt)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(2)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.vertical, 4)
-                        }
-                        .buttonStyle(.plain)
-                    }
+            TextEditor(text: $ai.result)
+                .font(.body)
+                .scrollContentBackground(.hidden)
+                .padding(7)
+                .frame(minHeight: 110, maxHeight: .infinity)
+                .background(.background, in: RoundedRectangle(cornerRadius: 7))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 7)
+                        .stroke(.separator, lineWidth: 1)
                 }
-            }
         }
         .frame(maxHeight: .infinity)
     }
 
-    private func run() {
-        switch source {
-        case let .allMeetings(meetings):
-            memory.ask(question: prompt, meetings: meetings)
-        case let .dictation(item):
-            ai.run(transcript: item.transcript)
-        }
-    }
-
     private var selectedProvider: AIProviderKind { AIProviderSettings.shared.provider }
-
-    private var currentPresets: [LibraryPromptPreset] {
-        source.isAllMeetings
-            ? LibraryPromptCatalog.allMeetingPresets
-            : LibraryPromptCatalog.dictationPresets
-    }
 
     private var selectedItemPreset: LibraryPromptPreset {
         LibraryPromptCatalog.itemPreset(id: selectedItemPresetID)
@@ -776,7 +631,6 @@ private struct AIWorkspaceContent: View {
     }
 
     private func refreshSelectedItemPrompt() {
-        guard !source.isAllMeetings else { return }
         let preset = LibraryPromptCatalog.itemPreset(id: selectedItemPresetID)
         if preset.id != selectedItemPresetID {
             selectedItemPresetID = preset.id
@@ -784,63 +638,10 @@ private struct AIWorkspaceContent: View {
         prompt = LibraryPromptPreferences.prompt(for: preset.id)
     }
 
-    private var currentResult: String {
-        source.usesMeetingMemory ? memory.answer : ai.result
-    }
-
-    private var currentError: String? {
-        source.usesMeetingMemory ? memory.errorMessage : ai.errorMessage
-    }
-
-    private var currentProgress: String? {
-        source.usesMeetingMemory ? memory.progressMessage : ai.processingMessage
-    }
-
-    private var isRunning: Bool {
-        source.usesMeetingMemory ? memory.isRunning : ai.isRunning
-    }
-
-    private var runButtonTitle: String {
-        source.isAllMeetings ? "Ask" : "Generate"
-    }
-
-    private var resultBinding: Binding<String> {
-        source.usesMeetingMemory ? $memory.answer : $ai.result
-    }
-
     private var runIsDisabled: Bool {
-        isRunning
+        ai.isRunning
             || !ai.isModelAvailable
             || prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            || !source.hasContent
-    }
-
-    private var emptyResultDescription: String {
-        source.hasContent
-            ? "Ask about decisions, action items, or anything discussed."
-            : "Record a meeting to get started."
-    }
-}
-
-private extension AIWorkspaceSource {
-    var isAllMeetings: Bool {
-        if case .allMeetings = self { return true }
-        return false
-    }
-
-    var usesMeetingMemory: Bool {
-        switch self {
-        case .allMeetings: true
-        case .dictation: false
-        }
-    }
-
-    var hasContent: Bool {
-        switch self {
-        case let .allMeetings(meetings):
-            !meetings.isEmpty
-        case let .dictation(item):
-            !item.transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        }
+            || item.transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }

@@ -4,36 +4,14 @@ NVIDIA Parakeet TDT 0.6B v3 Core ML model
 
 Source model: https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3
 Core ML distribution: https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml
+Core ML distribution revision: aed02740059203c4a87495924f685de3722ae9ce
 Core ML integration: https://github.com/FluidInference/FluidAudio
 License: Creative Commons Attribution 4.0 International (CC BY 4.0)
 License URL: https://creativecommons.org/licenses/by/4.0/
 
-Yaprflow for Mac bundles the unmodified compiled Core ML components and
-vocabulary, transcribes offline in bounded segments, and relies on Parakeet's
+Yaprflow for Mac, iPhone, and iPad bundles the unmodified compiled Core ML
+components and vocabulary, transcribes offline in bounded segments, and relies on Parakeet's
 automatic detection for its 25 supported European languages.
-
-NVIDIA Nemotron 3.5 ASR Streaming 0.6B, 1120 ms chunk-size INT8 ONNX export
-
-Source model: https://huggingface.co/nvidia/nemotron-3.5-asr-streaming-0.6b
-Source model/model-card revision reviewed: ea30d66debe3740a08b573244286791d423d6b3e
-Official ONNX distribution: https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-1120ms-int8-2026-06-11.tar.bz2
-Official archive SHA-256: adbdd5e9fef87300c37cebfcfc4f1ebe56845c860c8a760af0a1dd65ce9beed3
-Pinned export mirror: https://huggingface.co/csukuangfj2/sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-1120ms-int8-2026-06-11
-Exact export mirror revision: cba1c96ca5ef0e8393b50584ae153a79145dc492
-License: OpenMDW License Agreement, version 1.1 (OpenMDW-1.1)
-Included license text: LICENSES/OpenMDW-1.1.txt
-Canonical license URL: https://openmdw.ai/license/1-1/
-License text source revision: b26b32b34ad2edcc29a7707abb68dcfb25a538c1
-License text SHA-256: 2ab44b68365473c112f5092211a38f231cb23e50de68b75a13369adbd76a74df
-
-Yaprflow's iOS target bundles the 1120 ms chunk-size INT8 encoder, decoder,
-joiner, and token table without modifying their contents. The source model supports 40
-language-locales across 35 languages: 32 locales transcribe out of the box and
-8 adaptation-ready locales require fine-tuning.
-
-The export repository links to the NVIDIA source model but does not record the
-exact NVIDIA commit used for conversion. The exported binaries are pinned by
-the export revision, official archive SHA-256, and per-file SHA-256 checksums.
 
 Silero VAD Core ML model
 

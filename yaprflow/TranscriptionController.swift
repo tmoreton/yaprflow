@@ -133,7 +133,7 @@ final class TranscriptionController {
     private let memoryPressureSource: DispatchSourceMemoryPressure
 
     // Models stay warm between nearby recordings, then unload while idle.
-    // Parakeet's Core ML weights are shared by quick dictation and meetings.
+    // Parakeet's Core ML weights are shared by dictation and meetings.
     private var speechRecognizer: AsrManager?
     private var vadManager: VoiceActivityDetector?
     private var speechRecognizerLoadingTask: Task<AsrManager, Error>?
@@ -320,12 +320,12 @@ final class TranscriptionController {
 
         do {
             try await Task.sleep(for: .seconds(1))
-            let phrase = "Violet rockets travel beyond the quiet forest. This sentence tests quick dictation capture."
+            let phrase = "Violet rockets travel beyond the quiet forest. This sentence tests dictation capture."
             guard try await Self.playRecordingSmokeTestPhrase(phrase) else {
                 await stop()
                 return RecordingSmokeTestResult(
                     succeeded: false,
-                    message: "The Quick Dictation test phrase could not be played."
+                    message: "The Dictation test phrase could not be played."
                 )
             }
             try await Task.sleep(for: .seconds(4))
@@ -350,7 +350,7 @@ final class TranscriptionController {
         let markerCount = recognizedWords.intersection(markerWords).count
         return RecordingSmokeTestResult(
             succeeded: !isActive && markerCount >= 4,
-            message: "Quick Dictation captured \(markerCount) test markers and stopped successfully."
+            message: "Dictation captured \(markerCount) test markers and stopped successfully."
         )
     }
 
@@ -595,10 +595,10 @@ final class TranscriptionController {
             if finalText.isEmpty {
                 state.status = .error("No speech detected")
                 telemetryFailure = .noSpeech
-                log.info("The Quick Dictation smoke test did not recognize its microphone signal")
+                log.info("The Dictation smoke test did not recognize its microphone signal")
             } else {
                 state.status = .copied
-                log.info("The Quick Dictation smoke test recognized its microphone signal")
+                log.info("The Dictation smoke test recognized its microphone signal")
             }
         } else if !finalText.isEmpty {
             let pb = NSPasteboard.general

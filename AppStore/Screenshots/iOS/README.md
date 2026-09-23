@@ -3,7 +3,7 @@
 These screenshots were captured from the production UI in the checked-in iOS
 Simulator build with no user transcript or meeting data:
 
-- `01-quick-dictation-iphone.png`: 1206 × 2622 iPhone portrait
+- `01-quick-dictation-iphone.png`: 1206 × 2622 iPhone Dictation screen
 - `02-in-person-meeting-iphone.png`: 1206 × 2622 iPhone portrait
 - `03-in-person-meeting-ipad.png`: 1668 × 2420 iPad portrait
 

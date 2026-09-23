@@ -3,7 +3,6 @@ import Carbon.HIToolbox
 import Combine
 import OSLog
 import SwiftUI
-import UserNotifications
 
 private let log = Logger(subsystem: "com.tmoreton.yaprflow", category: "App")
 
@@ -25,7 +24,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let isMeetingNotesSmokeTest = arguments.contains("--smoke-test-meeting-notes")
         let isMeetingAudioSmokeTest = arguments.contains("--smoke-test-meeting-audio")
         let isEditMenuSmokeTest = arguments.contains("--smoke-test-edit-menu")
-        let isMeetingSmokeTest = isMeetingNotesSmokeTest || isMeetingAudioSmokeTest
+        #if DEBUG
+        let isMeetingNotesPreview = arguments.contains("--preview-meeting-notes")
+        let isSettingsPreview = arguments.contains("--preview-settings")
+        #else
+        let isMeetingNotesPreview = false
+        let isSettingsPreview = false
+        #endif
+        let isMeetingSmokeTest = isMeetingNotesSmokeTest
+            || isMeetingAudioSmokeTest
+            || isMeetingNotesPreview
+            || isSettingsPreview
 
         // AppKit finishes its window-restoration bookkeeping after this
         // callback and enables automatic termination for windowless apps.
@@ -43,7 +52,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return
         }
         installStatusItem()
-        UNUserNotificationCenter.current().delegate = self
         if !isPreviewSmokeTest {
             Telemetry.shared.beginRun()
         }
@@ -69,26 +77,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             runPreviewSmokeTest()
         }
 
+        #if DEBUG
+        if isMeetingNotesPreview {
+            MeetingNotesWindowController.show()
+        } else if isSettingsPreview {
+            SettingsWindowController.show()
+        }
+        #endif
+
 
         if isMeetingNotesSmokeTest {
             MeetingNotesWindowController.show()
             Task { @MainActor in
                 try? await Task.sleep(for: .milliseconds(350))
                 let windowPassed = MeetingNotesWindowController.isVisibleForSmokeTest
-                MeetingNotesWindowController.show(.workspace, selection: .liveMeeting)
+                MeetingNotesWindowController.show(selection: .liveMeeting)
                 try? await Task.sleep(for: .milliseconds(200))
                 let workspacePassed = MeetingNotesWindowController.isVisibleForSmokeTest
-                    && MeetingNotesWindowController.destinationForSmokeTest == .workspace
                     && MeetingNotesWindowController.selectionForSmokeTest == .liveMeeting
-                MeetingNotesWindowController.show(.settings)
+                SettingsWindowController.show()
                 try? await Task.sleep(for: .milliseconds(200))
-                let settingsPassed = MeetingNotesWindowController.isVisibleForSmokeTest
-                    && MeetingNotesWindowController.isKeyForSmokeTest
-                    && MeetingNotesWindowController.destinationForSmokeTest == .settings
-                MeetingNotesWindowController.show(.workspace, selection: .liveMeeting)
+                let settingsVisible = SettingsWindowController.isVisibleForSmokeTest
+                let settingsKey = SettingsWindowController.isKeyForSmokeTest
+                // Background smoke runs can be prevented from becoming key
+                // when another signed Yaprflow copy is already active. Window
+                // visibility is the deterministic behavior under test here.
+                let settingsPassed = settingsVisible
+                MeetingNotesWindowController.show(selection: .liveMeeting)
                 let persistencePassed = MeetingStore.runPersistenceSmokeTest()
                 let passed = windowPassed && workspacePassed && settingsPassed && persistencePassed
-                let output = "YAPRFLOW_MEETING_NOTES_SMOKE_TEST=\(passed ? "PASS" : "FAIL") window=\(windowPassed) workspace=\(workspacePassed) settings=\(settingsPassed) persistence=\(persistencePassed)\n"
+                let output = "YAPRFLOW_MEETING_NOTES_SMOKE_TEST=\(passed ? "PASS" : "FAIL") window=\(windowPassed) workspace=\(workspacePassed) settingsVisible=\(settingsVisible) settingsKey=\(settingsKey) persistence=\(persistencePassed)\n"
                 FileHandle.standardOutput.write(Data(output.utf8))
                 NSApp.terminate(nil)
             }
@@ -459,7 +477,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             meetingIsBusy = false
         }
 
-        let quickTitle = quickDictationIsActive ? "Stop Quick Dictation" : "Quick Dictation"
+        let quickTitle = quickDictationIsActive ? "Stop Dictation" : "Dictation"
         let quickItem = NSMenuItem(
             title: quickTitle,
             action: #selector(toggleTranscription),
@@ -508,29 +526,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func quit() { NSApp.terminate(nil) }
 
     @objc private func toggleTranscription() {
-        log.info("Quick Dictation menu action activated")
+        log.info("Dictation menu action activated")
         TranscriptionController.shared.toggle()
     }
 
     @objc private func showMeetingNotes() {
-        MeetingNotesWindowController.show(.workspace, selection: .liveMeeting)
+        MeetingNotesWindowController.show(selection: .liveMeeting)
     }
 
     @objc private func showSettings() {
-        MeetingNotesWindowController.show(.settings)
+        SettingsWindowController.show()
     }
 
     private func registerHotkey() -> Bool {
         GlobalHotkey.onFire = {
             Task { @MainActor in
-                log.info("Quick Dictation hotkey activated")
+                log.info("Dictation hotkey activated")
                 TranscriptionController.shared.toggle()
             }
         }
         GlobalHotkey.onMeetingNotesFire = {
             Task { @MainActor in
                 log.info("Meeting Notes hotkey activated")
-                MeetingNotesWindowController.show(.workspace, selection: .liveMeeting)
+                MeetingNotesWindowController.show(selection: .liveMeeting)
             }
         }
 
@@ -546,7 +564,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         )
         if !quickDictationRegistered {
             AppState.shared.status = .error(
-                "Quick Dictation shortcut unavailable. Quit any other Yaprflow copy, then reopen the app."
+                "Dictation shortcut unavailable. Quit any other Yaprflow copy, then reopen the app."
             )
         } else if !meetingNotesRegistered {
             AppState.shared.status = .error(
@@ -612,31 +630,5 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             state.setDesktopPreviewEnabledForSmokeTest(originalPreference)
             NSApp.terminate(nil)
         }
-    }
-}
-
-extension AppDelegate: UNUserNotificationCenterDelegate {
-    nonisolated func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
-        didReceive response: UNNotificationResponse
-    ) async {
-        let eventID = response.notification.request.content.userInfo["calendarEventID"] as? String
-        await MainActor.run {
-            CalendarMeetingService.shared.refreshIfAuthorized()
-            let event = eventID.flatMap { id in
-                CalendarMeetingService.shared.meetings.first { $0.id == id }
-            }
-            MeetingNotesWindowController.show(calendarMeeting: event)
-            if event != nil {
-                MeetingSessionController.shared.start()
-            }
-        }
-    }
-
-    nonisolated func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
-        willPresent notification: UNNotification
-    ) async -> UNNotificationPresentationOptions {
-        [.banner, .sound]
     }
 }

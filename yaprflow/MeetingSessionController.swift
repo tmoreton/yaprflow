@@ -351,7 +351,6 @@ final class MeetingSessionController: ObservableObject {
     private var micTask: Task<Void, Never>?
     private var systemTask: Task<Void, Never>?
     private var elapsedTask: Task<Void, Never>?
-    private var automaticStopTask: Task<Void, Never>?
     private var microphoneSegmentCommitTask: Task<Void, Never>?
     private var sessionGeneration: UInt = 0
     private var startedAt: Date?
@@ -387,21 +386,10 @@ final class MeetingSessionController: ObservableObject {
     var isRecording: Bool { phase.isCapturing }
     var isPaused: Bool { phase == .paused }
 
-    func prepare(calendarMeeting: CalendarMeeting? = nil) {
+    func prepare() {
         guard !phase.isCapturing else { return }
         resetEchoPresentationState()
-        if let event = calendarMeeting {
-            meeting = MeetingRecord(
-                title: event.title,
-                calendarEventIdentifier: event.id,
-                recurrenceIdentifier: event.recurrenceIdentifier,
-                scheduledStart: event.startDate,
-                scheduledEnd: event.endDate,
-                attendees: event.attendees
-            )
-        } else {
-            meeting = MeetingRecord(title: "New meeting")
-        }
+        meeting = MeetingRecord(title: "New meeting")
         phase = .idle
         elapsed = 0
         #if DEBUG
@@ -433,12 +421,12 @@ final class MeetingSessionController: ObservableObject {
 
     func updateRawNotes(_ notes: String) {
         meeting.rawNotes = notes
-        _ = try? MeetingStore.shared.save(meeting)
+        MeetingStore.shared.saveReportingError(meeting)
     }
 
     func updateTitle(_ title: String) {
         meeting.title = title
-        _ = try? MeetingStore.shared.save(meeting)
+        MeetingStore.shared.saveReportingError(meeting)
     }
 
     func selectTemplate(_ id: String) {
@@ -446,12 +434,15 @@ final class MeetingSessionController: ObservableObject {
         if let notes = meeting.generatedNotes {
             meeting.generatedNotes = MeetingGeneratedNotesGrounder.grounded(notes, in: meeting)
         }
-        _ = try? MeetingStore.shared.save(meeting)
+        MeetingStore.shared.saveReportingError(meeting)
     }
 
     func saveGeneratedNotes(_ notes: MeetingGeneratedNotes) {
         applyGeneratedNotes(notes)
-        _ = try? MeetingStore.shared.save(meeting)
+        guard MeetingStore.shared.saveReportingError(meeting) else {
+            phase = .failed("The generated notes could not be saved.")
+            return
+        }
         if case let .failed(message) = phase,
            message.hasPrefix("Transcript saved, but notes could not be generated:") {
             phase = .complete
@@ -541,7 +532,6 @@ final class MeetingSessionController: ObservableObject {
             lastAudioActivityAt = meeting.startedAt
             phase = .recording
             startElapsedTimer()
-            scheduleAutomaticStop()
         } catch {
             acceptsAudio = false
             microphone.stop()
@@ -564,7 +554,6 @@ final class MeetingSessionController: ObservableObject {
         var finalizationReason = reason
         phase = .finalizing("Finishing transcript…")
         elapsedTask?.cancel()
-        automaticStopTask?.cancel()
         microphoneSegmentCommitTask?.cancel()
         microphoneSegmentCommitTask = nil
         microphone.stop()
@@ -625,21 +614,32 @@ final class MeetingSessionController: ObservableObject {
 
     private func generateNotes() async {
         phase = .finalizing("Generating trustworthy notes…")
+        let generatedNotes: MeetingGeneratedNotes
         do {
-            let notes = try await MeetingAIService.generateNotes(
+            generatedNotes = try await MeetingAIService.generateNotes(
                 for: meeting,
                 progress: { [weak self] message in self?.phase = .finalizing(message) }
             )
-            applyGeneratedNotes(notes)
+        } catch MeetingAIError.modelUnavailable {
+            // A transcript without configured AI is still a completed, useful meeting.
+            phase = MeetingStore.shared.saveReportingError(meeting)
+                ? .complete
+                : .failed("The transcript could not be saved.")
+            return
+        } catch {
+            let saved = MeetingStore.shared.saveReportingError(meeting)
+            phase = saved
+                ? .failed("Transcript saved, but notes could not be generated: \(error.localizedDescription)")
+                : .failed("The transcript could not be saved, and notes could not be generated: \(error.localizedDescription)")
+            return
+        }
+
+        applyGeneratedNotes(generatedNotes)
+        do {
             try MeetingStore.shared.save(meeting)
             phase = .complete
-        } catch MeetingAIError.modelUnavailable {
-            _ = try? MeetingStore.shared.save(meeting)
-            // A transcript without configured AI is still a completed, useful meeting.
-            phase = .complete
         } catch {
-            _ = try? MeetingStore.shared.save(meeting)
-            phase = .failed("Transcript saved, but notes could not be generated: \(error.localizedDescription)")
+            phase = .failed("The notes were generated but could not be saved: \(error.localizedDescription)")
         }
     }
 
@@ -802,7 +802,7 @@ final class MeetingSessionController: ObservableObject {
 
             // Stop the system stream, then inject a deterministic synthesized
             // buffer through the meeting's microphone recognition path. The
-            // separate Quick Dictation smoke test exercises the physical mic;
+            // separate Dictation smoke test exercises the physical mic;
             // this avoids making the separation test depend on speaker volume,
             // headphones, or room acoustics.
             await systemAudio.stop()
@@ -943,18 +943,6 @@ final class MeetingSessionController: ObservableObject {
                 }
                 try? await Task.sleep(for: .seconds(1))
             }
-        }
-    }
-
-    private func scheduleAutomaticStop() {
-        guard let scheduledEnd = meeting.scheduledEnd else { return }
-        let stopDate = scheduledEnd.addingTimeInterval(15 * 60)
-        guard stopDate > Date() else { return }
-        automaticStopTask = Task { @MainActor [weak self] in
-            do {
-                try await Task.sleep(for: .seconds(stopDate.timeIntervalSinceNow))
-            } catch { return }
-            await self?.stop(reason: "Recording stopped 15 minutes after the scheduled meeting ended.")
         }
     }
 

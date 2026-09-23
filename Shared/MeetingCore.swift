@@ -383,10 +383,6 @@ public struct MeetingRecord: Codable, Identifiable, Hashable, Sendable {
     public var version: Int
     public let id: UUID
     public var title: String
-    public var calendarEventIdentifier: String?
-    public var recurrenceIdentifier: String?
-    public var scheduledStart: Date?
-    public var scheduledEnd: Date?
     public var startedAt: Date
     public var endedAt: Date?
     public var attendees: [MeetingAttendee]
@@ -399,10 +395,6 @@ public struct MeetingRecord: Codable, Identifiable, Hashable, Sendable {
         version: Int = MeetingRecord.currentVersion,
         id: UUID = UUID(),
         title: String,
-        calendarEventIdentifier: String? = nil,
-        recurrenceIdentifier: String? = nil,
-        scheduledStart: Date? = nil,
-        scheduledEnd: Date? = nil,
         startedAt: Date = Date(),
         endedAt: Date? = nil,
         attendees: [MeetingAttendee] = [],
@@ -414,10 +406,6 @@ public struct MeetingRecord: Codable, Identifiable, Hashable, Sendable {
         self.version = version
         self.id = id
         self.title = title
-        self.calendarEventIdentifier = calendarEventIdentifier
-        self.recurrenceIdentifier = recurrenceIdentifier
-        self.scheduledStart = scheduledStart
-        self.scheduledEnd = scheduledEnd
         self.startedAt = startedAt
         self.endedAt = endedAt
         self.attendees = attendees
@@ -738,102 +726,6 @@ public enum LibraryPromptCatalog {
         """
     )
 
-    public static let executiveBrief = LibraryPromptPreset(
-        id: "executive-brief",
-        title: "Executive Brief",
-        systemImage: "sparkles.rectangle.stack",
-        prompt: """
-        Build an executive brief from the relevant saved meetings. Use only supported evidence. Never invent a fact, owner, deadline, decision, or trend, and do not present a proposal as an agreement. Combine duplicates and call out meaningful conflicts between meetings.
-
-        Use these sections, omitting empty sections:
-        ## Executive overview
-        Summarize the most consequential outcomes and changes in 3–5 sentences.
-
-        ## Decisions
-        List confirmed decisions and name the source meeting for each.
-
-        ## Commitments and next steps
-        Format each item as: - [ ] Action — Owner: name or Not stated — Due: date or Not stated — Meeting: title
-
-        ## Risks and blockers
-        Distinguish active blockers from potential risks.
-
-        ## Open questions
-        Capture unresolved issues and the next clarification needed.
-
-        Cite every substantive bullet with the exact bracketed meeting or segment reference supplied in the source.
-        """
-    )
-
-    public static let actionTracker = LibraryPromptPreset(
-        id: "action-tracker",
-        title: "Action Tracker",
-        systemImage: "checkmark.circle",
-        prompt: """
-        Find explicit commitments, assigned work, deadlines, handoffs, and follow-ups across the relevant saved meetings. Use only supported evidence, merge true duplicates, and never invent an owner, date, priority, or completion status.
-
-        Organize the result as:
-        ## Assigned actions
-        - [ ] Action — Owner: name — Due: date or Not stated — Status: stated status or Not stated — Meeting: title
-
-        ## Unassigned actions
-        - [ ] Action — Owner: Not stated — Due: date or Not stated — Meeting: title
-
-        ## Blocked or dependent work
-        Explain the blocker or dependency and the action it affects.
-
-        ## Follow-ups to clarify
-        List missing owners, dates, approvals, and conflicting commitments.
-
-        Cite every item with the exact bracketed meeting or segment reference supplied in the source. If an action is only suggested, label it Proposed rather than Assigned.
-        """
-    )
-
-    public static let decisionLog = LibraryPromptPreset(
-        id: "decision-log",
-        title: "Decision Log",
-        systemImage: "signpost.right.and.left",
-        prompt: """
-        Create a decision log across the relevant saved meetings. Include only decisions that were explicitly confirmed; keep recommendations, options, and unresolved debates separate. Never invent rationale, owners, dates, or consequences.
-
-        For each confirmed decision, provide:
-        ## Decision: short outcome
-        - Meeting: title
-        - Decision: what was agreed
-        - Rationale: stated reasoning, or Not stated
-        - Owner: name, or Not stated
-        - Effective date or deadline: date, or Not stated
-        - Implications: only consequences explicitly discussed
-        - Remaining uncertainty: any unresolved part
-
-        Then add:
-        ## Pending decisions
-        List decisions still awaiting input, approval, or a tie-breaker.
-
-        Cite every entry with the exact bracketed meeting or segment reference supplied in the source. Note conflicts when later meetings revise an earlier decision.
-        """
-    )
-
-    public static let followUpQueue = LibraryPromptPreset(
-        id: "follow-up-queue",
-        title: "Follow-up Queue",
-        systemImage: "paperplane",
-        prompt: """
-        Identify the highest-value follow-ups across the relevant saved meetings and turn them into a concise outreach queue. Use only supported evidence. Never invent a recipient, promise, owner, date, or decision.
-
-        For each follow-up, provide:
-        ## Follow-up: short purpose
-        - Source meeting: title
-        - Recipient: stated person or Not stated
-        - Goal: the answer, confirmation, approval, or action needed
-        - Owner: stated person or Not stated
-        - Due: stated date or Not stated
-        - Context: one sentence explaining why it matters
-
-        Draft a short ready-to-send message with a specific subject line, a direct request, and the relevant confirmed context. Keep each draft under 120 words. Limit the queue to the five most consequential follow-ups and cite each one with the exact bracketed meeting or segment reference supplied in the source.
-        """
-    )
-
     public static let itemPresets = [
         structuredBrief,
         oneToOneNotes,
@@ -846,9 +738,7 @@ public enum LibraryPromptCatalog {
         detailedNotes,
     ]
     public static let dictationPresets = [polishedDictation] + itemPresets
-    public static let allMeetingPresets = [executiveBrief, actionTracker, decisionLog, followUpQueue]
     public static let itemDefaultPrompt = structuredBrief.prompt
-    public static let allMeetingsDefaultPrompt = executiveBrief.prompt
 
     public static func itemPreset(id: String) -> LibraryPromptPreset {
         dictationPresets.first { $0.id == id } ?? structuredBrief
@@ -897,127 +787,9 @@ public struct MeetingSearchHit: Identifiable, Hashable, Sendable {
     public let segmentID: UUID?
     public let title: String
     public let excerpt: String
-    public let score: Int
 
     public var id: String {
         "\(meetingID.uuidString):\(segmentID?.uuidString ?? "meeting")"
-    }
-}
-
-public enum MeetingSearchIndex {
-    public static func search(
-        _ query: String,
-        in meetings: [MeetingRecord],
-        limit: Int = 20
-    ) -> [MeetingSearchHit] {
-        let terms = tokens(in: query)
-        guard !terms.isEmpty, limit > 0 else { return [] }
-
-        var hits: [MeetingSearchHit] = []
-        for meeting in meetings {
-            let titleTokens = tokens(in: meeting.title)
-            let noteTokens = tokens(in: meeting.rawNotes)
-            let attendeeTokens = tokens(in: meeting.attendees.map(\.name).joined(separator: " "))
-            let meetingScore = weightedMatches(terms, in: titleTokens, weight: 8)
-                + weightedMatches(terms, in: attendeeTokens, weight: 5)
-                + weightedMatches(terms, in: noteTokens, weight: 3)
-            if meetingScore > 0 {
-                hits.append(MeetingSearchHit(
-                    meetingID: meeting.id,
-                    segmentID: nil,
-                    title: meeting.title,
-                    excerpt: excerpt(from: meeting.rawNotes, matching: terms),
-                    score: meetingScore
-                ))
-            }
-
-            for segment in meeting.transcript {
-                let lexicalScore = weightedMatches(terms, in: tokens(in: segment.text), weight: 2)
-                let semanticScore = semanticSimilarity(query, segment.text)
-                    .map { Int(max(0, ($0 - 0.35) * 20)) } ?? 0
-                let score = lexicalScore + semanticScore
-                guard score > 0 else { continue }
-                hits.append(MeetingSearchHit(
-                    meetingID: meeting.id,
-                    segmentID: segment.id,
-                    title: meeting.title,
-                    excerpt: "\(segment.displaySpeaker): \(excerpt(from: segment.text, matching: terms))",
-                    score: score + meetingScore
-                ))
-            }
-        }
-
-        return hits.sorted {
-            if $0.score == $1.score { return $0.title < $1.title }
-            return $0.score > $1.score
-        }.prefix(limit).map { $0 }
-    }
-
-    public static func context(
-        for query: String,
-        in meetings: [MeetingRecord],
-        maximumSegments: Int = 30
-    ) -> String {
-        let meetingByID = Dictionary(uniqueKeysWithValues: meetings.map { ($0.id, $0) })
-        return search(query, in: meetings, limit: maximumSegments).compactMap { hit in
-            guard let meeting = meetingByID[hit.meetingID] else { return nil }
-            if let segmentID = hit.segmentID,
-               let segment = meeting.transcript.first(where: { $0.id == segmentID }) {
-                return "[meeting:\(meeting.id.uuidString) segment:\(segment.id.uuidString)] \(meeting.title) — \(segment.displaySpeaker): \(segment.text)"
-            }
-            return "[meeting:\(meeting.id.uuidString)] \(meeting.title) — Notes: \(meeting.rawNotes)"
-        }.joined(separator: "\n")
-    }
-
-    private static func tokens(in text: String) -> [String] {
-        text.lowercased()
-            .components(separatedBy: CharacterSet.alphanumerics.inverted)
-            .filter { $0.count > 1 }
-    }
-
-    private static func weightedMatches(_ query: [String], in content: [String], weight: Int) -> Int {
-        let contentSet = Set(content)
-        return query.reduce(into: 0) { score, term in
-            if contentSet.contains(term) {
-                score += weight * 2
-            } else if content.contains(where: { $0.hasPrefix(term) || term.hasPrefix($0) }) {
-                score += weight
-            }
-        }
-    }
-
-    /// Apple's sentence embedding keeps meeting-memory retrieval local while
-    /// allowing related wording (for example "ship" and "launch") to match.
-    private static func semanticSimilarity(_ lhs: String, _ rhs: String) -> Double? {
-        guard lhs.count >= 3, rhs.count >= 3,
-              let embedding = NLEmbedding.sentenceEmbedding(for: .english),
-              let lhsVector = embedding.vector(for: lhs),
-              let rhsVector = embedding.vector(for: rhs),
-              lhsVector.count == rhsVector.count else {
-            return nil
-        }
-        var dot = 0.0
-        var lhsMagnitude = 0.0
-        var rhsMagnitude = 0.0
-        for index in lhsVector.indices {
-            dot += lhsVector[index] * rhsVector[index]
-            lhsMagnitude += lhsVector[index] * lhsVector[index]
-            rhsMagnitude += rhsVector[index] * rhsVector[index]
-        }
-        guard lhsMagnitude > 0, rhsMagnitude > 0 else { return nil }
-        return dot / (sqrt(lhsMagnitude) * sqrt(rhsMagnitude))
-    }
-
-    private static func excerpt(from text: String, matching terms: [String]) -> String {
-        let compact = text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
-        guard compact.count > 180 else { return compact }
-        let lower = compact.lowercased()
-        let match = terms.compactMap { lower.range(of: $0)?.lowerBound }.min()
-        let center = match.map { lower.distance(from: lower.startIndex, to: $0) } ?? 0
-        let startOffset = max(0, min(compact.count - 180, center - 50))
-        let start = compact.index(compact.startIndex, offsetBy: startOffset)
-        let end = compact.index(start, offsetBy: min(180, compact.distance(from: start, to: compact.endIndex)))
-        return (startOffset > 0 ? "…" : "") + compact[start..<end] + (end < compact.endIndex ? "…" : "")
     }
 }
 
@@ -1064,17 +836,6 @@ public enum MeetingPromptBuilder {
         }.joined(separator: "\n")
     }
 
-    public static func questionPrompt(question: String, context: String) -> String {
-        """
-        Answer the question using only the meeting excerpts below. Cite claims inline with their bracketed meeting/segment references. If the excerpts do not answer it, say so.
-
-        Question: \(question)
-
-        <meeting-excerpts>
-        \(context)
-        </meeting-excerpts>
-        """
-    }
 }
 
 /// Enforces source grounding for contact details after generation. Prompt rules
@@ -1740,7 +1501,7 @@ public enum MeetingMarkdownRenderer {
         }
 
         if !meeting.rawNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            sections.append(contentsOf: ["", "## My notes", "", meeting.rawNotes])
+            sections.append(contentsOf: ["", "## Your notes", "", meeting.rawNotes])
         }
 
         sections.append(contentsOf: ["", "## Transcript", ""])

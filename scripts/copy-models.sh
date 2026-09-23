@@ -16,7 +16,7 @@ fail() {
 destination="$1"
 model_dir="$2"
 case "$model_dir" in
-    "$YAPRFLOW_MAC_ASR_MODEL_DIR"|"$YAPRFLOW_IOS_ASR_MODEL_DIR") ;;
+    "$YAPRFLOW_ASR_MODEL_DIR") ;;
     *) fail "unsupported model directory: $model_dir" ;;
 esac
 [[ "$destination" == /* ]] || fail "model destination must be an absolute path"

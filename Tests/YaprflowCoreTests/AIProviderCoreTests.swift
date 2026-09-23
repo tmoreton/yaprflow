@@ -158,6 +158,40 @@ struct AIProviderCoreTests {
         #expect(requests == 2)
     }
 
+    @Test("Long transcript output can retry beyond the old 4096-token cap")
+    func openRouterLongResponseRetry() async throws {
+        var requests = 0
+        let session = mockSession { request in
+            requests += 1
+            let body = try #require(request.jsonBody)
+            if requests == 1 {
+                #expect(body["max_completion_tokens"] as? Int == 2_400)
+                return response(for: request, body: """
+                    {"choices":[{"message":{"content":"Partial"},"finish_reason":"length"}]}
+                    """)
+            }
+
+            #expect(body["max_completion_tokens"] as? Int == 4_800)
+            return response(for: request, body: """
+                {"choices":[{"message":{"content":"Complete text"},"finish_reason":"stop"}]}
+                """)
+        }
+
+        let result = try await AIChatClient(session: session).complete(
+            configuration: AIChatConfiguration(
+                provider: .openRouter,
+                model: "deepseek/deepseek-v4.1-flash",
+                apiKey: "test-router-key"
+            ),
+            instructions: "Polish without omission.",
+            prompt: "A long transcript",
+            maximumResponseTokens: 2_400
+        )
+
+        #expect(requests == 2)
+        #expect(result == "Complete text")
+    }
+
     @Test("Ollama uses the local chat endpoint without an API key")
     func ollamaRequest() async throws {
         let session = mockSession { request in

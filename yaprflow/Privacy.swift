@@ -8,33 +8,14 @@ struct SettingsView: View {
     @ObservedObject private var updater = AppUpdater.shared
     #endif
     @State private var isShowingFeedback = false
+    @State private var showsAdvancedSettings = false
+    @State private var errorMessage: String?
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Settings")
-                        .font(.title2.weight(.semibold))
-                    Text("The essentials for dictation, meetings, and AI.")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
-
                 settingsGroup("General") {
                     VStack(spacing: 0) {
-                        HStack(spacing: 12) {
-                            settingLabel(
-                                "Speech language",
-                                detail: "Parakeet automatically detects 25 supported European languages."
-                            )
-                            Spacer(minLength: 16)
-                            Text("Automatic")
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.vertical, 9)
-
-                        Divider()
-
                         HStack(spacing: 12) {
                             settingLabel("Desktop preview", detail: "Show finalized text after each pause.")
                             Spacer(minLength: 16)
@@ -47,7 +28,26 @@ struct SettingsView: View {
                         Divider()
 
                         HStack(spacing: 12) {
-                            settingLabel("Quick Dictation", detail: "Start or stop from any app.")
+                            settingLabel(
+                                "Copied text",
+                                detail: "Polished applies local cleanup; Exact keeps the recognized wording."
+                            )
+                            Spacer(minLength: 16)
+                            Picker("Copied text style", selection: $appState.dictationMode) {
+                                ForEach(DictationMode.allCases, id: \.self) { mode in
+                                    Text(mode.displayName).tag(mode)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                            .frame(width: 118)
+                        }
+                        .padding(.vertical, 9)
+
+                        Divider()
+
+                        HStack(spacing: 12) {
+                            settingLabel("Dictation", detail: "Start or stop from any app.")
                             Spacer(minLength: 16)
                             HotkeyRecorder(hotkey: appState.hotkey)
                                 .frame(width: 118, height: 28)
@@ -57,14 +57,14 @@ struct SettingsView: View {
                         Divider()
 
                         HStack(spacing: 12) {
-                            settingLabel("Meetings", detail: "Open the meeting workspace.")
+                            settingLabel(
+                                "Vocabulary",
+                                detail: "Teach Yaprflow names, acronyms, and preferred spellings."
+                            )
                             Spacer(minLength: 16)
-                            Text(HotkeyConfig.meetingNotesHotkey.displayString)
-                                .font(.callout.monospaced())
-                                .padding(.horizontal, 10)
-                                .frame(height: 28)
-                                .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
-                                .accessibilityLabel("Meetings shortcut Command M")
+                            Button("Open File") {
+                                openVocabularyFile()
+                            }
                         }
                         .padding(.vertical, 9)
                     }
@@ -74,8 +74,14 @@ struct SettingsView: View {
                     AIProviderSettingsView()
                 }
 
-                settingsGroup("Outputs") {
-                    PromptPresetSettingsView()
+                DisclosureGroup(isExpanded: $showsAdvancedSettings) {
+                    FeatureCard {
+                        PromptPresetSettingsView()
+                    }
+                    .padding(.top, 8)
+                } label: {
+                    Text("Advanced")
+                        .font(.headline)
                 }
 
                 settingsGroup("Privacy") {
@@ -130,6 +136,17 @@ struct SettingsView: View {
         .sheet(isPresented: $isShowingFeedback) {
             FeedbackView()
                 .frame(minWidth: 620, minHeight: 600)
+        }
+        .alert(
+            "Couldn’t open vocabulary",
+            isPresented: Binding(
+                get: { errorMessage != nil },
+                set: { if !$0 { errorMessage = nil } }
+            )
+        ) {
+            Button("OK") { errorMessage = nil }
+        } message: {
+            Text(errorMessage ?? "Please try again.")
         }
     }
 
@@ -231,6 +248,34 @@ struct SettingsView: View {
         )
     }
 
+    private func openVocabularyFile() {
+        do {
+            NSWorkspace.shared.open(try appState.vocabularyFileURL())
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+}
+
+@MainActor
+enum SettingsWindowController {
+    private static let window = FeatureWindowController(
+        title: "Settings",
+        contentSize: NSSize(width: 780, height: 700),
+        minimumSize: NSSize(width: 640, height: 520),
+        usesTransparentTitlebar: false
+    ) {
+        SettingsView()
+    }
+
+    static func show() {
+        Telemetry.shared.track(.featureOpened(.settings))
+        window.show()
+    }
+
+    static var isVisibleForSmokeTest: Bool { window.isVisibleForSmokeTest }
+    static var isKeyForSmokeTest: Bool { window.isKeyForSmokeTest }
 }
 
 private struct PromptPresetSettingsView: View {
@@ -243,7 +288,7 @@ private struct PromptPresetSettingsView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Output prompts")
                         .font(.callout.weight(.medium))
-                    Text("Meeting outputs and dictations; Polished Dictation is dictation-only.")
+                    Text("Meeting notes and dictations; Polished Dictation is dictation-only.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

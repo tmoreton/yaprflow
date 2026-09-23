@@ -38,7 +38,7 @@ struct AIProviderSettingsView: View {
 
             Divider()
 
-            Toggle("Automatically polish each new dictation", isOn: $settings.automaticDictationOutput)
+            Toggle("Save an AI-polished version after each dictation", isOn: $settings.automaticDictationOutput)
                 .font(.callout)
 
             Text(settings.provider.sendsTranscriptOffDevice
@@ -47,7 +47,7 @@ struct AIProviderSettingsView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            Text("Edit the Polished Dictation instructions under Outputs.")
+            Text("Edit the Polished Dictation instructions under Advanced.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 

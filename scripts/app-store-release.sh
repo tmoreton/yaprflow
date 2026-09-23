@@ -26,15 +26,10 @@ PROJECT="yaprflow.xcodeproj"
 CONFIGURATION="Release"
 EXPORT_OPTIONS="$ROOT/AppStore/ExportOptions.plist"
 MODEL_CHECKSUMS="$ROOT/scripts/model-checksums.sha256"
-NATIVE_ASR_CHECKSUMS="$ROOT/scripts/native-asr-checksums.sha256"
 ACKNOWLEDGEMENTS_SOURCE="$ROOT/yaprflow/Acknowledgements.txt"
 MODEL_NOTICE_SOURCE="$ROOT/scripts/model-NOTICE.txt"
 MODEL_ORIGIN_NOTICE_SOURCE="$ROOT/NOTICE.txt"
-MODEL_LICENSE_SOURCE="$ROOT/LICENSES/OpenMDW-1.1.txt"
 PRIVACY_MANIFEST_SOURCE="$ROOT/yaprflow/PrivacyInfo.xcprivacy"
-ONNXRUNTIME_NOTICES_SOURCE="$ROOT/LICENSES/ONNXRuntime-ThirdPartyNotices-v1.28.2.txt"
-SHERPA_NOTICES_SOURCE="$ROOT/LICENSES/SherpaOnnx-ThirdParty-v1.13.8"
-SHERPA_ARTIFACTS_ROOT="$ROOT/Vendor/SherpaOnnxASR/Artifacts"
 
 EXPECTED_BUNDLE_ID="com.tmoreton.yaprflow"
 EXPECTED_TEAM_ID="GVXC5FQ2RP"
@@ -50,13 +45,6 @@ usage() {
 fail() {
     echo "error: $*" >&2
     exit 1
-}
-
-require_native_asr_artifacts() {
-    if ! yaprflow_verify_native_asr_artifacts "$ROOT" "$NATIVE_ASR_CHECKSUMS"; then
-        echo "       Run scripts/build-sherpa-onnx-asr.sh, then retry the release." >&2
-        exit 1
-    fi
 }
 
 if [[ $# -gt 0 ]]; then
@@ -95,22 +83,7 @@ for command_name in \
 done
 [[ -x /usr/libexec/PlistBuddy ]] || fail "/usr/libexec/PlistBuddy is unavailable"
 
-require_native_asr_artifacts
 "$ROOT/scripts/verify-app-icon.sh"
-
-ONNXRUNTIME_MACOS_FRAMEWORK="$SHERPA_ARTIFACTS_ROOT/OnnxRuntimeMacOS.xcframework/macos-arm64_x86_64/onnxruntime.framework"
-[[ -L "$ONNXRUNTIME_MACOS_FRAMEWORK/Versions/Current" \
-   && "$(readlink "$ONNXRUNTIME_MACOS_FRAMEWORK/Versions/Current")" == "A" \
-   && -e "$ONNXRUNTIME_MACOS_FRAMEWORK/Versions/Current" ]] \
-    || fail "ONNX Runtime macOS Versions/Current must link to A; rebuild the native artifacts"
-for framework_component in onnxruntime Headers Modules Resources; do
-    framework_link="$ONNXRUNTIME_MACOS_FRAMEWORK/$framework_component"
-    [[ -L "$framework_link" ]] \
-        || fail "ONNX Runtime macOS $framework_component must be a canonical framework symlink; rebuild the native artifacts"
-    [[ "$(readlink "$framework_link")" == "Versions/Current/$framework_component" \
-       && -e "$framework_link" ]] \
-        || fail "ONNX Runtime macOS $framework_component has an invalid framework link; rebuild the native artifacts"
-done
 
 if ! BUILD_SETTINGS="$(
     xcodebuild \
@@ -276,25 +249,6 @@ verify_app_payload() {
         || fail "the retained model-origin NOTICE.txt is missing or empty"
     cmp -s "$MODEL_ORIGIN_NOTICE_SOURCE" "$resources_path/NOTICE.txt" \
         || fail "bundled NOTICE.txt does not match the retained model-origin notice"
-    [[ -s "$MODEL_LICENSE_SOURCE" ]] \
-        || fail "the source OpenMDW-1.1 license is missing or empty"
-    cmp -s \
-        "$MODEL_LICENSE_SOURCE" \
-        "$resources_path/OpenMDW-1.1.txt" \
-        || fail "bundled OpenMDW-1.1 license does not match the reviewed source"
-    [[ -s "$ONNXRUNTIME_NOTICES_SOURCE" ]] \
-        || fail "the source ONNX Runtime third-party notices are missing or empty"
-    cmp -s \
-        "$ONNXRUNTIME_NOTICES_SOURCE" \
-        "$resources_path/ONNXRuntime-ThirdPartyNotices-v1.28.2.txt" \
-        || fail "bundled ONNX Runtime notices do not match the reviewed source notice"
-    [[ -d "$SHERPA_NOTICES_SOURCE" ]] \
-        || fail "the source sherpa-onnx dependency notices are missing"
-    diff -qr \
-        "$SHERPA_NOTICES_SOURCE" \
-        "$resources_path/SherpaOnnx-ThirdParty-v1.13.8" >/dev/null \
-        || fail "bundled sherpa-onnx dependency notices do not match the reviewed source"
-
     plutil -lint "$PRIVACY_MANIFEST_SOURCE" >/dev/null \
         || fail "the source privacy manifest is missing or invalid"
     [[ -f "$resources_path/PrivacyInfo.xcprivacy" ]] \
@@ -379,7 +333,6 @@ verify_app_store_signature() {
     require_plist_value "$entitlements_plist" com.apple.security.app-sandbox "true"
     require_plist_value "$entitlements_plist" com.apple.security.device.audio-input "true"
     require_plist_value "$entitlements_plist" com.apple.security.network.client "true"
-    require_plist_value "$entitlements_plist" com.apple.security.personal-information.calendars "true"
 
     actual_entitlement_keys="$(
         /usr/libexec/PlistBuddy -c Print "$entitlements_plist" \
@@ -400,7 +353,6 @@ verify_app_store_signature() {
             com.apple.security.app-sandbox \
             com.apple.security.device.audio-input \
             com.apple.security.network.client \
-            com.apple.security.personal-information.calendars \
             | LC_ALL=C sort
     )"
     if [[ "$actual_entitlement_keys" != "$expected_entitlement_keys" ]]; then
