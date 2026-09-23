@@ -1,14 +1,14 @@
 # Production release verification
 
-Last updated: September 22, 2026
+Last updated: September 23, 2026
 
 ## Active release
 
 - Public site: `https://yaprflow.com/`
-- Vercel deployment: `dpl_3tdR3yBo7mjYYragsKntuAHoqDpX`
-- Deployment URL: `https://yaprflow-checkout-plxxz1ajz-tmoretons-projects.vercel.app`
+- Vercel deployment: `dpl_FXQZiDF14YAjNCG9tsnCmCfJ5ghi`
+- Deployment URL: `https://yaprflow-checkout-2xj4knkiq-tmoretons-projects.vercel.app`
 - Direct checkout installer: Yaprflow 5.2.16, build 29, universal Intel and Apple silicon
-- Sparkle update: Yaprflow 5.2.17, build 30, universal Intel and Apple silicon
+- Sparkle update: Yaprflow 5.2.18, build 31, universal Intel and Apple silicon
 - Private installer: `releases/yaprflow-5.2.16.dmg`
 - Installer size: 480,522,346 bytes
 - Installer SHA-256: `45f57761cf41f28d8783931e896be831dc3ae6b96add96b4f384cd24380e9c74`
@@ -20,25 +20,24 @@ Last updated: September 22, 2026
 ## Native app checks
 
 - The direct app and DMG were signed with Developer ID, accepted by Apple's notarization service, stapled, and accepted by Gatekeeper.
-- The direct app notarization submission ID is `dcb65fb1-b2e0-48d2-9969-55856c170889`; the DMG submission ID is `c6502116-ac23-4edf-bbf3-58417c14176a`.
+- The direct app notarization submission ID is `78512398-22dd-4610-955c-d4f2bd590f4a`; the DMG submission ID is `4e7321cc-45ea-41fd-aa6e-c245b92b18eb`.
 - The private Blob upload was downloaded through a short-lived private URL and matched the local file's full size and SHA-256. Anonymous download access remains denied.
-- The 5.2.16 direct build compiled as a universal `arm64` and `x86_64` application, bundles Parakeet TDT 0.6B v3, and contains Sparkle. App Store candidates were not rebuilt for this direct-download release.
+- The 5.2.18 direct build compiled as a universal `arm64` and `x86_64` application, bundles Parakeet TDT 0.6B v3, and contains Sparkle. App Store candidates were not rebuilt for this direct-download release.
 - The paired TestFlight release gate compiled the macOS 5.2.8 build 21 archive and exported and verified iOS 1.0.0 build 8. The Mac installer export stopped because the required Mac Installer Distribution private certificate is missing, so neither candidate was uploaded to App Store Connect.
-- The iOS meeting-store smoke test passed.
-- The shared Swift suite previously passed 68 tests. The 5.2.16 desktop preview smoke test passed with the live microphone-level waveform rendered in its 208 × 36-point listening state.
+- The shared Swift suite passed 78 tests. The website suite passed 100 tests, and the iOS meeting-store smoke test passed.
 
 ## Sparkle checks
 
 - The direct edition includes Sparkle and requires both archive and feed signatures.
-- The first updater-enabled release was 5.1.4. The production feed now offers Mac 5.2.17 build 30 and carries a verified EdDSA feed signature and signed enclosure.
+- The first updater-enabled release was 5.1.4. The production feed now offers Mac 5.2.18 build 31 and carries a verified EdDSA feed signature and signed enclosure.
 - The private EdDSA key remains outside the repository. The repository contains only the public key.
 - The paid 5.2.16 installer stays in the private checkout store. Its byte-identical updater copy is isolated in the unlisted public `yaprflow-sparkle-updates` store under an opaque immutable path and randomized filename. The full public object matches SHA-256 `45f57761cf41f28d8783931e896be831dc3ae6b96add96b4f384cd24380e9c74`.
-- The 5.2.17 Sparkle updater is in the same isolated public store. Its full downloaded copy matches the notarized local DMG: 480,566,897 bytes and SHA-256 `6ba34f78529f6d10911f5e8f0d40cf9926f4271e80661dc759b2b0c008c84ce9`. The live `https://yaprflow.com/appcast.xml` is byte-for-byte identical to the workflow-signed feed.
+- The 5.2.18 Sparkle updater is in the same isolated public store. Its full downloaded copy matches the notarized local DMG: 480,472,317 bytes and SHA-256 `b0d907e4c768d858e49db50a988b1da1f740437a1055093a6a23899743d11666`. The protected publication workflow regenerated and verified the signed feed before committing it to `main`; the live `https://yaprflow.com/appcast.xml` is byte-for-byte identical to that workflow-signed feed.
 
 ## Website and checkout checks
 
-- The full website suite passed: 100 tests, zero failures. The production build completed with the pinned Vercel CLI and the project's Node.js runtime.
-- Production deployment `dpl_3tdR3yBo7mjYYragsKntuAHoqDpX` is READY and aliased to `https://yaprflow.com/`.
+- The full website suite passed: 100 tests, zero failures. The linked project's prebuilt Production output deployed successfully through the Vercel CLI.
+- Production deployment `dpl_FXQZiDF14YAjNCG9tsnCmCfJ5ghi` is READY and aliased to `https://yaprflow.com/`.
 - A real installed Mac 5.2.6 build 19 discovered 5.2.8 through **Check Now** and displayed the signed embedded release notes and **Install Update** action.
 - Public `/api/config` reports live mode, the US $7.99 one-time price, `downloadReady: true`, and `voiceDemoAvailable: true`.
 - The public page reports software version 5.2.16 and shows the optional newsletter choice.
