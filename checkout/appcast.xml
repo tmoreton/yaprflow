@@ -9,6 +9,27 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
         <description>Signed updates for Yaprflow for Mac.</description>
         <language>en</language>
         <item>
+            <title>5.2.19</title>
+            <pubDate>Wed, 23 Sep 2026 14:25:14 +0000</pubDate>
+            <link>https://yaprflow.com/</link>
+            <sparkle:version>32</sparkle:version>
+            <sparkle:shortVersionString>5.2.19</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Yaprflow 5.2.19
+
+- Makes Meeting tools more compact while keeping summary generation, questions,
+  provider status, and privacy information accessible.
+- Shows saved meetings and dictations together in newest-first order, with
+  shorter previews so recent transcripts are easier to find.
+- Keeps the red recording and yellow preparation menu bar waveform the same
+  size as the neutral icon.
+
+Speech recognition remains on-device and raw audio is not saved. Text is sent
+off-device only when you choose and use an online AI provider.
+]]></description>
+            <enclosure url="https://m3kx2mv37nzf8tbz.public.blob.vercel-storage.com/updates/5.2.19/4d43f07dc3432d822150/yaprflow-5.2.19-vLISLaNOXeLO9cJ1vMvIOmcWaUYjep.dmg" length="480481641" type="application/octet-stream" sparkle:edSignature="sH4WxQeECmDLmwwl2Tfp/a+IrqdlRKP9mzzpjP+lnsQcl0pdMY4TcyAWV+f6ZEpCaRP6ZVbpM3jDVrnZTtceBw=="/>
+        </item>
+        <item>
             <title>5.2.18</title>
             <pubDate>Wed, 23 Sep 2026 12:21:59 +0000</pubDate>
             <link>https://yaprflow.com/</link>
@@ -61,28 +82,9 @@ for optional polishing, that provider receives the dictation text.
 ]]></description>
             <enclosure url="https://m3kx2mv37nzf8tbz.public.blob.vercel-storage.com/updates/5.2.17/6ba34f78529f6d10911f/yaprflow-5.2.17-oTk9sCvP0knmp4lIdnUntBlM3FTCob.dmg" length="480566897" type="application/octet-stream" sparkle:edSignature="opyUVoWbEP3jMrfId+DMjUc3bud+kfAN01X3loypHhVbu4h1oZsR04nZShZ08GRXpXWA5jz1HZNvwJFjZy2rDA=="/>
         </item>
-        <item>
-            <title>5.2.16</title>
-            <pubDate>Tue, 22 Sep 2026 20:27:20 +0000</pubDate>
-            <link>https://yaprflow.com/</link>
-            <sparkle:version>29</sparkle:version>
-            <sparkle:shortVersionString>5.2.16</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[# Yaprflow 5.2.16
-
-- Shrinks the live Quick Dictation audio-level overlay to 208 × 36 points,
-  with a shorter waveform and tight spacing around the recording indicator.
-- Preparation and error messages resize only when they need more room.
-- Includes the transcription boundary improvements from 5.2.14 and the menu
-  bar status colors from 5.2.15.
-
-Speech recognition remains on the Mac.
-]]></description>
-            <enclosure url="https://m3kx2mv37nzf8tbz.public.blob.vercel-storage.com/updates/5.2.16/45f57761cf41f28d8783/yaprflow-5.2.16-pyKQFxTCWTU8CSvoGmiHKmM9e07nRz.dmg" length="480522346" type="application/octet-stream" sparkle:edSignature="3tgbEmbFik8SBRqeU+QZPwhon5JcbpglrVtj92hfBadTSxQ9mxHPkW8x+lwpojuM+RV+mDfBTVwcgLzny1YfBw=="/>
-        </item>
     </channel>
 </rss>
 <!-- sparkle-signatures:
-edSignature: +P45Ltzajddv9w1s1af2fb8tvtr9lH2wcDktuBO9qjSoljQx32ipecYGa8x9nX0HhSGQo0FsoaP9Hn91g36wBA==
-length: 5298
+edSignature: IubTrCeioAEtMzoR4YbSl/6v4jNxBfe9EEEjPo7ea6smbs9AtPt59HS0gCKlUXveiowoe7nP01n7F9QbSTNBBQ==
+length: 5443
 -->
