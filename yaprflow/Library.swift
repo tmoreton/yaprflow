@@ -160,81 +160,70 @@ struct MeetingAskPanel: View {
 
             if isExpanded {
                 Divider()
-                VStack(alignment: .leading, spacing: 10) {
-                    FeatureCard {
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack(spacing: 10) {
-                                Text("Notes format")
-                                    .font(.callout.weight(.medium))
-                                Spacer()
-                                Menu {
-                                    ForEach(MeetingTemplateCatalog.builtIns) { template in
-                                        Button {
-                                            onSelectOutput(template.id)
-                                        } label: {
-                                            Label(template.name, systemImage: template.systemImage)
-                                        }
-                                    }
+                VStack(alignment: .leading, spacing: 9) {
+                    HStack(spacing: 8) {
+                        Menu {
+                            ForEach(MeetingTemplateCatalog.builtIns) { template in
+                                Button {
+                                    onSelectOutput(template.id)
                                 } label: {
-                                    Label(output.name, systemImage: output.systemImage)
-                                }
-                                .menuStyle(.borderlessButton)
-                                .fixedSize()
-
-                                Button(memory.isRunning ? "Working…" : generationButtonTitle) {
-                                    memory.generateSummary(
-                                        for: meeting,
-                                        completion: onSummaryGenerated
-                                    )
-                                }
-                                .buttonStyle(.bordered)
-                                .disabled(runIsDisabled)
-                            }
-
-                            Divider()
-
-                            HStack(alignment: .bottom, spacing: 8) {
-                                TextField("Ask a question about this meeting…", text: $question, axis: .vertical)
-                                    .lineLimit(1...3)
-                                    .textFieldStyle(.roundedBorder)
-                                    .onSubmit(askQuestion)
-
-                                Button(memory.isRunning ? "Working…" : "Ask") {
-                                    askQuestion()
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .disabled(askIsDisabled)
-                            }
-
-                            HStack(spacing: 7) {
-                                Image(systemName: ai.isModelAvailable ? "checkmark.circle.fill" : "info.circle")
-                                    .foregroundStyle(ai.isModelAvailable ? .green : .secondary)
-                                Text(memory.progressMessage ?? ai.availabilityMessage)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-
-                                Button(action: onOpenSettings) {
-                                    Image(systemName: "gearshape")
-                                }
-                                .buttonStyle(.plain)
-                                .foregroundStyle(.secondary)
-                                .help("AI settings")
-
-                                Spacer()
-
-                                if memory.isRunning {
-                                    ProgressView()
-                                        .controlSize(.small)
+                                    Label(template.name, systemImage: template.systemImage)
                                 }
                             }
-
-                            if selectedProvider.sendsTranscriptOffDevice {
-                                Text("This sends the meeting and your question to \(selectedProvider.displayName).")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
+                        } label: {
+                            Label(output.name, systemImage: output.systemImage)
                         }
+                        .menuStyle(.borderlessButton)
+                        .accessibilityLabel("Notes format: \(output.name)")
+
+                        Spacer(minLength: 8)
+
+                        Button(memory.isRunning ? "Working…" : generationButtonTitle) {
+                            memory.generateSummary(
+                                for: meeting,
+                                completion: onSummaryGenerated
+                            )
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(runIsDisabled)
+                    }
+
+                    HStack(spacing: 8) {
+                        TextField("Ask about this meeting…", text: $question, axis: .vertical)
+                            .lineLimit(1...2)
+                            .textFieldStyle(.roundedBorder)
+                            .onSubmit(askQuestion)
+
+                        Button(memory.isRunning ? "Working…" : "Ask") {
+                            askQuestion()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(askIsDisabled)
+                    }
+
+                    HStack(spacing: 6) {
+                        Image(systemName: ai.isModelAvailable ? "checkmark.circle.fill" : "info.circle")
+                            .foregroundStyle(ai.isModelAvailable ? .green : .secondary)
+                        Text(statusMessage)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .help(statusMessage)
+
+                        if memory.isRunning {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+
+                        Spacer(minLength: 4)
+
+                        Button(action: onOpenSettings) {
+                            Image(systemName: "gearshape")
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
+                        .help("AI settings")
+                        .accessibilityLabel("AI settings")
                     }
 
                     if let errorMessage = memory.errorMessage {
@@ -285,7 +274,8 @@ struct MeetingAskPanel: View {
                         }
                     }
                 }
-                .padding(12)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
                 .transition(.opacity)
             }
         }
@@ -305,6 +295,14 @@ struct MeetingAskPanel: View {
     }
 
     private var selectedProvider: AIProviderKind { AIProviderSettings.shared.provider }
+
+    private var statusMessage: String {
+        if let progressMessage = memory.progressMessage { return progressMessage }
+        guard ai.isModelAvailable else { return ai.availabilityMessage }
+        return selectedProvider.sendsTranscriptOffDevice
+            ? "\(selectedProvider.displayName) · sends meeting + question off-device"
+            : "Apple Intelligence · on-device"
+    }
 
     private var hasContent: Bool {
         !meeting.transcript.isEmpty

@@ -397,7 +397,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             button.setAccessibilityLabel("Yaprflow")
         }
 
-        // Colored states use bitmap-rendered non-template images. Applying
+        // Colored states use custom-drawn non-template images. Applying
         // contentTintColor to the button can recolor them unexpectedly.
     }
 
@@ -414,39 +414,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return symbol
         }
 
-        // Render a real colored image. AppKit may retint a symbol configuration
-        // when it moves into the remote menu-bar scene, leaving the previous
-        // preparation color visible after capture has started.
-        let size = NSSize(width: 18, height: 18)
-        guard let bitmap = NSBitmapImageRep(
-            bitmapDataPlanes: nil,
-            pixelsWide: 36,
-            pixelsHigh: 36,
-            bitsPerSample: 8,
-            samplesPerPixel: 4,
-            hasAlpha: true,
-            isPlanar: false,
-            colorSpaceName: .deviceRGB,
-            bytesPerRow: 0,
-            bitsPerPixel: 0
-        ), let context = NSGraphicsContext(bitmapImageRep: bitmap) else {
-            return symbol
+        // Draw the same native symbol at its intrinsic size for every state.
+        // The previous fixed-size bitmap did not match the symbol's sizing
+        // behavior in the menu bar.
+        // Drawing a non-template image also keeps AppKit from reusing the
+        // previous preparation color when recording begins.
+        let colored = NSImage(size: symbol.size, flipped: false) { rect in
+            NSGraphicsContext.saveGraphicsState()
+            defer { NSGraphicsContext.restoreGraphicsState() }
+            symbol.draw(in: rect)
+            guard let context = NSGraphicsContext.current else { return false }
+            context.compositingOperation = .sourceIn
+            tint.setFill()
+            NSBezierPath(rect: rect).fill()
+            return true
         }
-        bitmap.size = size
-        let configured = symbol.withSymbolConfiguration(
-            NSImage.SymbolConfiguration(pointSize: 15, weight: .regular)
-        ) ?? symbol
-        NSGraphicsContext.saveGraphicsState()
-        NSGraphicsContext.current = context
-        let rect = NSRect(origin: .zero, size: size)
-        configured.draw(in: rect)
-        context.compositingOperation = .sourceIn
-        tint.setFill()
-        NSBezierPath(rect: rect).fill()
-        NSGraphicsContext.restoreGraphicsState()
-
-        let colored = NSImage(size: size)
-        colored.addRepresentation(bitmap)
         colored.isTemplate = false
         colored.accessibilityDescription = "Yaprflow"
         return colored

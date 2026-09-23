@@ -13,6 +13,25 @@ private enum WorkspaceDeletionTarget {
     case dictation(TranscriptHistoryItem)
 }
 
+private enum LibrarySidebarItem: Identifiable {
+    case meeting(MeetingRecord)
+    case dictation(TranscriptHistoryItem)
+
+    var id: MeetingWorkspaceSelection {
+        switch self {
+        case let .meeting(meeting): .meeting(meeting.id)
+        case let .dictation(dictation): .dictation(dictation.id)
+        }
+    }
+
+    var recordedAt: Date {
+        switch self {
+        case let .meeting(meeting): meeting.startedAt
+        case let .dictation(dictation): dictation.recordedAt
+        }
+    }
+}
+
 @MainActor
 private final class MeetingNotesNavigation: ObservableObject {
     static let shared = MeetingNotesNavigation()
@@ -165,38 +184,36 @@ struct MeetingNotesView: View {
                         .accessibilityLabel("Open current meeting, \(session.meeting.title)")
                     }
 
-                    if !filteredMeetings.isEmpty {
-                        sectionHeader("Meetings")
-                        ForEach(filteredMeetings) { meeting in
-                            sourceButton(selection: .meeting(meeting.id)) {
-                                MeetingSidebarRow(meeting: meeting)
-                            }
-                            .accessibilityLabel("Open \(meeting.title)")
-                            .contextMenu {
-                                Button("Delete Meeting", systemImage: "trash", role: .destructive) {
-                                    pendingDeletion = .meeting(meeting)
+                    if !recentItems.isEmpty {
+                        sectionHeader("Recent")
+                        ForEach(recentItems) { item in
+                            switch item {
+                            case let .meeting(meeting):
+                                sourceButton(selection: item.id) {
+                                    MeetingSidebarRow(meeting: meeting)
                                 }
-                            }
-                        }
-                    }
-
-                    if !filteredDictations.isEmpty {
-                        sectionHeader("Dictations")
-                        ForEach(filteredDictations) { dictation in
-                            sourceButton(selection: .dictation(dictation.id)) {
-                                DictationRow(item: dictation)
-                            }
-                            .accessibilityLabel("Open dictation, \(dictation.title)")
-                            .contextMenu {
-                                Button("Copy Transcript", systemImage: "doc.on.clipboard") {
-                                    copyDictation(dictation)
+                                .accessibilityLabel("Open meeting, \(meeting.title)")
+                                .contextMenu {
+                                    Button("Delete Meeting", systemImage: "trash", role: .destructive) {
+                                        pendingDeletion = .meeting(meeting)
+                                    }
                                 }
-                                Button("Reveal in Finder", systemImage: "folder") {
-                                    NSWorkspace.shared.activateFileViewerSelecting([dictation.url])
+                            case let .dictation(dictation):
+                                sourceButton(selection: item.id) {
+                                    DictationRow(item: dictation)
                                 }
-                                Divider()
-                                Button("Delete Dictation", systemImage: "trash", role: .destructive) {
-                                    pendingDeletion = .dictation(dictation)
+                                .accessibilityLabel("Open dictation, \(dictation.title)")
+                                .contextMenu {
+                                    Button("Copy Transcript", systemImage: "doc.on.clipboard") {
+                                        copyDictation(dictation)
+                                    }
+                                    Button("Reveal in Finder", systemImage: "folder") {
+                                        NSWorkspace.shared.activateFileViewerSelecting([dictation.url])
+                                    }
+                                    Divider()
+                                    Button("Delete Dictation", systemImage: "trash", role: .destructive) {
+                                        pendingDeletion = .dictation(dictation)
+                                    }
                                 }
                             }
                         }
@@ -259,7 +276,7 @@ struct MeetingNotesView: View {
             content()
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 8)
-                .padding(.vertical, 7)
+                .padding(.vertical, 6)
                 .background(
                     navigation.selection == selection ? Color.accentColor.opacity(0.13) : .clear,
                     in: RoundedRectangle(cornerRadius: 8)
@@ -336,6 +353,12 @@ struct MeetingNotesView: View {
                 || item.generatedDescription?.localizedCaseInsensitiveContains(query) == true
                 || item.transcript.localizedCaseInsensitiveContains(query)
         }
+    }
+
+    private var recentItems: [LibrarySidebarItem] {
+        (filteredMeetings.map(LibrarySidebarItem.meeting)
+            + filteredDictations.map(LibrarySidebarItem.dictation))
+            .sorted { $0.recordedAt > $1.recordedAt }
     }
 
     private var normalizedSearch: String {
@@ -443,7 +466,7 @@ private struct DictationRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 9) {
             sidebarIcon("waveform", color: .orange)
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(item.title)
                         .font(.callout.weight(.medium))
@@ -459,7 +482,7 @@ private struct DictationRow: View {
                 Text(item.preview)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .lineLimit(2)
+                    .lineLimit(1)
             }
         }
     }
@@ -496,7 +519,7 @@ private struct MeetingSidebarRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 9) {
             sidebarIcon("person.2.fill", color: .blue)
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(meeting.title)
                         .font(.callout.weight(.medium))
@@ -521,7 +544,7 @@ private struct MeetingSidebarRow: View {
                 Text(preview)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .lineLimit(2)
+                    .lineLimit(1)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
