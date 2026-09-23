@@ -9,6 +9,37 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
         <description>Signed updates for Yaprflow for Mac.</description>
         <language>en</language>
         <item>
+            <title>5.2.18</title>
+            <pubDate>Wed, 23 Sep 2026 12:21:59 +0000</pubDate>
+            <link>https://yaprflow.com/</link>
+            <sparkle:version>31</sparkle:version>
+            <sparkle:shortVersionString>5.2.18</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Yaprflow 5.2.18
+
+- Simplifies Meeting Notes on Mac with a grouped Library sidebar, clearer
+  recording controls, fewer competing actions, and a separate Settings window.
+- Streamlines iPhone and iPad around two clear modes—Dictation and Meeting—with
+  a persistent labeled capture control, one Library, and a two-column iPad
+  meeting workspace.
+- Standardizes labels such as Notes format and Your notes across Mac and iOS.
+- Uses the same on-device Parakeet speech engine on Mac, iPhone, and iPad while
+  removing unused legacy transcription runtimes and calendar integration.
+- Improves meeting and dictation persistence, including safer recovery from
+  interrupted writes and more consistent local records.
+- Improves OpenRouter and OpenAI transcript processing when a model exhausts
+  its response budget. Yaprflow retries with more room, then divides long
+  transcripts into smaller parts if needed.
+- Avoids decrypting saved AI credentials merely to open Settings or Meeting
+  Notes, preventing unnecessary Keychain prompts and window stalls.
+
+Speech recognition remains on-device and raw audio is not saved. The original
+transcript remains unchanged. Text is sent off-device only when you choose and
+use an online AI provider.
+]]></description>
+            <enclosure url="https://m3kx2mv37nzf8tbz.public.blob.vercel-storage.com/updates/5.2.18/b0d907e4c768d858e49d/yaprflow-5.2.18-DOZ3W6UF6eu6EcxNRpRI8zgCG4qBok.dmg" length="480472317" type="application/octet-stream" sparkle:edSignature="zUy7sMi3e4TjmWcOUZzxT1ahHULkBij/vbleAZzWfgv8A/o6x0eeN3cfFgIcUAsSjdGOkO0ivXhEuxYLOsiBCA=="/>
+        </item>
+        <item>
             <title>5.2.17</title>
             <pubDate>Tue, 22 Sep 2026 22:58:19 +0000</pubDate>
             <link>https://yaprflow.com/</link>
@@ -49,35 +80,9 @@ Speech recognition remains on the Mac.
 ]]></description>
             <enclosure url="https://m3kx2mv37nzf8tbz.public.blob.vercel-storage.com/updates/5.2.16/45f57761cf41f28d8783/yaprflow-5.2.16-pyKQFxTCWTU8CSvoGmiHKmM9e07nRz.dmg" length="480522346" type="application/octet-stream" sparkle:edSignature="3tgbEmbFik8SBRqeU+QZPwhon5JcbpglrVtj92hfBadTSxQ9mxHPkW8x+lwpojuM+RV+mDfBTVwcgLzny1YfBw=="/>
         </item>
-        <item>
-            <title>5.2.13</title>
-            <pubDate>Tue, 22 Sep 2026 17:22:18 +0000</pubDate>
-            <link>https://yaprflow.com/</link>
-            <sparkle:version>26</sparkle:version>
-            <sparkle:shortVersionString>5.2.13</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[# Yaprflow 5.2.13
-
-This release improves recording feedback and permission recovery:
-
-- Quick Dictation now shows a live microphone-level waveform while recording
-  instead of displaying partial transcription text.
-- Dictation continues to transcribe natural, bounded sections with Parakeet,
-  keeping long recordings memory-safe while preserving final accuracy.
-- Meeting Notes now lets ScreenCaptureKit verify Screen & System Audio access
-  directly after a Sparkle update instead of stopping on a stale preliminary
-  permission result.
-- If macOS genuinely denies capture, Yaprflow still provides a direct route to
-  the correct Privacy & Security settings.
-
-All speech recognition remains on the Mac. Audio is not uploaded for
-transcription.
-]]></description>
-            <enclosure url="https://m3kx2mv37nzf8tbz.public.blob.vercel-storage.com/updates/5.2.13/08fa0d0c9ed901369c65/yaprflow-5.2.13-ZGopSGRmFd9z82WfT7TTm6qljib52d.dmg" length="480496924" type="application/octet-stream" sparkle:edSignature="J3bAjRHRK6F7ukQ3hpUIjG8KQ1bGios0rtcb79VG3Aj47+gTaGjGt9vkzIqz4Krg3VsSy2nb/Ub7EsbRH4W0Ag=="/>
-        </item>
     </channel>
 </rss>
 <!-- sparkle-signatures:
-edSignature: cc+x63PqLkxVVCP1OjbcOnfGzvV34U8o98M9EChbRkGiChRrkJA5Huw0jl73Y/Qox/2i8DcBgU5Cwi+0mJ+5BQ==
-length: 4804
+edSignature: +P45Ltzajddv9w1s1af2fb8tvtr9lH2wcDktuBO9qjSoljQx32ipecYGa8x9nX0HhSGQo0FsoaP9Hn91g36wBA==
+length: 5298
 -->
