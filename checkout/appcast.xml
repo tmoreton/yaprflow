@@ -9,6 +9,26 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
         <description>Signed updates for Yaprflow for Mac.</description>
         <language>en</language>
         <item>
+            <title>5.2.22</title>
+            <pubDate>Thu, 24 Sep 2026 16:35:10 +0000</pubDate>
+            <link>https://yaprflow.com/</link>
+            <sparkle:version>35</sparkle:version>
+            <sparkle:shortVersionString>5.2.22</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Yaprflow 5.2.22
+
+- Prevents meeting capture from unnecessarily lowering the volume of other
+  people speaking on the Mac.
+- Makes repeated manual update checks safe while another update check is
+  already running.
+- Hardens audio processing, meeting-note editing, storage, and AI requests so
+  unexpected input produces a recoverable error instead of closing the app.
+
+Speech recognition remains on-device and raw audio is not saved.
+]]></description>
+            <enclosure url="https://m3kx2mv37nzf8tbz.public.blob.vercel-storage.com/updates/5.2.22/07060ab4154e77f41c92/yaprflow-5.2.22-h451wpSbRtfssvHWM0R2foRH17Drlu.dmg" length="480461883" type="application/octet-stream" sparkle:edSignature="wvx67EntgYt//pf4pOvftxsfvJscgQl/2ieok0b6FU8aN7JFO6QlN48IPRONvzehCVH+5Ny16Nu7P3hKqOBuAA=="/>
+        </item>
+        <item>
             <title>5.2.21</title>
             <pubDate>Thu, 24 Sep 2026 13:40:34 +0000</pubDate>
             <link>https://yaprflow.com/</link>
@@ -50,30 +70,9 @@ app you are currently using.
 ]]></description>
             <enclosure url="https://m3kx2mv37nzf8tbz.public.blob.vercel-storage.com/updates/5.2.20/142be0037164889871f7/yaprflow-5.2.20-Hn9eJX3FTY79xu8QpuHARCUOaTogHq.dmg" length="480453100" type="application/octet-stream" sparkle:edSignature="wqi51QyvFgazOS2VijI2qAkWEY2eh1o35m/Hx+nfJcrzjnj5Vzn6yGT0i0sEeBCXF+Wtjp5hmqEQ+PKhKCj/Aw=="/>
         </item>
-        <item>
-            <title>5.2.19</title>
-            <pubDate>Wed, 23 Sep 2026 14:25:14 +0000</pubDate>
-            <link>https://yaprflow.com/</link>
-            <sparkle:version>32</sparkle:version>
-            <sparkle:shortVersionString>5.2.19</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[# Yaprflow 5.2.19
-
-- Makes Meeting tools more compact while keeping summary generation, questions,
-  provider status, and privacy information accessible.
-- Shows saved meetings and dictations together in newest-first order, with
-  shorter previews so recent transcripts are easier to find.
-- Keeps the red recording and yellow preparation menu bar waveform the same
-  size as the neutral icon.
-
-Speech recognition remains on-device and raw audio is not saved. Text is sent
-off-device only when you choose and use an online AI provider.
-]]></description>
-            <enclosure url="https://m3kx2mv37nzf8tbz.public.blob.vercel-storage.com/updates/5.2.19/4d43f07dc3432d822150/yaprflow-5.2.19-vLISLaNOXeLO9cJ1vMvIOmcWaUYjep.dmg" length="480481641" type="application/octet-stream" sparkle:edSignature="sH4WxQeECmDLmwwl2Tfp/a+IrqdlRKP9mzzpjP+lnsQcl0pdMY4TcyAWV+f6ZEpCaRP6ZVbpM3jDVrnZTtceBw=="/>
-        </item>
     </channel>
 </rss>
 <!-- sparkle-signatures:
-edSignature: LNS/yDznp6qzUd2DTj/1WvxIVuDhRzFUkbX+I19LTX3QaCQb4+CsHSAV8+G0nEmTbD8QYyv56UTiv0VBlltKCg==
-length: 4553
+edSignature: UO9dIjoXYCXafyROXSwbilGlV2elSPj5dYQ0iXpJ0dIl7eX1jNeKRUwM7xM8tfrmv5E48gRPpCsY+ObO3I43AQ==
+length: 4453
 -->
