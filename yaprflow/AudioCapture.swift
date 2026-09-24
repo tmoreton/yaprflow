@@ -22,16 +22,13 @@ nonisolated final class AudioCapture: @unchecked Sendable {
     private var acceptingCallbacks = false
     private var activeGeneration: UInt?
     private var configurationObserver: NSObjectProtocol?
-    private let prefersVoiceProcessing: Bool
     private let bufferHandler: @Sendable (UInt, AVAudioPCMBuffer) -> Void
     private let configurationChangeHandler: @Sendable (UInt) -> Void
 
     init(
-        prefersVoiceProcessing: Bool = false,
         bufferHandler: @escaping @Sendable (UInt, AVAudioPCMBuffer) -> Void,
         configurationChangeHandler: @escaping @Sendable (UInt) -> Void
     ) {
-        self.prefersVoiceProcessing = prefersVoiceProcessing
         self.bufferHandler = bufferHandler
         self.configurationChangeHandler = configurationChangeHandler
         configurationObserver = NotificationCenter.default.addObserver(
@@ -63,37 +60,13 @@ nonisolated final class AudioCapture: @unchecked Sendable {
         try validateInputAvailable()
 
         let input = engine.inputNode
-        if prefersVoiceProcessing {
-            // Apple's voice-processing input includes acoustic echo
-            // cancellation, but its default "typical voice chat" configuration
-            // also ducks other apps' audio. Meeting capture observes an
-            // existing call rather than rendering one, so keep echo
-            // cancellation while minimizing that unwanted volume reduction.
-            // Advanced ducking is inappropriate here because it can make the
-            // remote participant nearly inaudible whenever local speech is
-            // detected.
-            do {
-                if !input.isVoiceProcessingEnabled {
-                    try input.setVoiceProcessingEnabled(true)
-                }
-                input.voiceProcessingOtherAudioDuckingConfiguration = .init(
-                    enableAdvancedDucking: false,
-                    duckingLevel: .min
-                )
-            } catch {
-                NSLog("Yaprflow: meeting microphone voice processing unavailable: %@", error.localizedDescription)
-            }
-        }
-        do {
-            try startInputTap(input, sessionGeneration: sessionGeneration)
-        } catch {
-            guard prefersVoiceProcessing, input.isVoiceProcessingEnabled else { throw error }
-            // Some input devices advertise voice processing but cannot start
-            // a recording graph with it. Restore ordinary capture rather
-            // than sacrificing the meeting transcript.
-            try input.setVoiceProcessingEnabled(false)
-            try startInputTap(input, sessionGeneration: sessionGeneration)
-        }
+        // Do not enable AVAudioEngine voice processing here. Yaprflow records
+        // alongside an existing conferencing app rather than owning the call,
+        // and enabling it can reconfigure the shared audio device, reducing
+        // both the meeting's speaker output and the microphone level seen by
+        // apps such as Zoom. Meeting capture removes playback echo using its
+        // separate system-audio reference instead.
+        try startInputTap(input, sessionGeneration: sessionGeneration)
     }
 
     private func startInputTap(_ input: AVAudioInputNode, sessionGeneration: UInt) throws {

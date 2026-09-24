@@ -38,9 +38,10 @@ nonisolated enum AudioLevelMeter {
 }
 
 /// Recognizes microphone segments made entirely of Mac playback. This is a
-/// conservative second line of defense after the input device's voice
-/// processing: it never suppresses a segment with independent local speech.
-/// Only a rolling, downsampled reference is retained; no audio is persisted.
+/// conservative alternative to input-device voice processing: it never
+/// suppresses a segment with independent local speech and it does not alter
+/// another app's microphone or speaker levels. Only a rolling, downsampled
+/// reference is retained; no audio is persisted.
 @MainActor
 final class MeetingPlaybackEchoDetector {
     private static let decimation = 4

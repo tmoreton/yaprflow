@@ -369,7 +369,6 @@ final class MeetingSessionController: ObservableObject {
         micIngress = ingress
         self.systemIngress = systemIngress
         microphone = AudioCapture(
-            prefersVoiceProcessing: true,
             bufferHandler: { generation, buffer in
                 ingress.enqueue(generation: generation, buffer: buffer)
             },
@@ -784,6 +783,7 @@ final class MeetingSessionController: ObservableObject {
                 message: "Meeting capture could not start: \(smokeTestPhaseDescription)"
             )
         }
+        let voiceProcessingWasActive = microphone.isVoiceProcessingActive
 
         do {
             // First prove that Mac playback is retained as Them and removed
@@ -859,6 +859,7 @@ final class MeetingSessionController: ObservableObject {
         let passed = reconciledSystemThemMarkers >= 4
             && reconciledSystemMeMarkers <= 1
             && reconciledMicrophoneMeMarkers >= 4
+            && !voiceProcessingWasActive
         let rawMeSegments = unreconciledTranscript.filter { $0.speaker == .me }.count
         let rawThemSegments = unreconciledTranscript.filter { $0.speaker == .them }.count
         let testMeeting = meeting
@@ -866,7 +867,7 @@ final class MeetingSessionController: ObservableObject {
 
         return MeetingAudioSeparationSmokeTestResult(
             succeeded: passed && cleanedUp,
-            message: "systemThem=\(reconciledSystemThemMarkers) systemMe=\(reconciledSystemMeMarkers) microphoneMe=\(reconciledMicrophoneMeMarkers) rawSystemThem=\(rawSystemThemMarkers) rawSystemMe=\(rawSystemMeMarkers) rawMicrophoneMe=\(rawMicrophoneMeMarkers) rawThemSegments=\(rawThemSegments) rawMeSegments=\(rawMeSegments) voiceProcessing=\(microphone.isVoiceProcessingActive) audioEchoSuppressed=\(echoDetector.suppressedSegmentCount) cleanup=\(cleanedUp)"
+            message: "systemThem=\(reconciledSystemThemMarkers) systemMe=\(reconciledSystemMeMarkers) microphoneMe=\(reconciledMicrophoneMeMarkers) rawSystemThem=\(rawSystemThemMarkers) rawSystemMe=\(rawSystemMeMarkers) rawMicrophoneMe=\(rawMicrophoneMeMarkers) rawThemSegments=\(rawThemSegments) rawMeSegments=\(rawMeSegments) voiceProcessingDuringCapture=\(voiceProcessingWasActive) audioEchoSuppressed=\(echoDetector.suppressedSegmentCount) cleanup=\(cleanedUp)"
         )
     }
 
