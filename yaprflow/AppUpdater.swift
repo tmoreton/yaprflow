@@ -11,9 +11,11 @@ final class AppUpdater: ObservableObject {
 
     @Published private(set) var automaticallyChecksForUpdates = true
     @Published private(set) var automaticallyDownloadsUpdates = true
+    @Published private(set) var canCheckForUpdates = false
 
     private let updaterController: SPUStandardUpdaterController
     private var hasStarted = false
+    private var stateCancellables = Set<AnyCancellable>()
 
     private init() {
         updaterController = SPUStandardUpdaterController(
@@ -23,10 +25,18 @@ final class AppUpdater: ObservableObject {
         )
         automaticallyChecksForUpdates = updaterController.updater.automaticallyChecksForUpdates
         automaticallyDownloadsUpdates = updaterController.updater.automaticallyDownloadsUpdates
-    }
-
-    var canCheckForUpdates: Bool {
-        hasStarted && updaterController.updater.canCheckForUpdates
+        let updater = updaterController.updater
+        updater.publisher(for: \.canCheckForUpdates, options: [.initial, .new])
+            .combineLatest(
+                updater.publisher(for: \.sessionInProgress, options: [.initial, .new])
+            )
+            .sink { [weak self] updaterCanCheck, sessionInProgress in
+                guard let self else { return }
+                self.canCheckForUpdates = self.hasStarted
+                    && updaterCanCheck
+                    && !sessionInProgress
+            }
+            .store(in: &stateCancellables)
     }
 
     func start() {
@@ -34,11 +44,18 @@ final class AppUpdater: ObservableObject {
         hasStarted = true
         updaterController.startUpdater()
         refreshPreferences()
+        refreshAvailability()
     }
 
     func checkForUpdates() {
         start()
-        updaterController.checkForUpdates(nil)
+        let updater = updaterController.updater
+        guard updater.canCheckForUpdates, !updater.sessionInProgress else {
+            refreshAvailability()
+            return
+        }
+        updater.checkForUpdates()
+        refreshAvailability()
     }
 
     func setAutomaticallyChecksForUpdates(_ enabled: Bool) {
@@ -54,6 +71,13 @@ final class AppUpdater: ObservableObject {
     func refreshPreferences() {
         automaticallyChecksForUpdates = updaterController.updater.automaticallyChecksForUpdates
         automaticallyDownloadsUpdates = updaterController.updater.automaticallyDownloadsUpdates
+    }
+
+    private func refreshAvailability() {
+        let updater = updaterController.updater
+        canCheckForUpdates = hasStarted
+            && updater.canCheckForUpdates
+            && !updater.sessionInProgress
     }
 }
 #endif

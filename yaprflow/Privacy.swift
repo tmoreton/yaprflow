@@ -263,6 +263,7 @@ struct SettingsView: View {
                     updater.checkForUpdates()
                 }
                 .accessibilityLabel("Check for updates now")
+                .disabled(!updater.canCheckForUpdates)
                 #endif
             }
             .padding(.vertical, 9)
