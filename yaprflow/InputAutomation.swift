@@ -20,6 +20,10 @@ enum InputAutomation {
         AXIsProcessTrusted()
     }
 
+    static var hasPostEventAccess: Bool {
+        CGPreflightPostEventAccess()
+    }
+
     static func requestAccessibilityAccess() {
         guard !hasAccessibilityAccess else { return }
         let options = [
@@ -28,11 +32,16 @@ enum InputAutomation {
         _ = AXIsProcessTrustedWithOptions(options)
     }
 
+    static func requestPostEventAccess() {
+        guard !hasPostEventAccess else { return }
+        _ = CGRequestPostEventAccess()
+    }
+
     static func pasteIfEnabled() async -> AutomaticPasteResult {
         guard AppState.shared.isAutoPasteEnabled else { return .disabled }
-        guard hasAccessibilityAccess else {
-            requestAccessibilityAccess()
-            inputAutomationLog.warning("Auto-paste is waiting for Accessibility access")
+        guard hasPostEventAccess else {
+            requestPostEventAccess()
+            inputAutomationLog.warning("Auto-paste is waiting for event-posting access")
             return .permissionRequired
         }
 

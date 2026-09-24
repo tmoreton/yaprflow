@@ -11,6 +11,7 @@ struct SettingsView: View {
     @State private var showsAdvancedSettings = false
     @State private var errorMessage: String?
     @State private var hasAccessibilityAccess = InputAutomation.hasAccessibilityAccess
+    @State private var hasPostEventAccess = InputAutomation.hasPostEventAccess
 
     var body: some View {
         ScrollView {
@@ -39,9 +40,9 @@ struct SettingsView: View {
                                     .labelsHidden()
                                     .toggleStyle(.switch)
 
-                                if appState.isAutoPasteEnabled && !hasAccessibilityAccess {
+                                if appState.isAutoPasteEnabled && !hasPostEventAccess {
                                     Button("Allow Access") {
-                                        InputAutomation.requestAccessibilityAccess()
+                                        InputAutomation.requestPostEventAccess()
                                     }
                                     .buttonStyle(.link)
                                     .font(.caption)
@@ -170,9 +171,11 @@ struct SettingsView: View {
         .background(Color(nsColor: .windowBackgroundColor))
         .onAppear {
             hasAccessibilityAccess = InputAutomation.hasAccessibilityAccess
+            hasPostEventAccess = InputAutomation.hasPostEventAccess
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             hasAccessibilityAccess = InputAutomation.hasAccessibilityAccess
+            hasPostEventAccess = InputAutomation.hasPostEventAccess
         }
         .sheet(isPresented: $isShowingFeedback) {
             FeedbackView()
@@ -215,7 +218,7 @@ struct SettingsView: View {
     }
 
     private var autoPasteDetail: String {
-        if appState.isAutoPasteEnabled && !hasAccessibilityAccess {
+        if appState.isAutoPasteEnabled && !hasPostEventAccess {
             return "Accessibility access is required to paste at the current cursor."
         }
         return "Paste finished dictation at the current cursor after copying it."
@@ -234,8 +237,8 @@ struct SettingsView: View {
             set: { isEnabled in
                 appState.isAutoPasteEnabled = isEnabled
                 if isEnabled {
-                    InputAutomation.requestAccessibilityAccess()
-                    hasAccessibilityAccess = InputAutomation.hasAccessibilityAccess
+                    InputAutomation.requestPostEventAccess()
+                    hasPostEventAccess = InputAutomation.hasPostEventAccess
                 }
             }
         )
