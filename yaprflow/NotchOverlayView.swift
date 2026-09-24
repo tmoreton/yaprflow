@@ -3,7 +3,7 @@ import SwiftUI
 enum NotchOverlayLayout {
     static func size(for status: TranscriptionStatus) -> CGSize {
         switch status {
-        case .listening, .copied, .idle:
+        case .listening, .copied, .pasted, .idle:
             return CGSize(width: 208, height: 36)
         case .preparing:
             return CGSize(width: 260, height: 38)
@@ -64,6 +64,8 @@ struct NotchOverlayView: View {
             return "Listening…"
         case .copied:
             return copiedDisplayText
+        case .pasted:
+            return "Pasted"
         case .error(let message):
             return message
         }
@@ -82,11 +84,11 @@ struct NotchOverlayView: View {
                 .fill(Color.red)
                 .frame(width: 8, height: 8)
                 .modifier(RecordingPulse())
-        case .copied:
+        case .copied, .pasted:
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(.green)
                 .font(.system(size: 14, weight: .bold))
-                .accessibilityLabel("Copied")
+                .accessibilityLabel(state.status == .pasted ? "Pasted" : "Copied")
         case .error:
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(.yellow)

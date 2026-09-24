@@ -1,3 +1,4 @@
+import AppKit
 import Carbon.HIToolbox
 import Foundation
 
@@ -27,7 +28,18 @@ struct HotkeyConfig: Codable, Equatable {
         return try? JSONDecoder().decode(HotkeyConfig.self, from: data)
     }
 
+    /// Carbon hotkeys require a non-modifier key. Modifier-only shortcuts are
+    /// handled by GlobalHotkey's event monitors instead.
+    var isModifierOnly: Bool {
+        guard let modifier = Self.carbonModifier(for: keyCode) else { return false }
+        return modifiers == modifier
+    }
+
     var displayString: String {
+        if isModifierOnly {
+            return Self.modifierSymbol(for: keyCode) ?? ""
+        }
+
         var s = ""
         if modifiers & UInt32(controlKey) != 0 { s += "⌃" }
         if modifiers & UInt32(optionKey) != 0  { s += "⌥" }
@@ -35,6 +47,46 @@ struct HotkeyConfig: Codable, Equatable {
         if modifiers & UInt32(cmdKey) != 0     { s += "⌘" }
         s += Self.name(for: keyCode)
         return s
+    }
+
+    static func carbonModifier(for keyCode: UInt32) -> UInt32? {
+        switch Int(keyCode) {
+        case kVK_Command, kVK_RightCommand:
+            return UInt32(cmdKey)
+        case kVK_Option, kVK_RightOption:
+            return UInt32(optionKey)
+        case kVK_Control, kVK_RightControl:
+            return UInt32(controlKey)
+        case kVK_Shift, kVK_RightShift:
+            return UInt32(shiftKey)
+        default:
+            return nil
+        }
+    }
+
+    static func eventModifierFlag(for keyCode: UInt32) -> NSEvent.ModifierFlags? {
+        switch Int(keyCode) {
+        case kVK_Command, kVK_RightCommand:
+            return .command
+        case kVK_Option, kVK_RightOption:
+            return .option
+        case kVK_Control, kVK_RightControl:
+            return .control
+        case kVK_Shift, kVK_RightShift:
+            return .shift
+        default:
+            return nil
+        }
+    }
+
+    private static func modifierSymbol(for keyCode: UInt32) -> String? {
+        switch Int(keyCode) {
+        case kVK_Command, kVK_RightCommand: return "⌘"
+        case kVK_Option, kVK_RightOption: return "⌥"
+        case kVK_Control, kVK_RightControl: return "⌃"
+        case kVK_Shift, kVK_RightShift: return "⇧"
+        default: return nil
+        }
     }
 
     private static func name(for code: UInt32) -> String {

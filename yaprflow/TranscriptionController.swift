@@ -390,6 +390,7 @@ final class TranscriptionController {
         case let .preparing(message): return message
         case .listening: return "listening"
         case .copied: return "copied"
+        case .pasted: return "pasted"
         case let .error(message): return message
         }
     }
@@ -605,6 +606,7 @@ final class TranscriptionController {
             pb.clearContents()
             if pb.setString(finalText, forType: .string) {
                 log.info("Transcript copied to the clipboard")
+                let autoPasteResult = await InputAutomation.pasteIfEnabled()
                 do {
                     try state.recordTranscript(
                         finalText,
@@ -633,10 +635,24 @@ final class TranscriptionController {
                 } else {
                     switch reason {
                     case .userInitiated:
-                        // Only claim success after NSPasteboard accepted the
-                        // finalized transcript.
-                        state.status = .copied
-                        scheduleAutoHide(after: 1.2)
+                        switch autoPasteResult {
+                        case .disabled:
+                            // Only claim success after NSPasteboard accepted
+                            // the finalized transcript.
+                            state.status = .copied
+                            scheduleAutoHide(after: 1.2)
+                        case .pasted:
+                            state.status = .pasted
+                            scheduleAutoHide(after: 1.2)
+                        case .permissionRequired:
+                            state.status = .error(
+                                "Copied; allow Accessibility access to paste automatically"
+                            )
+                            scheduleAutoHide(after: 3.5)
+                        case .failed:
+                            state.status = .error("Copied, but couldn’t paste automatically")
+                            scheduleAutoHide(after: 2.4)
+                        }
                     case .audioConfigurationChanged:
                         state.status = .error("Microphone changed; captured text was copied")
                         telemetryFailure = .microphoneChanged

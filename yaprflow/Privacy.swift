@@ -10,6 +10,7 @@ struct SettingsView: View {
     @State private var isShowingFeedback = false
     @State private var showsAdvancedSettings = false
     @State private var errorMessage: String?
+    @State private var hasAccessibilityAccess = InputAutomation.hasAccessibilityAccess
 
     var body: some View {
         ScrollView {
@@ -22,6 +23,30 @@ struct SettingsView: View {
                             Toggle("Desktop preview", isOn: desktopPreviewBinding)
                                 .labelsHidden()
                                 .toggleStyle(.switch)
+                        }
+                        .padding(.vertical, 9)
+
+                        Divider()
+
+                        HStack(spacing: 12) {
+                            settingLabel(
+                                "Auto-paste",
+                                detail: autoPasteDetail
+                            )
+                            Spacer(minLength: 16)
+                            VStack(alignment: .trailing, spacing: 4) {
+                                Toggle("Auto-paste", isOn: autoPasteBinding)
+                                    .labelsHidden()
+                                    .toggleStyle(.switch)
+
+                                if appState.isAutoPasteEnabled && !hasAccessibilityAccess {
+                                    Button("Allow Access") {
+                                        InputAutomation.requestAccessibilityAccess()
+                                    }
+                                    .buttonStyle(.link)
+                                    .font(.caption)
+                                }
+                            }
                         }
                         .padding(.vertical, 9)
 
@@ -47,10 +72,20 @@ struct SettingsView: View {
                         Divider()
 
                         HStack(spacing: 12) {
-                            settingLabel("Dictation", detail: "Start or stop from any app.")
+                            settingLabel("Dictation", detail: dictationShortcutDetail)
                             Spacer(minLength: 16)
-                            HotkeyRecorder(hotkey: appState.hotkey)
-                                .frame(width: 118, height: 28)
+                            VStack(alignment: .trailing, spacing: 4) {
+                                HotkeyRecorder(hotkey: appState.hotkey)
+                                    .frame(width: 118, height: 28)
+
+                                if appState.hotkey.isModifierOnly && !hasAccessibilityAccess {
+                                    Button("Allow Access") {
+                                        InputAutomation.requestAccessibilityAccess()
+                                    }
+                                    .buttonStyle(.link)
+                                    .font(.caption)
+                                }
+                            }
                         }
                         .padding(.vertical, 9)
 
@@ -133,6 +168,12 @@ struct SettingsView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .windowBackgroundColor))
+        .onAppear {
+            hasAccessibilityAccess = InputAutomation.hasAccessibilityAccess
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            hasAccessibilityAccess = InputAutomation.hasAccessibilityAccess
+        }
         .sheet(isPresented: $isShowingFeedback) {
             FeedbackView()
                 .frame(minWidth: 620, minHeight: 600)
@@ -171,6 +212,33 @@ struct SettingsView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    private var autoPasteDetail: String {
+        if appState.isAutoPasteEnabled && !hasAccessibilityAccess {
+            return "Accessibility access is required to paste at the current cursor."
+        }
+        return "Paste finished dictation at the current cursor after copying it."
+    }
+
+    private var dictationShortcutDetail: String {
+        if appState.hotkey.isModifierOnly && !hasAccessibilityAccess {
+            return "Accessibility access is required for a modifier-only shortcut."
+        }
+        return "Start or stop from any app; a modifier can be used by itself."
+    }
+
+    private var autoPasteBinding: Binding<Bool> {
+        Binding(
+            get: { appState.isAutoPasteEnabled },
+            set: { isEnabled in
+                appState.isAutoPasteEnabled = isEnabled
+                if isEnabled {
+                    InputAutomation.requestAccessibilityAccess()
+                    hasAccessibilityAccess = InputAutomation.hasAccessibilityAccess
+                }
+            }
+        )
     }
 
     @ViewBuilder

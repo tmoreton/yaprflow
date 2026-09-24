@@ -102,6 +102,7 @@ enum TranscriptionStatus: Equatable {
     case preparing(String)
     case listening
     case copied
+    case pasted
     case error(String)
 }
 
@@ -112,6 +113,7 @@ final class AppState: ObservableObject {
     private static let lastTranscriptKey = "yaprflow.lastTranscript"
     private static let dictationModeKey = "yaprflow.dictationMode"
     private static let desktopPreviewEnabledKey = "yaprflow.desktopPreviewEnabled"
+    private static let autoPasteEnabledKey = "yaprflow.autoPasteEnabled"
     private static let transcriptsFolderName = "Transcripts"
     private static let vocabularyFileName = "Vocabulary.md"
     private var shouldPersistDesktopPreviewPreference = true
@@ -124,6 +126,11 @@ final class AppState: ObservableObject {
             if shouldPersistDesktopPreviewPreference {
                 UserDefaults.standard.set(isDesktopPreviewEnabled, forKey: Self.desktopPreviewEnabledKey)
             }
+        }
+    }
+    @Published var isAutoPasteEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(isAutoPasteEnabled, forKey: Self.autoPasteEnabledKey)
         }
     }
     @Published var dictationMode: DictationMode {
@@ -144,6 +151,7 @@ final class AppState: ObservableObject {
         self.isDesktopPreviewEnabled = UserDefaults.standard.object(
             forKey: Self.desktopPreviewEnabledKey
         ) as? Bool ?? true
+        self.isAutoPasteEnabled = UserDefaults.standard.bool(forKey: Self.autoPasteEnabledKey)
         self.dictationMode = UserDefaults.standard.string(forKey: Self.dictationModeKey)
             .flatMap(DictationMode.init(rawValue:)) ?? .polished
     }

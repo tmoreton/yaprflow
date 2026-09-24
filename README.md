@@ -39,7 +39,7 @@ licensed noncommercial builds.
   failure categories with Aptabase from Settings. It starts on and never
   includes audio, transcript text, prompts, or feedback messages.
 - **One hotkey workflow on Mac**: start and stop dictation with Command-T, or
-  change the shortcut from the menu-bar item.
+  change the shortcut to another combination or a single modifier key.
 - **Private Meeting Notes**: capture microphone and Mac audio, type guiding
   notes, choose meeting templates, and generate decisions,
   action items, follow-up email text, and transcript-linked evidence.
@@ -104,7 +104,12 @@ Yaprflow runs as a menu-bar app. Click the waveform icon to open the menu.
 - **Dictation** starts or stops short-form speech-to-text and copies the
   result to the clipboard.
 - **Change shortcut**: open Settings, click the keyboard shortcut button, then
-  press the new key combination. Escape cancels shortcut capture.
+  press the new key combination or tap a modifier such as Option by itself.
+  Escape cancels shortcut capture. Modifier-only shortcuts require macOS
+  Accessibility access.
+- **Auto-paste**: enable it in Settings to paste finished dictation at the
+  current cursor automatically. The text is still copied to the clipboard if
+  Accessibility access has not been granted.
 - **Automatic multilingual recognition**: the bundled Parakeet model detects
   supported languages while you speak, with no language setting to manage.
 - **Yaprflow workspace** keeps live capture, saved meetings, and Dictation
