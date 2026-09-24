@@ -265,20 +265,17 @@ final class StreamingAudioConverter {
         }
     }
 
-    private let targetFormat: AVAudioFormat
+    private let targetFormat: AVAudioFormat?
     private var sourceKey: FormatKey?
     private var converter: AVAudioConverter?
 
     init(sampleRate: Double = 16_000) {
-        guard let targetFormat = AVAudioFormat(
+        targetFormat = AVAudioFormat(
             commonFormat: .pcmFormatFloat32,
             sampleRate: sampleRate,
             channels: 1,
             interleaved: false
-        ) else {
-            preconditionFailure("Unable to create the 16 kHz mono audio format")
-        }
-        self.targetFormat = targetFormat
+        )
     }
 
     /// Starts the next recording with clean sample-rate-converter history while
@@ -289,6 +286,9 @@ final class StreamingAudioConverter {
 
     func resampleBuffer(_ buffer: AVAudioPCMBuffer) throws -> [Float] {
         guard buffer.frameLength > 0 else { return [] }
+        guard let targetFormat else {
+            throw AudioConversionError.cannotCreateConverter
+        }
         let inputFormat = buffer.format
 
         if matchesTarget(inputFormat) {
@@ -341,6 +341,9 @@ final class StreamingAudioConverter {
     /// few milliseconds can remain inside the converter's filter history.
     func finish() throws -> [Float] {
         guard let converter else { return [] }
+        guard let targetFormat else {
+            throw AudioConversionError.cannotCreateConverter
+        }
 
         let feeder = EndOfStreamFeeder()
         var drained: [Float] = []
@@ -370,7 +373,8 @@ final class StreamingAudioConverter {
     }
 
     private func matchesTarget(_ format: AVAudioFormat) -> Bool {
-        format.sampleRate == targetFormat.sampleRate
+        guard let targetFormat else { return false }
+        return format.sampleRate == targetFormat.sampleRate
             && format.channelCount == 1
             && format.commonFormat == .pcmFormatFloat32
             && !format.isInterleaved
@@ -415,19 +419,19 @@ nonisolated struct VoiceActivitySegmentationConfiguration: Sendable {
         negativeThreshold: Float? = nil,
         negativeThresholdOffset: Float = 0.15
     ) {
-        precondition(minSilenceDuration >= 0)
-        precondition(speechStartPadding >= 0)
-        precondition(speechEndPadding >= 0)
-        precondition(negativeThresholdOffset >= 0)
-        if let negativeThreshold {
-            precondition((0...1).contains(negativeThreshold))
+        self.minSilenceDuration = minSilenceDuration.isFinite
+            ? max(0, minSilenceDuration) : 0.75
+        self.speechStartPadding = speechStartPadding.isFinite
+            ? max(0, speechStartPadding) : 0.35
+        self.speechEndPadding = speechEndPadding.isFinite
+            ? max(0, speechEndPadding) : 0.45
+        if let negativeThreshold, negativeThreshold.isFinite {
+            self.negativeThreshold = min(max(negativeThreshold, 0), 1)
+        } else {
+            self.negativeThreshold = nil
         }
-
-        self.minSilenceDuration = minSilenceDuration
-        self.speechStartPadding = speechStartPadding
-        self.speechEndPadding = speechEndPadding
-        self.negativeThreshold = negativeThreshold
-        self.negativeThresholdOffset = negativeThresholdOffset
+        self.negativeThresholdOffset = negativeThresholdOffset.isFinite
+            ? max(0, negativeThresholdOffset) : 0.15
     }
 
     func effectiveNegativeThreshold(baseThreshold: Float) -> Float {
@@ -490,13 +494,19 @@ nonisolated struct VoiceActivityStreamResult: Sendable {
 }
 
 nonisolated enum VoiceActivityDetectorError: LocalizedError {
+    case modelInputInvalid(String)
     case modelOutputMissing(String)
+    case modelOutputInvalid(String)
     case modelProcessingFailed(Error)
 
     var errorDescription: String? {
         switch self {
+        case .modelInputInvalid(let name):
+            return "The voice detector received invalid \(name) input."
         case .modelOutputMissing(let name):
             return "The voice detector did not produce its \(name) output."
+        case .modelOutputInvalid(let name):
+            return "The voice detector produced invalid \(name) output."
         case .modelProcessingFailed(let error):
             return "Voice detection failed: \(error.localizedDescription)"
         }
@@ -509,8 +519,8 @@ actor VoiceActivityDetector {
         var defaultThreshold: Float
 
         init(defaultThreshold: Float = 0.85) {
-            precondition((0...1).contains(defaultThreshold))
-            self.defaultThreshold = defaultThreshold
+            self.defaultThreshold = defaultThreshold.isFinite
+                ? min(max(defaultThreshold, 0), 1) : 0.85
         }
     }
 
@@ -589,14 +599,14 @@ actor VoiceActivityDetector {
             clear(buffers.audio)
             clear(buffers.hidden)
             clear(buffers.cell)
-            copy(state.context, to: buffers.audio)
-            copy(
+            try copy(state.context, to: buffers.audio)
+            try copy(
                 chunk,
                 to: buffers.audio,
                 offset: VoiceActivityModelState.contextLength
             )
-            copy(state.hiddenState, to: buffers.hidden)
-            copy(state.cellState, to: buffers.cell)
+            try copy(state.hiddenState, to: buffers.hidden)
+            try copy(state.cellState, to: buffers.cell)
 
             let inputs = try MLDictionaryFeatureProvider(dictionary: [
                 "audio_input": buffers.audio,
@@ -606,15 +616,18 @@ actor VoiceActivityDetector {
             let output = try model.prediction(from: inputs)
             let probabilityArray = try feature(
                 named: "vad_output",
-                in: output
+                in: output,
+                minimumCount: 1
             )
             let hidden = try feature(
                 named: "new_hidden_state",
-                in: output
+                in: output,
+                minimumCount: VoiceActivityModelState.recurrentStateLength
             )
             let cell = try feature(
                 named: "new_cell_state",
-                in: output
+                in: output,
+                minimumCount: VoiceActivityModelState.recurrentStateLength
             )
 
             let probability = probabilityArray.dataPointer
@@ -666,17 +679,22 @@ actor VoiceActivityDetector {
 
     private func feature(
         named name: String,
-        in provider: MLFeatureProvider
+        in provider: MLFeatureProvider,
+        minimumCount: Int
     ) throws -> MLMultiArray {
-        if let value = provider.featureValue(for: name)?.multiArrayValue {
-            return value
+        let value = provider.featureValue(for: name)?.multiArrayValue ?? {
+            guard let resolvedName = provider.featureNames.first(where: {
+                $0.localizedCaseInsensitiveContains(name)
+            }) else { return nil }
+            return provider.featureValue(for: resolvedName)?.multiArrayValue
+        }()
+        guard let value else {
+            throw VoiceActivityDetectorError.modelOutputMissing(name)
         }
-        if let resolvedName = provider.featureNames.first(where: {
-            $0.localizedCaseInsensitiveContains(name)
-        }), let value = provider.featureValue(for: resolvedName)?.multiArrayValue {
-            return value
+        guard value.dataType == .float32, value.count >= minimumCount else {
+            throw VoiceActivityDetectorError.modelOutputInvalid(name)
         }
-        throw VoiceActivityDetectorError.modelOutputMissing(name)
+        return value
     }
 
     private func clear(_ array: MLMultiArray) {
@@ -691,8 +709,13 @@ actor VoiceActivityDetector {
         _ values: [Float],
         to array: MLMultiArray,
         offset: Int = 0
-    ) {
-        precondition(offset >= 0 && offset + values.count <= array.count)
+    ) throws {
+        guard array.dataType == .float32,
+              offset >= 0,
+              offset <= array.count,
+              values.count <= array.count - offset else {
+            throw VoiceActivityDetectorError.modelInputInvalid("buffer")
+        }
         let destination = array.dataPointer
             .assumingMemoryBound(to: Float.self)
             .advanced(by: offset)

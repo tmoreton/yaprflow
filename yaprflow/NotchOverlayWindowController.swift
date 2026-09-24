@@ -60,7 +60,7 @@ final class NotchOverlayWindowController: NSWindowController, NSWindowDelegate {
             }
     }
 
-    required init?(coder: NSCoder) { fatalError() }
+    required init?(coder: NSCoder) { return nil }
 
     override init(window: NSWindow?) {
         super.init(window: window)

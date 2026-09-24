@@ -38,6 +38,7 @@ enum AIProviderError: LocalizedError {
     case missingModel
     case missingAPIKey
     case unsupportedProvider
+    case invalidEndpoint
     case invalidResponse
     case emptyResponse
     case truncatedResponse
@@ -52,6 +53,8 @@ enum AIProviderError: LocalizedError {
             "Save an API key for the selected provider in Settings."
         case .unsupportedProvider:
             "This provider cannot be used through the network client."
+        case .invalidEndpoint:
+            "The model service address is invalid."
         case .invalidResponse:
             "The model service returned a response Yaprflow could not read."
         case .emptyResponse:
@@ -67,7 +70,7 @@ enum AIProviderError: LocalizedError {
 }
 
 struct AIChatClient {
-    static let ollamaBaseURL = URL(string: "http://localhost:11434/api/")!
+    private static let ollamaBaseURLString = "http://localhost:11434/api/"
 
     let session: URLSession
 
@@ -92,11 +95,12 @@ struct AIChatClient {
         case .appleIntelligence:
             throw AIProviderError.unsupportedProvider
         case .openAI:
-            url = URL(string: "https://api.openai.com/v1/chat/completions")!
+            url = try Self.endpoint("https://api.openai.com/v1/chat/completions")
         case .openRouter:
-            url = URL(string: "https://openrouter.ai/api/v1/chat/completions")!
+            url = try Self.endpoint("https://openrouter.ai/api/v1/chat/completions")
         case .ollama:
-            url = Self.ollamaBaseURL.appendingPathComponent("chat")
+            url = try Self.endpoint(Self.ollamaBaseURLString)
+                .appendingPathComponent("chat")
         }
 
         let tokenLimits = Self.responseTokenLimits(
@@ -187,7 +191,8 @@ struct AIChatClient {
     }
 
     func installedOllamaModels() async throws -> [String] {
-        var request = URLRequest(url: Self.ollamaBaseURL.appendingPathComponent("tags"))
+        let baseURL = try Self.endpoint(Self.ollamaBaseURLString)
+        var request = URLRequest(url: baseURL.appendingPathComponent("tags"))
         request.timeoutInterval = 10
         let data: Data
         let response: URLResponse
@@ -206,6 +211,13 @@ struct AIChatClient {
             throw AIProviderError.invalidResponse
         }
         return decoded.models.map(\.name).sorted()
+    }
+
+    private static func endpoint(_ value: String) throws -> URL {
+        guard let url = URL(string: value) else {
+            throw AIProviderError.invalidEndpoint
+        }
+        return url
     }
 
     private static func serviceError(from data: Data) -> String {

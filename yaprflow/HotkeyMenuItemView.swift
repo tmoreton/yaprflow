@@ -33,7 +33,7 @@ final class HotkeyRecorderButton: NSButton {
         refresh()
     }
 
-    required init?(coder: NSCoder) { fatalError() }
+    required init?(coder: NSCoder) { return nil }
 
     func updateDisplayedHotkey(_ hotkey: HotkeyConfig) {
         guard !isCapturingShortcut else { return }

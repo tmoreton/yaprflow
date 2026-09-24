@@ -16,13 +16,15 @@ public enum TranscriptPolishing {
         var text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, isConfidentlyEnglish(text) else { return text }
 
-        let range = NSRange(text.startIndex..., in: text)
-        text = fillerWordRegex.stringByReplacingMatches(
-            in: text,
-            options: [],
-            range: range,
-            withTemplate: ""
-        )
+        if let fillerWordRegex {
+            let range = NSRange(text.startIndex..., in: text)
+            text = fillerWordRegex.stringByReplacingMatches(
+                in: text,
+                options: [],
+                range: range,
+                withTemplate: ""
+            )
+        }
         while text.contains("  ") {
             text = text.replacingOccurrences(of: "  ", with: " ")
         }
@@ -33,8 +35,9 @@ public enum TranscriptPolishing {
         }
 
         for rule in spokenPunctuationRules {
+            guard let regex = rule.regex else { continue }
             let punctuationRange = NSRange(text.startIndex..., in: text)
-            text = rule.regex.stringByReplacingMatches(
+            text = regex.stringByReplacingMatches(
                 in: text,
                 options: [],
                 range: punctuationRange,
@@ -47,13 +50,15 @@ public enum TranscriptPolishing {
            text.rangeOfCharacter(from: .lowercaseLetters) == nil
         {
             text = text.lowercased()
-            let lowercaseRange = NSRange(text.startIndex..., in: text)
-            text = standaloneIRegex.stringByReplacingMatches(
-                in: text,
-                options: [],
-                range: lowercaseRange,
-                withTemplate: "I"
-            )
+            if let standaloneIRegex {
+                let lowercaseRange = NSRange(text.startIndex..., in: text)
+                text = standaloneIRegex.stringByReplacingMatches(
+                    in: text,
+                    options: [],
+                    range: lowercaseRange,
+                    withTemplate: "I"
+                )
+            }
         }
 
         return resolvingSpokenPunctuationMarkers(in: text)
@@ -66,20 +71,20 @@ public enum TranscriptPolishing {
         return recognizer.languageHypotheses(withMaximum: 3)[.english, default: 0] >= 0.5
     }
 
-    private static let fillerWordRegex: NSRegularExpression = {
+    private static let fillerWordRegex: NSRegularExpression? = {
         let pattern = #"(?i)\b(?:u+h+m*|u+m+h*|e+r+h*|a+h+m*|hmm+|mm+|mhm+)\b[,\.]?\s*"#
-        return try! NSRegularExpression(pattern: pattern)
+        return try? NSRegularExpression(pattern: pattern)
     }()
 
     private static let standaloneIRegex =
-        try! NSRegularExpression(pattern: #"\bi\b"#)
+        try? NSRegularExpression(pattern: #"\bi\b"#)
 
     private struct SpokenPunctuationRule {
-        let regex: NSRegularExpression
+        let regex: NSRegularExpression?
         let replacement: String
 
         init(_ pattern: String, replacement: String) {
-            regex = try! NSRegularExpression(pattern: pattern, options: [.caseInsensitive])
+            regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive])
             self.replacement = replacement
         }
     }

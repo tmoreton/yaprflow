@@ -152,7 +152,9 @@ struct SettingsView: View {
                     }
                     .buttonStyle(.link)
 
-                    Link("Privacy", destination: URL(string: "https://yaprflow.com/privacy.html")!)
+                    if let privacyURL = URL(string: "https://yaprflow.com/privacy.html") {
+                        Link("Privacy", destination: privacyURL)
+                    }
 
                     Button("Acknowledgements") {
                         AcknowledgementsWindowController.show()

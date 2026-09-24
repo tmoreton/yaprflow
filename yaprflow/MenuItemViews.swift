@@ -33,7 +33,7 @@ final class CaptureModeMenuItemView: NSView {
         updateAppearance()
     }
 
-    required init?(coder: NSCoder) { fatalError() }
+    required init?(coder: NSCoder) { return nil }
 
     override var intrinsicContentSize: NSSize {
         NSSize(width: 260, height: 32)
@@ -148,11 +148,23 @@ final class CaptureModeMenuItemView: NSView {
 
 @MainActor
 final class BottomMenuActionsView: NSView {
-    private var settingsButton: NSButton!
-    private var quitButton: NSButton!
     private weak var actionTarget: AnyObject?
     private let settingsAction: Selector
     private let quitAction: Selector
+    private lazy var settingsButton = makeButton(
+        symbolName: "gearshape",
+        title: "Settings",
+        accessibilityDescription: "Show Yaprflow settings",
+        action: #selector(showSettings),
+        textColor: .labelColor
+    )
+    private lazy var quitButton = makeButton(
+        symbolName: nil,
+        title: "\u{2318}Q",
+        accessibilityDescription: "Quit Yaprflow",
+        action: #selector(quit),
+        textColor: .secondaryLabelColor
+    )
 
     init(target: AnyObject, settingsAction: Selector, quitAction: Selector) {
         self.actionTarget = target
@@ -163,28 +175,13 @@ final class BottomMenuActionsView: NSView {
         setupLayout()
     }
 
-    required init?(coder: NSCoder) { fatalError() }
+    required init?(coder: NSCoder) { return nil }
 
     override var intrinsicContentSize: NSSize {
         NSSize(width: NSView.noIntrinsicMetric, height: 34)
     }
 
     private func setupLayout() {
-        settingsButton = makeButton(
-            symbolName: "gearshape",
-            title: "Settings",
-            accessibilityDescription: "Show Yaprflow settings",
-            action: #selector(showSettings),
-            textColor: .labelColor
-        )
-        quitButton = makeButton(
-            symbolName: nil,
-            title: "\u{2318}Q",
-            accessibilityDescription: "Quit Yaprflow",
-            action: #selector(quit),
-            textColor: .secondaryLabelColor
-        )
-
         addSubview(settingsButton)
         addSubview(quitButton)
 

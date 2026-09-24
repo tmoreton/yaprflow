@@ -2,6 +2,14 @@ import Combine
 import Foundation
 import SwiftUI
 
+private enum AppStateStorageError: LocalizedError {
+    case applicationSupportUnavailable
+
+    var errorDescription: String? {
+        "The Application Support folder is unavailable."
+    }
+}
+
 enum DictationMode: String, CaseIterable {
     case exact
     case polished
@@ -243,10 +251,12 @@ final class AppState: ObservableObject {
     }
 
     private static func ensureTranscriptsDirectory() throws -> URL {
-        let appSupport = FileManager.default.urls(
+        guard let appSupport = FileManager.default.urls(
             for: .applicationSupportDirectory,
             in: .userDomainMask
-        ).first!
+        ).first else {
+            throw AppStateStorageError.applicationSupportUnavailable
+        }
         let directory = appSupport
             .appendingPathComponent("Yaprflow", isDirectory: true)
             .appendingPathComponent(transcriptsFolderName, isDirectory: true)
@@ -276,10 +286,12 @@ final class AppState: ObservableObject {
     }
 
     private static func ensureAppSupportDirectory() throws -> URL {
-        let appSupport = FileManager.default.urls(
+        guard let appSupport = FileManager.default.urls(
             for: .applicationSupportDirectory,
             in: .userDomainMask
-        ).first!
+        ).first else {
+            throw AppStateStorageError.applicationSupportUnavailable
+        }
         let directory = appSupport.appendingPathComponent("Yaprflow", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory

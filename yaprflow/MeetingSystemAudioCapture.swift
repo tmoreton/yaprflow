@@ -199,7 +199,12 @@ final class MeetingSystemAudioCapture {
             flags: UInt32(kCMSampleBufferFlag_AudioBufferList_Assure16ByteAlignment),
             blockBufferOut: &blockBuffer
         )
-        let frameCount = AVAudioFrameCount(sampleBuffer.numSamples)
+        let sampleCount = sampleBuffer.numSamples
+        guard sampleCount > 0,
+              sampleCount <= Int(AVAudioFrameCount.max) else {
+            throw MeetingSystemAudioError.invalidAudioBuffer
+        }
+        let frameCount = AVAudioFrameCount(sampleCount)
         guard listStatus == noErr,
               let destination = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount) else {
             throw MeetingSystemAudioError.invalidAudioBuffer

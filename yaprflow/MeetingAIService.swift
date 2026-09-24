@@ -118,7 +118,7 @@ enum MeetingAIService {
                 return .invalidResponse
             case .ollamaUnavailable:
                 return .network
-            case .missingModel, .missingAPIKey, .unsupportedProvider:
+            case .missingModel, .missingAPIKey, .unsupportedProvider, .invalidEndpoint:
                 return .provider
             }
         }

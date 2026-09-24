@@ -990,16 +990,13 @@ private struct SavedMeetingEditor: View {
                 Text("Structured notes").font(.headline)
                 ScrollView {
                     VStack(spacing: 8) {
-                        ForEach(notes.insights.indices, id: \.self) { index in
+                        ForEach(notes.insights) { insight in
                             HStack {
-                                Text(notes.insights[index].kind.displayName)
+                                Text(insight.kind.displayName)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                     .frame(width: 90, alignment: .leading)
-                                TextField("Note", text: Binding(
-                                    get: { meeting.generatedNotes?.insights[index].text ?? "" },
-                                    set: { meeting.generatedNotes?.insights[index].text = $0 }
-                                ))
+                                TextField("Note", text: insightTextBinding(id: insight.id))
                             }
                         }
                     }
@@ -1019,6 +1016,22 @@ private struct SavedMeetingEditor: View {
         }
         .padding(22)
         .frame(width: 620, height: 590)
+    }
+
+    private func insightTextBinding(id: UUID) -> Binding<String> {
+        Binding(
+            get: {
+                meeting.generatedNotes?.insights
+                    .first(where: { $0.id == id })?.text ?? ""
+            },
+            set: { value in
+                guard var notes = meeting.generatedNotes,
+                      let index = notes.insights.firstIndex(where: { $0.id == id })
+                else { return }
+                notes.insights[index].text = value
+                meeting.generatedNotes = notes
+            }
+        )
     }
 }
 

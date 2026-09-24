@@ -62,8 +62,7 @@ nonisolated final class BoundedAudioIngress: @unchecked Sendable {
     private var session: Session?
 
     init(capacity: Int = 256) {
-        precondition(capacity > 0)
-        self.capacity = capacity
+        self.capacity = max(1, capacity)
     }
 
     func beginSession(generation: UInt) -> AsyncStream<CapturedAudioPacket> {
@@ -968,16 +967,18 @@ final class TranscriptionController {
         if text.contains(where: { $0.isLetter }), text == text.uppercased() {
             text = text.lowercased()
         }
-        let range = NSRange(text.startIndex..., in: text)
-        text = standalonePronounRegex.stringByReplacingMatches(
-            in: text,
-            range: range,
-            withTemplate: "I"
-        )
+        if let standalonePronounRegex {
+            let range = NSRange(text.startIndex..., in: text)
+            text = standalonePronounRegex.stringByReplacingMatches(
+                in: text,
+                range: range,
+                withTemplate: "I"
+            )
+        }
         return text
     }
 
-    private static let standalonePronounRegex = try! NSRegularExpression(
+    private static let standalonePronounRegex = try? NSRegularExpression(
         pattern: #"\bi\b"#
     )
 
