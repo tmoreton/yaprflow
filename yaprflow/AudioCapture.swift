@@ -63,12 +63,23 @@ nonisolated final class AudioCapture: @unchecked Sendable {
         try validateInputAvailable()
 
         let input = engine.inputNode
-        if prefersVoiceProcessing, !input.isVoiceProcessingEnabled {
+        if prefersVoiceProcessing {
             // Apple's voice-processing input includes acoustic echo
-            // cancellation. If the device cannot provide it, keep recording;
-            // meeting capture also has a conservative playback-echo detector.
+            // cancellation, but its default "typical voice chat" configuration
+            // also ducks other apps' audio. Meeting capture observes an
+            // existing call rather than rendering one, so keep echo
+            // cancellation while minimizing that unwanted volume reduction.
+            // Advanced ducking is inappropriate here because it can make the
+            // remote participant nearly inaudible whenever local speech is
+            // detected.
             do {
-                try input.setVoiceProcessingEnabled(true)
+                if !input.isVoiceProcessingEnabled {
+                    try input.setVoiceProcessingEnabled(true)
+                }
+                input.voiceProcessingOtherAudioDuckingConfiguration = .init(
+                    enableAdvancedDucking: false,
+                    duckingLevel: .min
+                )
             } catch {
                 NSLog("Yaprflow: meeting microphone voice processing unavailable: %@", error.localizedDescription)
             }
