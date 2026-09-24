@@ -9,6 +9,26 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
         <description>Signed updates for Yaprflow for Mac.</description>
         <language>en</language>
         <item>
+            <title>5.2.21</title>
+            <pubDate>Thu, 24 Sep 2026 13:40:34 +0000</pubDate>
+            <link>https://yaprflow.com/</link>
+            <sparkle:version>34</sparkle:version>
+            <sparkle:shortVersionString>5.2.21</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Yaprflow 5.2.21
+
+- Fixes Auto-paste permission setup so macOS shows the correct prompt and can
+  paste completed dictation at the current cursor.
+- Keeps the finished text on the clipboard when permission has not yet been
+  granted.
+
+Speech recognition remains on-device and raw audio is not saved. Auto-paste
+uses macOS permission only to send the standard Paste shortcut to the app you
+are currently using.
+]]></description>
+            <enclosure url="https://m3kx2mv37nzf8tbz.public.blob.vercel-storage.com/updates/5.2.21/636f06238a9ff531cbb6/yaprflow-5.2.21-E2jEJyzcXvXUjh4Qbopce8aWrHihNt.dmg" length="480453346" type="application/octet-stream" sparkle:edSignature="BXz5pxM56Ot7+PnYYegYiyDcyjrNdA+RD6XCn8v7knYNrTFrxsF0MZu4NBk22yqwtsBWREOuN1hpe5DOU9IgCA=="/>
+        </item>
+        <item>
             <title>5.2.20</title>
             <pubDate>Thu, 24 Sep 2026 13:22:17 +0000</pubDate>
             <link>https://yaprflow.com/</link>
@@ -51,40 +71,9 @@ off-device only when you choose and use an online AI provider.
 ]]></description>
             <enclosure url="https://m3kx2mv37nzf8tbz.public.blob.vercel-storage.com/updates/5.2.19/4d43f07dc3432d822150/yaprflow-5.2.19-vLISLaNOXeLO9cJ1vMvIOmcWaUYjep.dmg" length="480481641" type="application/octet-stream" sparkle:edSignature="sH4WxQeECmDLmwwl2Tfp/a+IrqdlRKP9mzzpjP+lnsQcl0pdMY4TcyAWV+f6ZEpCaRP6ZVbpM3jDVrnZTtceBw=="/>
         </item>
-        <item>
-            <title>5.2.18</title>
-            <pubDate>Wed, 23 Sep 2026 12:21:59 +0000</pubDate>
-            <link>https://yaprflow.com/</link>
-            <sparkle:version>31</sparkle:version>
-            <sparkle:shortVersionString>5.2.18</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[# Yaprflow 5.2.18
-
-- Simplifies Meeting Notes on Mac with a grouped Library sidebar, clearer
-  recording controls, fewer competing actions, and a separate Settings window.
-- Streamlines iPhone and iPad around two clear modes—Dictation and Meeting—with
-  a persistent labeled capture control, one Library, and a two-column iPad
-  meeting workspace.
-- Standardizes labels such as Notes format and Your notes across Mac and iOS.
-- Uses the same on-device Parakeet speech engine on Mac, iPhone, and iPad while
-  removing unused legacy transcription runtimes and calendar integration.
-- Improves meeting and dictation persistence, including safer recovery from
-  interrupted writes and more consistent local records.
-- Improves OpenRouter and OpenAI transcript processing when a model exhausts
-  its response budget. Yaprflow retries with more room, then divides long
-  transcripts into smaller parts if needed.
-- Avoids decrypting saved AI credentials merely to open Settings or Meeting
-  Notes, preventing unnecessary Keychain prompts and window stalls.
-
-Speech recognition remains on-device and raw audio is not saved. The original
-transcript remains unchanged. Text is sent off-device only when you choose and
-use an online AI provider.
-]]></description>
-            <enclosure url="https://m3kx2mv37nzf8tbz.public.blob.vercel-storage.com/updates/5.2.18/b0d907e4c768d858e49d/yaprflow-5.2.18-DOZ3W6UF6eu6EcxNRpRI8zgCG4qBok.dmg" length="480472317" type="application/octet-stream" sparkle:edSignature="zUy7sMi3e4TjmWcOUZzxT1ahHULkBij/vbleAZzWfgv8A/o6x0eeN3cfFgIcUAsSjdGOkO0ivXhEuxYLOsiBCA=="/>
-        </item>
     </channel>
 </rss>
 <!-- sparkle-signatures:
-edSignature: nkFdjOme7YhCSv1QU2sTQ2BZFDk0WAeeBEBElxzk+0C/ABS9waHijzRN27T0L1aXH+ZYCliXzOhkdH6qhSX2Dg==
-length: 5382
+edSignature: LNS/yDznp6qzUd2DTj/1WvxIVuDhRzFUkbX+I19LTX3QaCQb4+CsHSAV8+G0nEmTbD8QYyv56UTiv0VBlltKCg==
+length: 4553
 -->
