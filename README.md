@@ -333,7 +333,7 @@ every release must therefore increment `CURRENT_PROJECT_VERSION` as well as the
 marketing version.
 
 The stable feed is `https://yaprflow.com/appcast.xml`. It currently offers
-Yaprflow 5.2.19 build 32; Yaprflow 5.2.8 was the first published updater release.
+Yaprflow 5.2.20 build 33; Yaprflow 5.2.8 was the first published updater release.
 Updater archives are stored in the isolated public Vercel Blob store
 `yaprflow-sparkle-updates`. Each immutable URL uses an opaque path and randomized
 filename and is referenced only by the signed feed; it is not linked from the
