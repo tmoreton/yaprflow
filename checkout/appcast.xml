@@ -9,6 +9,28 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
         <description>Signed updates for Yaprflow for Mac.</description>
         <language>en</language>
         <item>
+            <title>5.2.20</title>
+            <pubDate>Thu, 24 Sep 2026 13:22:17 +0000</pubDate>
+            <link>https://yaprflow.com/</link>
+            <sparkle:version>33</sparkle:version>
+            <sparkle:shortVersionString>5.2.20</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Yaprflow 5.2.20
+
+- Allows a modifier key such as Option to be used by itself as the Quick
+  Dictation shortcut. A quick press and release toggles dictation, while normal
+  Option-key combinations continue to work in other apps.
+- Adds an optional Auto-paste setting that inserts completed dictation at the
+  current cursor after copying it to the clipboard.
+- Guides you through granting Accessibility access when Auto-paste needs it.
+
+Speech recognition remains on-device and raw audio is not saved. Auto-paste
+uses macOS Accessibility access only to send the standard Paste shortcut to the
+app you are currently using.
+]]></description>
+            <enclosure url="https://m3kx2mv37nzf8tbz.public.blob.vercel-storage.com/updates/5.2.20/142be0037164889871f7/yaprflow-5.2.20-Hn9eJX3FTY79xu8QpuHARCUOaTogHq.dmg" length="480453100" type="application/octet-stream" sparkle:edSignature="wqi51QyvFgazOS2VijI2qAkWEY2eh1o35m/Hx+nfJcrzjnj5Vzn6yGT0i0sEeBCXF+Wtjp5hmqEQ+PKhKCj/Aw=="/>
+        </item>
+        <item>
             <title>5.2.19</title>
             <pubDate>Wed, 23 Sep 2026 14:25:14 +0000</pubDate>
             <link>https://yaprflow.com/</link>
@@ -60,31 +82,9 @@ use an online AI provider.
 ]]></description>
             <enclosure url="https://m3kx2mv37nzf8tbz.public.blob.vercel-storage.com/updates/5.2.18/b0d907e4c768d858e49d/yaprflow-5.2.18-DOZ3W6UF6eu6EcxNRpRI8zgCG4qBok.dmg" length="480472317" type="application/octet-stream" sparkle:edSignature="zUy7sMi3e4TjmWcOUZzxT1ahHULkBij/vbleAZzWfgv8A/o6x0eeN3cfFgIcUAsSjdGOkO0ivXhEuxYLOsiBCA=="/>
         </item>
-        <item>
-            <title>5.2.17</title>
-            <pubDate>Tue, 22 Sep 2026 22:58:19 +0000</pubDate>
-            <link>https://yaprflow.com/</link>
-            <sparkle:version>30</sparkle:version>
-            <sparkle:shortVersionString>5.2.17</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[# Yaprflow 5.2.17
-
-- Improves Meeting Notes speaker separation: Mac playback is less likely to
-  appear as duplicate “Me” speech, while distinct microphone speech remains.
-- Refines transcript matching for shortened or repeated system-audio echoes.
-- Makes the menu bar recording indicator red for both meetings and Quick
-  Dictation, with yellow reserved for preparation or paused states.
-- Adds optional automatic polishing of new dictations using the selected AI
-  provider. The original transcript and copied text remain unchanged.
-
-Speech recognition remains on the Mac. If an online AI provider is selected
-for optional polishing, that provider receives the dictation text.
-]]></description>
-            <enclosure url="https://m3kx2mv37nzf8tbz.public.blob.vercel-storage.com/updates/5.2.17/6ba34f78529f6d10911f/yaprflow-5.2.17-oTk9sCvP0knmp4lIdnUntBlM3FTCob.dmg" length="480566897" type="application/octet-stream" sparkle:edSignature="opyUVoWbEP3jMrfId+DMjUc3bud+kfAN01X3loypHhVbu4h1oZsR04nZShZ08GRXpXWA5jz1HZNvwJFjZy2rDA=="/>
-        </item>
     </channel>
 </rss>
 <!-- sparkle-signatures:
-edSignature: IubTrCeioAEtMzoR4YbSl/6v4jNxBfe9EEEjPo7ea6smbs9AtPt59HS0gCKlUXveiowoe7nP01n7F9QbSTNBBQ==
-length: 5443
+edSignature: nkFdjOme7YhCSv1QU2sTQ2BZFDk0WAeeBEBElxzk+0C/ABS9waHijzRN27T0L1aXH+ZYCliXzOhkdH6qhSX2Dg==
+length: 5382
 -->
