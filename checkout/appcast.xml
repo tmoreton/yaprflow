@@ -9,6 +9,24 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
         <description>Signed updates for Yaprflow for Mac.</description>
         <language>en</language>
         <item>
+            <title>5.2.23</title>
+            <pubDate>Fri, 25 Sep 2026 00:49:16 +0000</pubDate>
+            <link>https://yaprflow.com/</link>
+            <sparkle:version>36</sparkle:version>
+            <sparkle:shortVersionString>5.2.23</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Yaprflow 5.2.23
+
+- Keeps Zoom and other conferencing apps at their normal microphone and
+  speaker levels while Meeting Notes is recording.
+- Preserves accurate speaker separation using Yaprflow's local playback-echo
+  detection instead of changing the shared Mac audio route.
+
+Speech recognition remains on-device and raw audio is not saved.
+]]></description>
+            <enclosure url="https://m3kx2mv37nzf8tbz.public.blob.vercel-storage.com/updates/5.2.23/9e9285f799c21ca90acd/yaprflow-5.2.23-L2kPxFpLd0AQ6iLl348zH2zazKUDGe.dmg" length="480460473" type="application/octet-stream" sparkle:edSignature="ni4xCkfvSAqEsPAQXvJ2LaKtGyFVDpG+BKVhTtwRby56fholfVuARi4V3Z5WM3xzEXeL2f/7BzYAiWwYHGYODQ=="/>
+        </item>
+        <item>
             <title>5.2.22</title>
             <pubDate>Thu, 24 Sep 2026 16:35:10 +0000</pubDate>
             <link>https://yaprflow.com/</link>
@@ -48,31 +66,9 @@ are currently using.
 ]]></description>
             <enclosure url="https://m3kx2mv37nzf8tbz.public.blob.vercel-storage.com/updates/5.2.21/636f06238a9ff531cbb6/yaprflow-5.2.21-E2jEJyzcXvXUjh4Qbopce8aWrHihNt.dmg" length="480453346" type="application/octet-stream" sparkle:edSignature="BXz5pxM56Ot7+PnYYegYiyDcyjrNdA+RD6XCn8v7knYNrTFrxsF0MZu4NBk22yqwtsBWREOuN1hpe5DOU9IgCA=="/>
         </item>
-        <item>
-            <title>5.2.20</title>
-            <pubDate>Thu, 24 Sep 2026 13:22:17 +0000</pubDate>
-            <link>https://yaprflow.com/</link>
-            <sparkle:version>33</sparkle:version>
-            <sparkle:shortVersionString>5.2.20</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[# Yaprflow 5.2.20
-
-- Allows a modifier key such as Option to be used by itself as the Quick
-  Dictation shortcut. A quick press and release toggles dictation, while normal
-  Option-key combinations continue to work in other apps.
-- Adds an optional Auto-paste setting that inserts completed dictation at the
-  current cursor after copying it to the clipboard.
-- Guides you through granting Accessibility access when Auto-paste needs it.
-
-Speech recognition remains on-device and raw audio is not saved. Auto-paste
-uses macOS Accessibility access only to send the standard Paste shortcut to the
-app you are currently using.
-]]></description>
-            <enclosure url="https://m3kx2mv37nzf8tbz.public.blob.vercel-storage.com/updates/5.2.20/142be0037164889871f7/yaprflow-5.2.20-Hn9eJX3FTY79xu8QpuHARCUOaTogHq.dmg" length="480453100" type="application/octet-stream" sparkle:edSignature="wqi51QyvFgazOS2VijI2qAkWEY2eh1o35m/Hx+nfJcrzjnj5Vzn6yGT0i0sEeBCXF+Wtjp5hmqEQ+PKhKCj/Aw=="/>
-        </item>
     </channel>
 </rss>
 <!-- sparkle-signatures:
-edSignature: UO9dIjoXYCXafyROXSwbilGlV2elSPj5dYQ0iXpJ0dIl7eX1jNeKRUwM7xM8tfrmv5E48gRPpCsY+ObO3I43AQ==
-length: 4453
+edSignature: s18cynoKKfWRy15t/A4qM7H19FS2ZsTZQE2YxgogdCAf1DiVnIO3R9OIU77zfNfr6Q6XcLX8sj29Uad/XmugDQ==
+length: 4175
 -->
